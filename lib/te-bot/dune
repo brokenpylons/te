@@ -1,0 +1,4 @@
+(library
+ (name te_bot)
+ (preprocess (pps ppx_deriving.std))
+ (libraries fmt ppx_deriving))

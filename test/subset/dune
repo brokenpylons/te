@@ -1,0 +1,3 @@
+(test
+ (name te_subset_test)
+ (libraries te_bot alcotest))
