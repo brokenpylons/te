@@ -1,4 +1,4 @@
 (executable
  (public_name te)
  (name main)
- (libraries te))
+ (libraries te_core te_bot))

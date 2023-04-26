@@ -9,9 +9,12 @@ module type CORE = sig
   val is_empty: 'a t -> bool
   val empty: 'a t
   val singleton: elt -> 'a -> 'a t
+  val the: 'a t -> (elt * 'a)
   val add: elt -> 'a -> 'a t -> 'a t
   val remove: elt -> 'a t -> 'a t
+  val fold: (elt -> 'a -> 'acc -> 'acc) -> 'acc -> 'a t -> 'acc
 
   val find: elt -> 'a t -> 'a
   val mem: elt -> 'a t -> bool
 end
+

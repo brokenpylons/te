@@ -26,20 +26,16 @@ module Set = struct
     type t
 
     include Set.CORE with type elt := elt and type t := t
+    include Set.BINARY with type elt := elt and type t := t
+    include Set.SEQUENTIAL with type elt := elt and type t := t
     val add_with: (elt -> elt -> elt) -> elt -> t -> t
-
-    val pp: elt Fmt.t -> t Fmt.t
-
-    val union: t -> t -> t
-    val inter: t -> t -> t
-    val diff: t -> t -> t
 
     val balanced: t -> bool
     val cardinal: t -> int
     val disjoint: t -> t -> bool
     val subset: t -> t -> bool
 
-    val fold: (elt -> 'acc -> 'acc) -> 'acc -> t -> 'acc
+    val find: elt -> t -> elt
     val filter: (elt -> bool) -> t -> t
     val iter: (elt -> unit) -> t -> unit
     val for_all: (elt -> bool) -> t -> bool
@@ -47,9 +43,6 @@ module Set = struct
     val map: (elt -> elt) -> t -> t
     (*val flat_map: (elt -> t) -> t -> t*)
 
-    val add_seq: elt Seq.t -> t -> t
-
-    val (&): elt -> t -> t
     val (<|>): t -> t -> t
   end
 
@@ -231,6 +224,7 @@ module Set = struct
     type t = elt Tree.t
     type enumerator = Cons of Elt.t * t * enumerator | Nil
 
+
     let empty = Empty
 
     let is_empty = function
@@ -295,6 +289,14 @@ module Set = struct
         else 
           let r' = add x r in 
           if r == r' then t else balance_right y l r'
+
+    include Set.Sequential(struct
+        type nonrec t = t
+        type nonrec elt = elt
+        let add = add
+        let empty = empty
+        let fold = fold
+      end)
 
     let rec add_with f x = function
       | Empty -> singleton x
@@ -414,20 +416,6 @@ module Set = struct
           let r' = remove x r in 
           if r == r' then t else balance_right y l r'
 
-    let (&) x t = add x t
-
-    let add_seq s t =
-      Seq.fold_left (Fun.flip add) t s
-
-    let of_seq s = 
-      add_seq s empty
-
-    let add_list s t =
-      List.fold_left (Fun.flip add) t s
-
-    let of_list s = 
-      add_list s empty
-
     let rec to_seq' t tl =
       match t with
       | Empty -> tl
@@ -543,6 +531,8 @@ module Map = struct
     val mem: elt -> 'a t -> bool
     val to_seq: 'a t -> (elt * 'a) Seq.t
     val of_seq: (elt * 'a) Seq.t -> 'a t
+
+    val add_with: (elt -> elt -> elt) -> ('a -> 'a -> 'a) -> elt -> 'a -> 'a t -> 'a t
 
     val merge: (elt -> 'a option -> 'a option -> 'a option) -> 'a t -> 'a t -> 'a t
     val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
@@ -815,6 +805,21 @@ module Map = struct
           if l == l' then t else balance_left y yp l' r
         else 
           let r' = add x xp r in 
+          if r == r' then t else balance_right y yp l r'
+
+    let rec add_with f g x xp = function
+      | Empty -> singleton x xp
+      | Node (tag, y, yp, l, r) as t ->
+        let c = Elt.compare x y in
+        if c = 0 then 
+          if x == y && xp == yp
+          then t
+          else Node (tag, f x y, g xp yp, l, r)
+        else if c < 0 then
+          let l' = add_with f g x xp l in
+          if l == l' then t else balance_left y yp l' r
+        else 
+          let r' = add_with f g x xp r in 
           if r == r' then t else balance_right y yp l r'
 
     let rec split x = function

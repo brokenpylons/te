@@ -36,20 +36,23 @@ module type LITS = sig
   val subset: t -> t -> bool
 end
 
-module Concrete(Lits: LITS): sig
-  type t = Lits.t Abstract.t
+module type CONCRETE = sig
+  type lits
+  type t = lits Abstract.t
 
   val pp: t Fmt.t
   val equal: t -> t -> bool
   val compare: t -> t -> int
 
   val is_nullable: t -> bool
-  val derivative: Lits.t -> t -> t
-  val derivative': Lits.t Seq.t -> t -> t
+  val derivative: lits -> t -> t
+  val derivative': lits list -> t -> t
 
-  val first: t -> Lits.t Seq.t
+  val first: t -> lits Seq.t
   val simplify: t -> t
 end
+
+module Concrete(Lits: LITS): CONCRETE with type lits = Lits.t 
 
 module Porcelan(C: OP): sig
   include OP with type 'a t = 'a C.t

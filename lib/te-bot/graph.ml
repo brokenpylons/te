@@ -30,6 +30,7 @@ module type EDGE_MAP = sig
   type 'a t
 
   include Map.CORE with type elt := elt and type 'a t := 'a t
+  val add_with: (elt -> elt -> elt) -> ('a -> 'a -> 'a) -> elt -> 'a -> 'a t -> 'a t
 
   val map: (elt -> 'a -> 'b) -> 'a t -> 'b t
 
@@ -72,6 +73,10 @@ module type S = sig
   val remove_edge: vertex -> vertex -> ('vl, 'el) t -> ('vl, 'el) t
 
   val connect: vertex -> vertex -> 'el -> ('vl, 'el) t -> ('vl, 'el) t
+
+  val link: vertex Seq.t -> vertex Seq.t -> 'el -> ('vl, 'el) t -> ('vl, 'el) t
+
+  val link_with: ('el -> 'el -> 'el) -> vertex Seq.t -> vertex Seq.t -> 'el -> ('vl, 'el) t -> ('vl, 'el) t
 
   val vertex_label: vertex -> ('vl, _) t -> 'vl
 
@@ -124,10 +129,9 @@ module type S = sig
     val make: vertex Supply.t -> t
   end
   module Gen(Index: INDEX): sig
+    val unfold_multiple: supply:(vertex Supply.t) -> ?merge: ('el -> 'el -> 'el) -> (vertex -> Index.elt -> 'vl * ('el * Index.elt) Seq.t) -> Index.elt list -> vertex list * ('vl, 'el) t
 
-    val unfold_multiple: supply:(vertex Supply.t) -> (vertex -> Index.elt -> 'vl * ('el * Index.elt) Seq.t) -> Index.elt list -> vertex list * ('vl, 'el) t
-
-    val unfold: supply:(vertex Supply.t) -> (vertex -> Index.elt -> 'vl * ('el * Index.elt) Seq.t) -> Index.elt -> vertex * ('vl, 'el) t
+    val unfold: supply:(vertex Supply.t) -> ?merge: ('el -> 'el -> 'el) -> (vertex -> Index.elt -> 'vl * ('el * Index.elt) Seq.t) -> Index.elt -> vertex * ('vl, 'el) t
   end
 
   val pp: 'vl Fmt.t -> 'el Fmt.t -> ('vl, 'el) t Fmt.t
@@ -182,6 +186,16 @@ module Make
   let connect v u el g =
     assert (Vertex_map.mem u g);
     Vertex_map.modify v (fun (vl, adj) -> (vl, Edge_map.add u el adj)) g
+
+  let connect_with f v u el g =
+    assert (Vertex_map.mem u g);
+    Vertex_map.modify v (fun (vl, adj) -> (vl, Edge_map.add_with Fun.const f u el adj)) g
+
+  let link vs us el g =
+    Seq.fold_left (fun g (v, u) -> connect v u el g) g (Seq.product vs us)
+
+  let link_with f vs us el g =
+    Seq.fold_left (fun g (v, u) -> connect_with f v u el g) g (Seq.product vs us)
 
   let skeleton g =
     Vertex_map.map (fun _ (_, adj) -> ((), Edge_map.map (fun _ _ -> ()) adj)) g
@@ -336,7 +350,7 @@ module Make
   end
   module Gen(Index: INDEX) = struct
 
-    let unfold_multiple ~supply f start =
+    let unfold_multiple ~supply ?(merge = Fun.const) f start =
       let graph = ref empty in
       let index = ref (Index.make supply) in
 
@@ -350,14 +364,14 @@ module Make
           graph := add v vl !graph;
 
           let adj = Seq.map (fun (el, x) -> (el, cycle x)) adj_xs in
-          Seq.iter (fun (el, u) -> graph := connect v u el !graph) adj;
+          Seq.iter (fun (el, u) -> graph := connect_with merge v u el !graph) adj;
           v
       in
       let vs = List.map cycle start in
       (vs, !graph)
 
-    let unfold ~supply f start =
-      let vs, g = unfold_multiple ~supply f [start] in
+    let unfold ~supply ?(merge = Fun.const) f start =
+      let vs, g = unfold_multiple ~supply ~merge f [start] in
       (List.the vs, g)
   end
 end

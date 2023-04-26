@@ -7,9 +7,7 @@ type 'a t
 
 val make: 'a -> ('a -> 'a) -> 'a t
 
-val make_number: int t
-
-val numbers_clean: unit -> int t
+val numbers: unit -> int t
 
 val map: ('a -> 'b) -> 'a t -> 'b t
 

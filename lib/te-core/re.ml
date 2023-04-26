@@ -109,8 +109,25 @@ module type LITS = sig
   val subset: t -> t -> bool
 end
 
-module Concrete(Lits: LITS) = struct
+module type CONCRETE = sig
+  type lits
+  type t = lits Abstract.t
+
+  val pp: t Fmt.t
+  val equal: t -> t -> bool
+  val compare: t -> t -> int
+
+  val is_nullable: t -> bool
+  val derivative: lits -> t -> t
+  val derivative': lits list -> t -> t
+
+  val first: t -> lits Seq.t
+  val simplify: t -> t
+end
+
+module Concrete(Lits: LITS): CONCRETE with type lits = Lits.t = struct
   include Abstract
+  type lits = Lits.t
   type t = Lits.t Abstract.t
   [@@deriving eq, ord, show]
 
@@ -197,7 +214,7 @@ module Concrete(Lits: LITS) = struct
       comp (derivative s x)
 
   let derivative' ss x =
-    Seq.fold_left (Fun.flip derivative) x ss
+    List.fold_left (Fun.flip derivative) x ss
 end
 
   

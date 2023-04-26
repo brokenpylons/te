@@ -11,9 +11,7 @@ let make seed next =
   in
   gen (ref seed)
 
-let make_number = make 0 ((+) 1)
-
-let numbers_clean () = make 0 ((+) 1)
+let numbers () = make 0 ((+) 1)
 
 let rec map f t =
   {value = lazy (f (Lazy.force t.value)); left = lazy (map f (Lazy.force t.left)); right = lazy (map f (Lazy.force t.right))}
