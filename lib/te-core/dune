@@ -1,4 +1,0 @@
-(library
- (name te_core)
- (preprocess (pps ppx_deriving.std))
- (libraries te_bot fmt ppx_deriving))
