@@ -1,5 +1,6 @@
 module type OP = sig
   type +_ t
+  val pp: 'a Fmt.t -> 'a t Fmt.t
 
   val nothing: _ t
   val null: _ t
@@ -18,7 +19,6 @@ end
 module Abstract: sig
   type +_ t
 
-  val pp: 'a Fmt.t -> 'a t Fmt.t
   val equal: ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
   val compare: ('a -> 'a -> int) -> 'a t -> 'a t -> int
 

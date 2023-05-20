@@ -12,6 +12,11 @@ let eof = R.lits Tn.Lits.eof
 
 let () = Fmt.pr "%a" Tn.Rhs.pp (Tn.Rhs.simplify R.((set "a" * set "b" * set "c") * (set "e" * set "d" * set "f")))
 
+let () =
+  let Vector.[v; u] = T.Var.make ~supply:T.Var.supply Vector.["V"; "_"] in
+  let (_, m) = Tn.convert ~supply:(T.State.supply) (Tn.Production.make (u, v) R.(star (set "a") + star (set "b")))
+  in Fmt.pr "%a" Tn.Rhs.pp (Tn.Rhs.simplify @@ Tn.M.to_re m)
+
 let () = 
   let Vector.[s'; s; a; b; c; d; u] = T.Var.make ~supply:T.Var.supply Vector.["S'"; "S"; "A"; "B"; "C"; "D"; "_"] in
   let ps = List.to_seq @@ Tn.Production.[
@@ -46,16 +51,16 @@ let () =
   let y = Tn.minimize ~supply:T.State.supply @@ Tn.subset ~supply:T.State.supply x' in
   let z = Tn.inter y x' in
   begin
-  print_endline @@
+  Fmt.pr "%s" @@
   Dot.string_of_graph @@
     Tn.M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Tn.Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Tn.Lits.pp x) x';
-  print_endline @@
+  Fmt.pr "%s" @@
   Dot.string_of_graph @@
     Tn.M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Tn.Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Tn.Lits.pp x) x;
-  print_endline @@
+  Fmt.pr "%s" @@
   Dot.string_of_graph @@
     Tn.M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Tn.Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Tn.Lits.pp x) y;
-  print_endline @@
+  Fmt.pr "%s" @@
   Dot.string_of_graph @@
     T.State_pair_graph.to_dot ~string_of_vertex_label:(fun x -> Fmt.to_to_string Fmt.bool x) ~string_of_edge_label:(fun x -> Fmt.to_to_string Tn.Lits.pp x) z
   end

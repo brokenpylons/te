@@ -39,6 +39,8 @@ module type FA = sig
     graph: (labels, lits) G.t;
   }
 
+  val to_re: _ t -> lits Re.Abstract.t
+
   val start: Start.single t -> T.State.t
   val start_multiple: 'a t -> T.States.t
   val states: _ t -> T.States.t
@@ -74,7 +76,7 @@ module type FA = sig
 end
 
 module Make(Labels: LABELS)(Lits: LITS): FA with type labels = Labels.t and type lits = Lits.t = struct
-  module Re = Re.Abstract
+  module Re = Re.Porcelan(Re.Abstract)
 
   module Start = struct
     module Via = struct
@@ -186,26 +188,36 @@ module Make(Labels: LABELS)(Lits: LITS): FA with type labels = Labels.t and type
   let lits q1 q2 m =
     G.edge_label q1 q2 m.graph
 
-  type point = T.State.t * T.State.t * Lits.t Re.t
-
-  let kleene m =
-    let initial = Seq.map (fun (s, q, ls) ->
-        (s, q, Re.union (Re.lits ls) (if T.State.equal s q then Re.null else Re.nothing)))
+  let to_re m =
+    let initial =
+      G.of_labeled_edges @@
+      Seq.map (fun (s, q, ls) ->
+          (s, q, Re.lits ls))
         (G.labeled_edges m.graph)
     in
-    let rec go active inactive =
-      match active with
-      | q :: active -> Seq.map
-
-
-
+    let verts = Seq.memoize @@ G.vertices initial in
+    let initial = Seq.fold_left (fun g p ->
+        G.connect p p (Re.union (try G.edge_label p p g with Not_found -> Re.nothing) Re.null) g)
+        initial verts
     in
-
-
-
-
-
-
+    let rec go active g =
+      match Seq.uncons active with
+      | Some (p, active) -> 
+        let loop = try G.edge_label p p g with Not_found -> Re.nothing in
+        go active @@
+        Seq.fold_left (fun g (s, q) ->
+            try G.connect s q Re.(G.edge_label s p g * star loop * G.edge_label p q g + G.edge_label s q g) g
+            with Not_found -> g)
+          g (Seq.product verts verts)
+      | None -> g
+    in
+    let g = go verts initial in
+        Fmt.pr "%s"  (Dot.string_of_graph @@ G.to_dot ~string_of_vertex_label:(fun _ -> "") ~string_of_edge_label:(fun x -> Fmt.to_to_string (Re.pp Lits.pp) x) g);
+    Seq.product (T.States.to_seq @@ start_multiple m) (T.States.to_seq @@ final m)
+    |> Seq.fold_left (fun e (s, q) -> 
+        try Re.union (G.edge_label s q g) e
+        with Not_found -> e)
+      Re.nothing
 
   module Gen(Index: G.INDEX) = struct
     module Graph_gen = G.Gen(Index)

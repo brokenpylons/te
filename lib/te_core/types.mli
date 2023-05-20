@@ -37,6 +37,7 @@ module States: sig
   val pp: t Fmt.t
   val disjoint: t -> t -> bool
   val cardinal: t -> int
+  val choose: t -> elt option
 end
 module State_to: Map.CORE with type elt = State.t
 module State_graph: Graph.S with type vertex = State.t

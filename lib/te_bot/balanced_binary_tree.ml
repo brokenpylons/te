@@ -31,6 +31,7 @@ module Set = struct
     val pp: elt Fmt.t -> t Fmt.t
     val add_with: (elt -> elt -> elt) -> elt -> t -> t
 
+    val choose: t -> elt option
     val balanced: t -> bool
     val cardinal: t -> int
     val disjoint: t -> t -> bool
@@ -238,6 +239,11 @@ module Set = struct
       | Node (_, x, Empty, Empty) ->
         x
       | _ -> assert false
+
+    let choose = function
+      | Empty -> None
+      | Node (_, x, _, _) ->
+        Some x
 
     let balanced = Tree.balanced
 

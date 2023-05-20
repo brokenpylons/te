@@ -2,6 +2,7 @@
 
 module type OP = sig
   type +_ t
+  val pp: 'a Fmt.t -> 'a t Fmt.t
 
   val nothing: _ t
   val null: _ t
@@ -36,7 +37,7 @@ module Abstract = struct
       | Null -> Fmt.string ppf "ε"
       | Any -> Fmt.string ppf "."
       | Lits x -> pp_lits ppf x
-      | Concat (_, _, x, y) -> Fmt.pf ppf "@[(@[%a@]@ @[%a@])@]" go x go y
+      | Concat (_, _, x, y) -> Fmt.pf ppf "@[(@[%a@]@ . @[%a@])@]" go x go y
       | Union (_, _, x, y) -> Fmt.pf ppf "@[(@[%a@]@,|@,@[%a@])@]" go x go y   
       | Repeat (_, _, x, i) -> Fmt.pf ppf "@[%a@,@[{%i}@]@]" go x i
       | Star x -> Fmt.pf ppf "@[(@[%a@]){*}@]" go x
@@ -209,8 +210,8 @@ module Concrete(Lits: LITS): CONCRETE with type lits = Lits.t = struct
        | Nothing -> null
        | Comp (_, _, Nothing) -> comp_nothing
        | Comp (_, _, Null) -> comp_nothing
-       | Star x -> simplify x
-       | x -> Star (simplify x))
+       | Star x -> x
+       | x -> Star x)
 
     | Comp (m, h, x) -> 
       (match simplify x with

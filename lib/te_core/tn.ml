@@ -219,10 +219,6 @@ let convert_multiple ~supply ps =
 module Acc' = Multimap.Make(T.Var_to)
 module Acc = Acc'.L2(T.States)
 
-(*let reverse ps =
-  Seq.map (fun p ->
-      M.rev p*)
-
 let construct ~supply s' ps =
   let ps' = Seq.memoize @@ convert_multiple ~supply ps in
   let starts, finals = Seq.fold_left (fun (starts, finals) (lhs, rhs) ->

@@ -100,6 +100,8 @@ module type S = sig
 
   val of_edges: (vertex * vertex) Seq.t -> (unit, unit) t
 
+  val of_labeled_edges: (vertex * vertex * 'el) Seq.t -> (unit, 'el) t
+
   val labeled_vertices: ('vl, _) t -> 'vl labeled_vertex Seq.t 
 
   val labeled_vertices_map: (vertex -> 'vl -> 'a) -> ('vl, 'el) t -> ('a, 'el) t
@@ -213,6 +215,11 @@ module Make
     empty
     |> (Fun.flip @@ Seq.fold_left (fun g v -> add v () g)) (Seq.append (Seq.map fst es) (Seq.map snd es))
     |> (Fun.flip @@ Seq.fold_left (fun g (v, u) -> connect v u () g)) es
+
+  let of_labeled_edges es = 
+    empty
+    |> (Fun.flip @@ Seq.fold_left (fun g v -> add v () g)) (Seq.append (Seq.map (fun (v, _, _) -> v) es) (Seq.map (fun (_, u, _) -> u) es))
+    |> (Fun.flip @@ Seq.fold_left (fun g (v, u, el) -> connect v u el g)) es
 
   let add_segment_safe v vl adj g =
     let g = if Vertex_map.mem v g
