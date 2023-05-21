@@ -1,6 +1,7 @@
 open Te_bot
 open! Prelude 
 module T = Types
+module G = T.State_graph
 
 let pp_if b pp ppf  =
   if b then Fmt.pf ppf "%a@ " pp else Fmt.nop ppf

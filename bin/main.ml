@@ -14,7 +14,7 @@ let () = Fmt.pr "%a" Tn.Rhs.pp (Tn.Rhs.simplify R.((set "a" * set "b" * set "c")
 
 let () =
   let Vector.[v; u] = T.Var.make ~supply:T.Var.supply Vector.["V"; "_"] in
-  let (_, m) = Tn.convert ~supply:(T.State.supply) (Tn.Production.make (u, v) R.(star (set "a") + star (set "b")))
+  let (_, m) = Tn.convert ~supply:(T.State.supply) (Tn.Production.make (u, v) R.(star (set "a") * star (set "b")))
   in Fmt.pr "%a" Tn.Rhs.pp (Tn.Rhs.simplify @@ Tn.M.to_re m)
 
 let () = 

@@ -173,27 +173,29 @@ module Concrete(Lits: LITS): CONCRETE with type lits = Lits.t = struct
     in go
 
   let rec simplify = function
-    | Union (_, _, x, Union (_, _, y, z)) -> union (simplify (union x y)) (simplify z)
+    | Union (_, _, x, Union (_, _, y, z)) -> simplify (union (union x y) z)
     | Union (m, h, x, y) ->
       (match simplify x, simplify y with
-       | Nothing, x -> simplify x
-       | x, Nothing -> simplify x
+       | Nothing, x -> x
+       | x, Nothing -> x
        | Comp (_, _, Nothing), _ -> comp_nothing
        | _, Comp (_, _, Nothing) -> comp_nothing
-       | x, y when equal x y -> simplify x
-       | x, y when compare x y > 0 -> Union (m, h, simplify y, simplify x)
-       | x, y -> Union (m, h, simplify x, simplify y))
+       | x, y when equal x y -> x
+       | x, y when compare x y > 0 -> Union (m, h, y, x)
+       | x, y -> Union (m, h, x, y))
 
-    | Concat (_, _, x, Concat (_, _, y, z)) -> concat (simplify (concat x y)) (simplify z)
+    | Concat (_, _, x, Concat (_, _, y, z)) -> simplify (concat (concat x y) z)
     | Concat (m, h, x, y) -> 
       (match simplify x, simplify y with
+       (*| Union (_, _, Null, x), Star y when equal x y -> simplify (Star x)
+       | Star x, Union (_, _, Null, y) when equal x y -> simplify (Star x)*)
        | Nothing, _ -> nothing
        | _, Nothing -> nothing
-       | Null, x -> simplify x
-       | x, Null -> simplify x
+       | Null, x -> x
+       | x, Null -> x
        | Comp (_, _, Nothing), Comp (_, _, Nothing) -> comp_nothing
        | Comp (_, _, Null), Comp (_, _, Null) -> comp_null
-       | x, y -> Concat (m, h, simplify x, simplify y))
+       | x, y -> Concat (m, h, x, y))
 
     | Repeat (_, _, _, 0) -> null
     | Repeat (m, h, x, i) -> 
@@ -206,6 +208,7 @@ module Concrete(Lits: LITS): CONCRETE with type lits = Lits.t = struct
 
     | Star x -> 
       (match simplify x with
+       (*| Union (_, _, Null, x) -> simplify (Star x)*)
        | Null -> null
        | Nothing -> null
        | Comp (_, _, Nothing) -> comp_nothing
