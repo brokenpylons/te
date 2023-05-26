@@ -16,10 +16,10 @@ module Lits: sig
   val vars: T.Vars.t -> t
   val codes: T.Codes.t -> t
 end
-module Enhanced_lits: Re.LITS
+module Enhanced_lits: Re.LITS with type t =  Lits.t * T.State.t
 
 module Labels: sig
-  type t = {states: T.States.t; predictions: T.Labeled_vars.t; matches: T.Labeled_vars.t}
+  type t = {states: T.States.t; starts: T.Labeled_vars.t; predictions: T.Labeled_vars.t; matches: T.Labeled_vars.t}
 
   val empty: t
   val union: t -> t -> t
@@ -31,6 +31,7 @@ val refine: Lits.t Seq.t -> Lits.t Seq.t
 module Rhs: Re.CONCRETE with type lits = Lits.t
 
 module M: Fa.FA with type labels = Labels.t and type lits = Lits.t
+module M': Fa.FA with type labels = Labels.t and type lits = Enhanced_lits.t
 
 module Production: sig
   type t
@@ -51,8 +52,13 @@ module Grammar: sig
 end
    *)
 
+type to_start
+
 val convert: supply:T.State.t Supply.t -> Production.t -> T.Labeled_var.t * M.Start.single M.t
 val convert_multiple: supply:T.State.t Supply.t -> Production.t Seq.t -> (T.Labeled_var.t * M.Start.single M.t) Seq.t
+val is_nullable: Production.t Seq.t -> T.Vars.t
+val construct'': T.Var.t -> T.State.t -> ((T.Labeled_var.t * T.State.t) * M'.Start.single M'.t) Seq.t -> M'.Start.single M'.t
+val construct': T.Var.t -> (T.Labeled_var.t * M.Start.single M.t) Seq.t -> M.Start.single M.t
 val construct: supply:T.State.t Supply.t -> T.Var.t -> Production.t Seq.t -> M.Start.single M.t
 val inter: M.Start.single M.t -> M.Start.single M.t -> (bool, Lits.t) T.State_pair_graph.t
 val erase_call: M.Start.multiple M.t -> M.Start.multiple M.t
@@ -61,4 +67,7 @@ val collapse: supply:T.State.t Supply.t -> _ M.t -> M.Start.single M.t
 val subset: supply:T.State.t Supply.t -> _ M.t -> M.Start.single M.t
 val minimize: supply:T.State.t Supply.t -> M.Start.single M.t -> M.Start.single M.t
 val earley: supply:T.State.t Supply.t -> M.Start.multiple M.t -> M.Start.single M.t
+val to_start: _ M.t -> to_start
+val extract_multiple: supply:T.State.t Supply.t -> (T.Labeled_var.t * M.Start.single M.t) Seq.t -> to_start -> _ M.t -> ((T.Labeled_var.t * T.State.t) * M'.Start.single M'.t) Seq.t
+val strip: supply:T.State.t Supply.t -> M'.Start.single M'.t -> M.Start.single M.t
 

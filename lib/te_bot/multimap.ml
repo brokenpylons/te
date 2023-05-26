@@ -83,12 +83,12 @@ module Make(M: MAP) = struct
     let add x xp t =
       M.update x (function Some s -> Some (S.add xp s) | None -> Some (S.singleton xp)) t
 
-    (*include Set.Sequential(struct
+    include Set.Sequential(struct
         type nonrec t = t
         type nonrec elt = elt
-        let add = add
+        let add (x, xp) t = add x xp t
         let empty = empty
-        let fold = fold
-      end)*)
+        let fold f = fold (fun x xp -> f (x, xp))
+      end)
   end
 end

@@ -23,6 +23,7 @@ module Abstract: sig
   val compare: ('a -> 'a -> int) -> 'a t -> 'a t -> int
 
   val is_nullable: _ t -> bool
+  val is_nullable': ('a -> bool) -> 'a t -> bool
   val reverse: 'a t -> 'a t
 
   include OP with type 'a t := 'a t
@@ -45,6 +46,7 @@ module type CONCRETE = sig
   val compare: t -> t -> int
 
   val is_nullable: t -> bool
+  val is_nullable': (lits -> bool) -> t -> bool
   val is_nothing: t -> bool
   val derivative: lits -> t -> t
   val derivative': lits list -> t -> t

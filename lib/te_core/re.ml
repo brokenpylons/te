@@ -44,6 +44,36 @@ module Abstract = struct
       | Comp (_, _, x) -> Fmt.pf ppf "@[¬(@[%a@])@]" go x
     in go
 
+  let is_nullable_concat x y =
+    x && y
+
+  let is_nullable_union x y =
+    x || y
+
+  let is_nullable_repeat x i = 
+    match i with
+    | 0 -> true
+    | i when i > 0 -> x
+    | _ -> assert false
+
+  let is_nullable_comp x =
+    not x
+
+  let is_nothing_concat x y =
+    x || y
+
+  let is_nothing_union x y =
+    x && y
+
+  let is_nothing_repeat x i = 
+    match i with
+    | 0 -> false
+    | i when i > 0 -> x
+    | _ -> assert false
+
+  let is_nothing_comp x =
+    not x
+
   let is_nullable = function
     | Nothing -> false
     | Null -> true
@@ -54,6 +84,17 @@ module Abstract = struct
     | Repeat (m, _, _, _) -> m
     | Star _ -> true
     | Comp (m, _, _) -> m
+
+  let rec is_nullable' env = function
+    | Nothing -> false
+    | Null -> true
+    | Any -> false
+    | Lits x -> env x
+    | Concat (_, _, x, y) -> is_nullable_concat (is_nullable' env x) (is_nullable' env y)
+    | Union (_, _, x, y) -> is_nullable_union (is_nullable' env x) (is_nullable' env y)
+    | Repeat (_, _, x, i) -> is_nullable_repeat (is_nullable' env x) i
+    | Star _ -> true
+    | Comp (_, _, x) -> is_nullable_comp (is_nullable' env x)
 
   let is_nothing = function
     | Nothing -> true
@@ -71,7 +112,7 @@ module Abstract = struct
     | Union (m, h, x, y) -> Union (m, h, reverse x, reverse y)
     | Repeat (m, h, x, i) -> Repeat (m, h, reverse x, i)
     | Star x -> Star (reverse x)
-    | Comp (m, n, x) -> Comp (m, n, x)
+    | Comp (m, n, x) -> Comp (m, n, reverse x)
     | x -> x
 
   let nothing =
@@ -87,21 +128,19 @@ module Abstract = struct
     Lits s
 
   let concat x y =
-    Concat (is_nullable x && is_nullable y, is_nothing x || is_nothing y, x, y)
+    Concat (is_nullable_concat (is_nullable x) (is_nullable y), is_nothing_concat (is_nothing x) (is_nothing y), x, y)
 
   let union x y =
-    Union (is_nullable x || is_nullable y, is_nothing x && is_nothing y, x, y)
+    Union (is_nullable_union (is_nullable x) (is_nullable y), is_nothing_union (is_nothing x) (is_nothing y), x, y)
 
-  let repeat x = function
-    | 0 -> Repeat (true, false, x, 0)
-    | i when i > 0 -> Repeat (is_nullable x, is_nothing x, x, i)
-    | _ -> assert false
+  let repeat x i =
+    Repeat (is_nullable_repeat (is_nullable x) i, is_nothing_repeat (is_nullable x) i, x, i)
 
   let star x =
     Star x
 
   let comp x =
-    Comp (not @@ is_nullable x, not @@ is_nothing x, x)
+    Comp (is_nullable_comp (is_nullable x), is_nothing_comp (is_nothing x), x)
 
   let comp_nothing =
     Comp (true, false, Nothing)
@@ -130,6 +169,7 @@ module type CONCRETE = sig
   val compare: t -> t -> int
 
   val is_nullable: t -> bool
+  val is_nullable': (lits -> bool) -> t -> bool
   val is_nothing: t -> bool
   val derivative: lits -> t -> t
   val derivative': lits list -> t -> t

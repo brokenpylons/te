@@ -111,6 +111,7 @@ module Vars: sig
   include Set.SEQUENTIAL with type elt := elt and type t := t
   val pp: t Fmt.t
   val subset: t -> t -> bool
+  val exists: (elt -> bool) -> t -> bool
 end
 module Var_to: sig
   include Map.CORE with type elt = Var.t
@@ -143,4 +144,5 @@ module Labeled_var_to: sig
   include Map.CORE with type elt = Labeled_var.t
   val update: elt -> ('a option -> 'a option) -> 'a t -> 'a t
   val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+  val of_seq: (elt * 'a) Seq.t -> 'a t
 end

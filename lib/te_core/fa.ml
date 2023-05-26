@@ -40,15 +40,16 @@ module type FA = sig
   }
 
   val to_re: _ t -> lits Re.Abstract.t
-  val right_context: _ t -> unit
 
   val start: Start.single t -> T.State.t
   val start_multiple: 'a t -> T.States.t
-  val states: _ t -> T.States.t
   val final: _ t -> T.States.t
   val is_final: T.State.t -> 'a t -> bool
   val is_final_multiple: T.States.t -> 'a t -> bool
   val skeleton: 'a t -> (labels, lits) G.t
+
+  val states: 'a t -> T.State.t Seq.t
+  val states_labels: 'a t -> (T.State.t * labels) Seq.t
   val transitions: 'a t -> (T.State.t * T.State.t * lits) Seq.t
   val homomorphism: (lits -> lits) -> 'a t -> 'a t
 
@@ -129,9 +130,6 @@ module Make(Labels: LABELS)(Lits: LITS): FA with type labels = Labels.t and type
     graph = G.transpose m.graph
   }
 
-  let states m =
-    T.States.of_seq @@ G.vertices m.graph
-
   let final m =
     m.final
 
@@ -165,6 +163,12 @@ module Make(Labels: LABELS)(Lits: LITS): FA with type labels = Labels.t and type
 
   let transitions m =
     G.labeled_edges m.graph
+
+  let states m =
+    G.vertices m.graph
+
+  let states_labels m =
+    G.labeled_vertices m.graph
 
   let homomorphism f m =
     {m with graph = G.labeled_edges_map (fun _ _ ls -> f ls) m.graph}
@@ -222,33 +226,6 @@ module Make(Labels: LABELS)(Lits: LITS): FA with type labels = Labels.t and type
     |> Seq.fold_left (fun e (s, q) -> 
         R.union (lits' s q g) e)
       R.nothing
-
-  let right_context m =
-    let initial =
-      G.of_labeled_edges @@
-      Seq.map (fun (s, q, ls) ->
-          (s, q, R.lits ls))
-        (G.labeled_edges m.graph)
-    in
-    let verts = Seq.memoize @@ G.vertices initial in
-    let rec go active g =
-      match Seq.uncons active with
-      | Some (p, active) -> 
-        let loop = try G.edge_label p p g with Not_found -> R.nothing in
-        go active @@
-        Seq.fold_left (fun g (s, q) ->
-            try G.connect s q R.(G.edge_label s p g * star loop * G.edge_label p q g + G.edge_label s q g) g
-            with Not_found -> g)
-          g (Seq.product verts verts)
-      | None -> g
-    in
-    let _ = go verts initial in
-    ()
-    (*Seq.product (T.States.to_seq @@ start_multiple m) (T.States.to_seq @@ final m)
-    |> Seq.fold_left (fun e (s, q) -> 
-        try R.union (G.edge_label s q g) e
-        with Not_found -> e)
-      R.nothing*)
 
   module Gen(Index: G.INDEX) = struct
     module Graph_gen = G.Gen(Index)
