@@ -40,7 +40,10 @@ module States = struct
   include Balanced_binary_tree.Set.Size(State)
   let pp = pp State.pp 
 end
-module State_to = Balanced_binary_tree.Map.Size(State)
+module State_to = struct
+  include Balanced_binary_tree.Map.Size(State)
+  let pp pp_p = pp State.pp pp_p
+end
 module State_graph = Graph.Make(State)(State_to)(State_to)
 
 module type INDEX_MAP = sig
@@ -145,4 +148,7 @@ module Labeled_vars = struct
   let pp = pp Labeled_var.pp
 end
 
-module Labeled_var_to = Balanced_binary_tree.Map.Size(Labeled_var)
+module Labeled_var_to = struct
+  include Balanced_binary_tree.Map.Size(Labeled_var)
+  let pp pp_p = pp Labeled_var.pp pp_p
+end

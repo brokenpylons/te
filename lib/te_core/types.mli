@@ -39,7 +39,11 @@ module States: sig
   val cardinal: t -> int
   val choose: t -> elt option
 end
-module State_to: Map.CORE with type elt = State.t
+module State_to: sig
+  include Map.CORE with type elt = State.t
+  val pp: 'a Fmt.t -> 'a t Fmt.t
+  val subset: ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+end
 module State_graph: Graph.S with type vertex = State.t
 
 module State_pair: sig
@@ -112,6 +116,7 @@ module Vars: sig
   val pp: t Fmt.t
   val subset: t -> t -> bool
   val exists: (elt -> bool) -> t -> bool
+  val choose: t -> elt option
 end
 module Var_to: sig
   include Map.CORE with type elt = Var.t
@@ -142,6 +147,7 @@ end
 
 module Labeled_var_to: sig
   include Map.CORE with type elt = Labeled_var.t
+  val pp: 'a Fmt.t -> 'a t Fmt.t
   val update: elt -> ('a option -> 'a option) -> 'a t -> 'a t
   val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
   val of_seq: (elt * 'a) Seq.t -> 'a t

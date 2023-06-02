@@ -39,8 +39,6 @@ module type FA = sig
     graph: (labels, lits) G.t;
   }
 
-  val to_re: _ t -> lits Re.Abstract.t
-
   val start: Start.single t -> T.State.t
   val start_multiple: 'a t -> T.States.t
   val final: _ t -> T.States.t
@@ -56,7 +54,7 @@ module type FA = sig
   val adjacent: T.State.t -> 'a t -> (T.State.t * lits) Seq.t
   val adjacent_multiple: T.States.t -> 'a t -> (T.State.t * lits) Seq.t
 
-  val goto: T.State.t -> lits -> 'a t -> T.States.t
+  val goto: T.State.t -> (lits -> bool) -> 'a t -> T.States.t
 
   val labels: T.State.t -> 'a t -> labels
   val labels_multiple: T.States.t -> 'a t -> labels
@@ -179,9 +177,9 @@ module Make(Labels: LABELS)(Lits: LITS): FA with type labels = Labels.t and type
   let adjacent_multiple qs m =
     Seq.flat_map (Fun.flip adjacent m) @@ T.States.to_seq qs
 
-  let goto from ls m =
+  let goto from f m =
     adjacent from m
-    |> Seq.filter_map (fun (to_, ls') -> if Lits.subset ls ls' then Some to_ else None)
+    |> Seq.filter_map (fun (to_, ls) -> if f ls then Some to_ else None)
     |> T.States.of_seq
 
   let labels q m =
@@ -192,40 +190,6 @@ module Make(Labels: LABELS)(Lits: LITS): FA with type labels = Labels.t and type
 
   let lits q1 q2 m =
     G.edge_label q1 q2 m.graph
-
-  let lits' s p g =
-    try G.edge_label s p g with Not_found -> R.nothing
-
-  let to_re m =
-    let initial =
-      G.of_labeled_edges @@
-      Seq.map (fun (s, q, ls) ->
-          (s, q, R.lits ls))
-        (G.labeled_edges m.graph)
-    in
-    let verts = Seq.memoize @@ G.vertices initial in
-    let initial = Seq.fold_left (fun g p ->
-        G.connect p p (R.union (lits' p p g) R.null) g)
-        initial verts
-    in
-    let rec go active g =
-      match Seq.uncons active with
-      | Some (p, active) -> 
-        let loop = lits' p p g in
-        go active @@
-        Seq.fold_left (fun g (s, q) ->
-            try G.connect s q R.(lits' s p g * star loop * lits' p q g + lits' s q g) g
-            with Not_found -> g)
-          g (Seq.product verts verts)
-      | None -> g
-    in
-    let g = go verts initial in
-    let module R' = Re.Concrete(Lits) in
-        Fmt.pr "%s"  (Dot.string_of_graph @@ G.to_dot ~string_of_vertex_label:(fun _ -> "") ~string_of_edge_label:(fun x -> Fmt.to_to_string (R.pp Lits.pp) (R'.simplify x)) g);
-    Seq.product (T.States.to_seq @@ start_multiple m) (T.States.to_seq @@ final m)
-    |> Seq.fold_left (fun e (s, q) -> 
-        R.union (lits' s q g) e)
-      R.nothing
 
   module Gen(Index: G.INDEX) = struct
     module Graph_gen = G.Gen(Index)

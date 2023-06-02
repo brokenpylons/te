@@ -7,37 +7,39 @@ let pp_if b pp ppf  =
   if b then Fmt.pf ppf "%a@ " pp else Fmt.nop ppf
 
 module Lits: sig
-  type t = {eof: bool; call: bool; return: T.Vars.t; null: bool; vars: T.Vars.t; codes: T.Codes.t}
+  type t = {eof: bool; call: T.Vars.t; return: T.Vars.t; null: bool; vars: T.Vars.t; codes: T.Codes.t}
   include Re.LITS with type t := t
   include Refine.PARTITION with type t := t
   val comp: t -> t
   val is_return: t -> bool
+  val is_call: t -> bool
+  val is_null: t -> bool
   val is_nullable: (T.Var.t -> bool) -> t -> bool
 
   val eof: t
   val empty: t
   val null: t
-  val call: t
+  val call: T.Vars.t -> t
   val return: T.Vars.t -> t
   val var: T.Var.t -> t
   val vars: T.Vars.t -> t
   val codes: T.Codes.t -> t
 end = struct
-  type t = {eof: bool; call: bool; return: T.Vars.t; null: bool; vars: T.Vars.t; codes: T.Codes.t}
+  type t = {eof: bool; call: T.Vars.t; return: T.Vars.t; null: bool; vars: T.Vars.t; codes: T.Codes.t}
   [@@deriving eq, ord]
 
   let pp ppf x =
     Fmt.pf ppf "@[%a%a%a%a%a%a@]"
       (pp_if x.eof Fmt.string) "$" 
-      (pp_if x.call Fmt.string) "◂"
-      (pp_if x.null Fmt.string) "ε" 
+      (pp_if (not @@ T.Vars.is_empty x.call) (fun ppf -> Fmt.pf ppf "◂ %a" T.Vars.pp)) x.call
+      (pp_if x.null Fmt.string) "ε"
       (pp_if (not @@ T.Vars.is_empty x.vars) T.Vars.pp) x.vars
       (pp_if (not @@ T.Codes.is_empty x.codes) T.Codes.pp) x.codes
       (pp_if (not @@ T.Vars.is_empty x.return) (fun ppf -> Fmt.pf ppf "▸ %a" T.Vars.pp)) x.return
 
   let subset x y =
     Bool.imp x.eof y.eof &&
-    Bool.imp x.call y.call &&
+    T.Vars.subset x.call y.call &&
     T.Vars.subset x.return y.return &&
     Bool.imp x.null y.null &&
     T.Vars.subset x.vars y.vars && 
@@ -46,7 +48,7 @@ end = struct
   let empty =
     {
       eof = false;
-      call = false;
+      call = T.Vars.empty;
       return = T.Vars.empty;
       null = false;
       vars = T.Vars.empty;
@@ -55,7 +57,7 @@ end = struct
 
   let is_empty x =
     not x.eof && 
-    not x.call && 
+    T.Vars.is_empty x.call && 
     T.Vars.is_empty x.return &&
     not x.null && 
     T.Vars.is_empty x.vars &&
@@ -64,8 +66,14 @@ end = struct
   let is_return x =
     not (T.Vars.is_empty x.return)
 
+  let is_call x =
+    not (T.Vars.is_empty x.call)
+
+  let is_null x =
+    x.null
+
   let eof = {empty with eof = true}
-  let call = {empty with call = true}
+  let call x = {empty with call = x}
   let return x = {empty with return = x}
   let null = {empty with null = true}
   let codes x = {empty with codes = x}
@@ -75,7 +83,7 @@ end = struct
   let comp x =
     {
       eof = true;
-      call = false;
+      call = T.Vars.empty;
       return = T.Vars.empty;
       null = false;
       vars = T.Vars.empty;
@@ -85,7 +93,7 @@ end = struct
   let union x y =
     {
       eof = x.eof || y.eof;
-      call = x.call || y.call;
+      call = T.Vars.union x.call y.call;
       return = T.Vars.union x.return y.return;
       null = x.null || y.null;
       vars = T.Vars.union x.vars y.vars;
@@ -95,7 +103,7 @@ end = struct
   let inter x y =
     {
       eof = x.eof && y.eof;
-      call = x.call && y.call;
+      call = T.Vars.inter x.call y.call;
       return = T.Vars.inter x.return y.return;
       null = x.null && y.null;
       vars = T.Vars.inter x.vars y.vars;
@@ -105,7 +113,7 @@ end = struct
   let diff x y =
     {
       eof = not (Bool.imp x.eof y.eof);
-      call = not (Bool.imp x.call y.call);
+      call = T.Vars.diff x.call y.call;
       return = T.Vars.diff x.return y.return;
       null = not (Bool.imp x.null y.null);
       vars = T.Vars.diff x.vars y.vars;
@@ -116,29 +124,44 @@ end = struct
     T.Vars.exists f x.vars
 end
 
+module R = Re.Porcelan(Re.Abstract)
+module Rhs = Re.Concrete(Lits)
+module Rhs_to = Balanced_binary_tree.Map.Size(Rhs)
+
+module Items' = Multimap.Make(T.Labeled_var_to)
+module Items = struct 
+  include Items'.L2(T.States)
+  let pp = T.Labeled_var_to.pp T.States.pp
+end
+
+type items = Items.t
+
 module Labels = struct
-  type t = {states: T.States.t; starts: T.Labeled_vars.t; predictions: T.Labeled_vars.t; matches: T.Labeled_vars.t}
+  type t = {items: Items.t; tail: Rhs.t; started: T.Labeled_vars.t; predictions: T.Labeled_vars.t; matches: T.Labeled_vars.t}
   [@@deriving eq, ord]
 
   let pp ppf x =
-    Fmt.pf ppf "@[%a%a%a%a@]"
-      (pp_if (not @@ T.States.is_empty x.states) (fun ppf -> Fmt.pf ppf "%a" T.States.pp)) x.states
-      (pp_if (not @@ T.Labeled_vars.is_empty x.starts) (fun ppf -> Fmt.pf ppf "S: %a" T.Labeled_vars.pp)) x.starts
+    Fmt.pf ppf "@[%a%a%a%a%a@]"
+      (pp_if (not @@ Rhs.is_nothing x.tail) (fun ppf -> Fmt.pf ppf "%a" Rhs.pp)) x.tail
+      (pp_if (not @@ Items.is_empty x.items) (fun ppf -> Fmt.pf ppf "%a" Items.pp)) x.items
+      (pp_if (not @@ T.Labeled_vars.is_empty x.started) (fun ppf -> Fmt.pf ppf "S: %a" T.Labeled_vars.pp)) x.started
       (pp_if (not @@ T.Labeled_vars.is_empty x.predictions) (fun ppf -> Fmt.pf ppf "P: %a" T.Labeled_vars.pp)) x.predictions
       (pp_if (not @@ T.Labeled_vars.is_empty x.matches) (fun ppf -> Fmt.pf ppf "M: %a" T.Labeled_vars.pp)) x.matches
 
   let empty =
     {
-      states = T.States.empty;
-      starts = T.Labeled_vars.empty;
+      items = Items.empty;
+      tail = R.nothing;
+      started = T.Labeled_vars.empty;
       predictions = T.Labeled_vars.empty;
       matches = T.Labeled_vars.empty;
     }
 
   let union x y =
     {
-      states = T.States.union x.states y.states;
-      starts = T.Labeled_vars.union x.starts y.starts;
+      items = Items.union x.items y.items;
+      tail = R.union x.tail y.tail;
+      started = T.Labeled_vars.union x.started y.started;
       predictions = T.Labeled_vars.union x.predictions y.predictions;
       matches = T.Labeled_vars.union x.matches y.matches;
     }
@@ -150,15 +173,25 @@ module Labels = struct
     }*)
 end
 
-module Enhanced_lits: Re.LITS with type t = Lits.t * T.State.t = struct
-  type t = Lits.t * T.State.t
+module Enhanced_lits: sig
+  include Re.LITS with type t = Lits.t T.State_to.t
+  val singleton: T.State.t -> Lits.t -> t
+  val strip: t -> Lits.t
+end = struct
+  type t = Lits.t T.State_to.t
   [@@deriving eq, ord]
 
-  let pp ppf (x, q) =
-    Fmt.pf ppf "@[%a(%a)@]" Lits.pp x T.State.pp q
+  let pp ppf x =
+    Fmt.pf ppf "@[%a@]" (T.State_to.pp Lits.pp) x
 
-  let subset =
-    on Lits.subset fst
+  let subset x y =
+    T.State_to.subset Lits.equal x y
+
+  let strip t =
+    T.State_to.fold (fun _ ls acc -> Lits.union ls acc) Lits.empty t
+
+  let singleton q ls =
+    T.State_to.singleton q ls
 end
 
 let refine xs =
@@ -166,8 +199,6 @@ let refine xs =
   let f = R.refine xs in
   Seq.cons (Lits.comp (R.considered f)) (R.partitions f)
 
-module Rhs = Re.Concrete(Lits)
-module Rhs_to = Balanced_binary_tree.Map.Size(Rhs)
 
 module Production = struct
   type t = T.Labeled_var.t * Rhs.t
@@ -220,10 +251,11 @@ let is_nullable ps =
       else None)
     ps
 
-let label is_start is_final is_dead lhs q =
+let label rhs is_start is_final is_dead lhs q =
   Labels.{
-    states = T.States.singleton q;
-    starts = T.Labeled_vars.(if is_start then singleton lhs else empty);
+    items = Items.singleton lhs q;
+    tail = rhs;
+    started = T.Labeled_vars.(if is_start then singleton lhs else empty);
     predictions = T.Labeled_vars.(if not is_dead then singleton lhs else empty);
     matches = T.Labeled_vars.(if is_final then singleton lhs else empty);
   }
@@ -231,10 +263,17 @@ let label is_start is_final is_dead lhs q =
 let convert ~supply (lhs, rhs') =
   let module Gen = M.Gen(T.State_index(Rhs_to)) in
   (lhs, Gen.unfold ~supply ~merge:Lits.union (fun q rhs ->
-       let is_start = Rhs.equal rhs rhs' 
+       let is_start = rhs == rhs' 
        and is_final = Rhs.is_nullable rhs
        and is_dead = Rhs.is_nothing rhs in
-       (is_final, label is_start is_final is_dead lhs q, Seq.filter_map (fun ls -> let d = Rhs.derivative ls rhs in if Rhs.is_nothing d then None else Some (ls, Rhs.simplify @@ d)) (refine @@ Rhs.first rhs)))
+       let next = Seq.filter_map (fun ls ->
+           let d = Rhs.simplify @@ Rhs.derivative ls rhs in
+           if Rhs.is_nothing d 
+           then None 
+           else Some (ls, d))
+           (refine @@ Rhs.head rhs)
+       in
+       (is_final, label rhs is_start is_final is_dead lhs q, next))
       rhs')
 
 let convert_multiple ~supply ps =
@@ -245,53 +284,31 @@ module Acc' = Multimap.Make(T.Var_to)
 module Acc = Acc'.L2(T.States)
 
 module Enhanced_var = struct
-  type t = T.Var.t * T.State.t
+  type t = T.State.t * T.Var.t
   [@@deriving ord]
 end
 module Enhanced_var_to = Balanced_binary_tree.Map.Size(Enhanced_var)
 module Acc2' = Multimap.Make(Enhanced_var_to)
 module Acc2 = Acc2'.L2(T.States)
 
-let construct'' s' state'  ps' =
-  let starts, finals = Seq.fold_left (fun (starts, finals) ((lhs, state), rhs) ->
-      let s = T.Labeled_var.var lhs in
-      Acc2.add (s, state) (M'.start rhs) starts, Acc2.add_multiple (s, state) (M'.final rhs) finals)
-      (Acc2.empty, Acc2.empty) ps'
-  in
-  let t = Seq.fold_left (Fun.flip @@ M'.sum % Production.rhs) M'.empty ps' in
-  M'.{
-    start = M'.Start.Single (T.States.the (Acc2.find_multiple (s', state') starts));
-    final = Acc2.find_multiple (s', state') finals;
-    graph = M'.skeleton (Seq.fold_left (fun t (from, to_, (ls, state)) -> 
-        T.Vars.fold (fun x t ->
-            t
-            |> M'.link (T.States.singleton from) (Acc2.find_multiple (x, state) starts) (Lits.call, from)
-            |> M'.link (Acc2.find_multiple (x, state) finals) (T.States.singleton to_) (Lits.return (T.Vars.singleton x), to_))
-          t ls.Lits.vars)
-        t (M'.transitions t))
-  }
-
-let construct' s' ps' =
+let construct s' ps =
   let starts, finals = Seq.fold_left (fun (starts, finals) (lhs, rhs) ->
       let s = T.Labeled_var.var lhs in
       Acc.add s (M.start rhs) starts, Acc.add_multiple s (M.final rhs) finals)
-      (Acc.empty, Acc.empty) ps'
+      (Acc.empty, Acc.empty) ps
   in
-  let t = Seq.fold_left (Fun.flip @@ M.sum % Production.rhs) M.empty ps' in
+  let t = Seq.fold_left (Fun.flip @@ M.sum % Production.rhs) M.empty ps in
   M.{
     start = M.Start.Single (T.States.the (Acc.find_multiple s' starts));
     final = Acc.find_multiple s' finals;
     graph = M.skeleton (Seq.fold_left (fun t (from, _to_, ls) -> 
         T.Vars.fold (fun x t ->
             t
-            |> M.link ~merge:Lits.union (T.States.singleton from) (Acc.find_multiple x starts) Lits.call
+            |> M.link ~merge:Lits.union (T.States.singleton from) (Acc.find_multiple x starts) (Lits.call @@ T.Vars.singleton x)
             (*|> M.link ~merge:Lits.union (Acc.find_multiple x finals) (T.States.singleton to_) (Lits.return (T.Vars.singleton x))*))
           t ls.Lits.vars)
         t (M.transitions t))
   }
-
-let construct ~supply s' ps =
-  construct' s' (Seq.memoize @@ convert_multiple ~supply ps)
 
 module State_pairs_to = Balanced_binary_tree.Map.Size(T.State_pair)
 
@@ -305,7 +322,7 @@ type to_start = Labeled_var_acc.t
 let to_start t =
   M.states_labels t
   |> Seq.flat_map (fun (q, ls) -> 
-      Seq.map (fun lhs -> (lhs, q)) @@ T.Labeled_vars.to_seq ls.Labels.starts)
+      Seq.map (fun lhs -> (lhs, q)) @@ T.Labeled_vars.to_seq ls.Labels.started)
   |> Labeled_var_acc.of_seq
 
 let extract ~supply state t1 t2  =
@@ -316,7 +333,7 @@ let extract ~supply state t1 t2  =
                      let c = Lits.inter c1 c2 in
                      if Lits.is_empty c || T.Labeled_vars.disjoint (M.labels to1 t1).predictions (M.labels to2 t2).predictions
                      then None
-                     else Some (((c, from1): Enhanced_lits.t), (to1, to2)))
+                     else Some ((Enhanced_lits.singleton from1 c), (to1, to2)))
       in
       (M.is_final from2 t2, Labels.union (M.labels from1 t1) (M.labels from2 t2), next))
     (state, M.start t2)
@@ -332,42 +349,66 @@ let strip ~supply t =
   Gen.unfold ~supply ~merge:Lits.union (fun _ from ->
       let next =
         M'.adjacent from t
-        |> Seq.map (fun (s, (ls, _)) -> (ls, s))
+        |> Seq.map (fun (s, ls') -> (Enhanced_lits.strip ls', s))
       in
       (M'.is_final from t, M'.labels from t, next))
     (M'.start t)
 
+module PG = T.State_pair_graph
+
 let inter m1 m2 =
-  T.State_pair_graph.unfold' (fun _ _ (start, (from1, from2)) ->
-      let adj = Seq.product (M.adjacent from1 m1) (M.adjacent from2 m2)
-                |> Seq.filter_map (fun ((to1, c1), (to2, c2)) ->
-                    let c = Lits.inter c1 c2 in
-                    if Lits.is_empty c || T.Labeled_vars.disjoint (M.labels to1 m1).predictions (M.labels to2 m2).predictions
-                    then None
-                    else Some (c, (to1, to2), (false, (to1, to2))))
-      in
-      let adj' = 
-        M.adjacent from2 m2
-        |> Seq.filter_map (fun (s, ls) -> if Lits.subset ls Lits.call then Some (ls, (from1, s), (true, (from1, s))) else None)
-      in
-      (start, Seq.(adj @ adj')))
-    (M.start m1, M.start m2) (true, (M.start m1, M.start m2))
+  let start = (M.start m1, M.start m2) in
+  (start,
+   PG.unfold' (fun _ _ (from1, from2) ->
+       let adj = Seq.product (M.adjacent from1 m1) (M.adjacent from2 m2)
+                 |> Seq.filter_map (fun ((to1, c1), (to2, c2)) ->
+                     let c = Lits.inter c1 c2 in
+                     if Lits.is_empty c || T.Labeled_vars.disjoint (M.labels to1 m1).predictions (M.labels to2 m2).predictions
+                     then None
+                     else Some (c, (to1, to2), (to1, to2)))
+       in
+       let adj' = 
+         M.adjacent from2 m2
+         |> Seq.filter_map (fun (s, ls) -> if Lits.is_call ls then Some (ls, (from1, s), (from1, s)) else None)
+       in
+       ((M.labels from2 m2).tail, Seq.(adj @ adj')))
+     start start)
+
+let backlog g =
+  PG.labeled_edges_map (fun s _ ls ->
+      match T.Vars.choose ls.Lits.call with
+      | Some v ->
+        Seq.fold_left R.union R.nothing @@
+        Seq.filter_map (fun (q, ls') ->
+            if Lits.subset ls' (Lits.var v)
+            then Some (PG.vertex_label q g)
+            else None)
+          (PG.adjacent s g)
+      | None -> R.null)
+    g
+
+module Kleene = Re.Kleene(Lits)(T.State_pair_graph)
+
+let rev_solve = Kleene.rev_solve 
+
+let right_context (start, g) =
+  fun s q -> R.concat (PG.vertex_label (s, q) g) (PG.edge_label start (s, q) g)
 
 module States_to = Balanced_binary_tree.Map.Size(T.States)
 
 let erase_call t =
-  M.homomorphism (fun ls -> if Lits.subset ls Lits.call then Lits.null else ls) t
+  M.homomorphism (fun ls -> if Lits.is_call ls then Lits.null else ls) t
 
 let erase_return t =
   M.homomorphism (fun ls -> if Lits.is_return ls then Lits.null else ls) t
 
 let closure t qs =
   let module C = Closure.Make(T.States) in
-  C.closure (fun q -> M.goto q Lits.call t) qs
+  C.closure (fun q -> M.goto q Lits.is_call t) qs
 
 let closure' t qs =
   let module C = Closure.Make(T.States) in
-  C.closure (fun q -> M.goto q Lits.null t) qs
+  C.closure (fun q -> M.goto q Lits.is_null t) qs
 
 let collapse ~supply t =
   let module Gen = M.Gen(T.State_index(States_to)) in
@@ -438,12 +479,65 @@ let subset ~supply t =
       let from = closure t from in
       let next =
         M.adjacent_multiple from t
-        |> Seq.filter_map (fun (s, ls) -> if Lits.subset ls Lits.call then None else Some (ls, T.States.singleton s))
+        |> Seq.filter_map (fun (s, ls) -> if Lits.is_call ls then None else Some (ls, T.States.singleton s))
         |> R.refine 
         |> R.partitions
       in
       (M.is_final_multiple from t, M.labels_multiple from t, next))
     (closure t @@ M.start_multiple t)
+
+type rtn = 
+  {
+    start: T.State.t;
+    final: T.States.t;
+    graph: (Rhs.t T.Labeled_var_to.t, Lits.t) G.t
+  }
+
+let rtn_to_string t =
+  let string_of_labels l = 
+    Fmt.to_to_string (T.Labeled_var_to.pp Rhs.pp) l
+  in
+  let string_of_lits = Fmt.to_to_string Lits.pp in
+  let node q l last labels = Dot.(node (T.State.to_id q) ~attrs:[
+      "label" => String l;
+      "peripheries" => String (if last then "2" else "1");
+      "xlabel" => String labels
+    ])
+  and edge q0 q1 l = Dot.(edge Directed (T.State.to_id q0) (T.State.to_id q1) ~attrs:[
+      "label" => String l
+    ])
+  and start_edges =
+    Seq.return @@
+    Dot.(edge Directed (String "start") (T.State.to_id t.start))
+  and start_node = Seq.return
+      Dot.(node (String "start") ~attrs:[
+          "style" => String "invis"
+        ])
+in
+  let nodes = Seq.map (fun (q, l) -> 
+      (node q (Fmt.to_to_string T.State.pp q) (T.States.mem q t.final) (string_of_labels l)))
+      (G.labeled_vertices t.graph) 
+  in
+  let edges = Seq.map (fun (q0, q1, ss) ->
+      edge q0 q1 (string_of_lits ss))
+      (G.labeled_edges t.graph) 
+  in
+  Dot.string_of_graph
+  Dot.(Digraph, "g", List.of_seq @@ Seq.(nodes @ edges @ start_node @ start_edges))
+
+let lookahead rc g =
+  {
+    start = M.start g;
+    final = M.final g;
+    graph = G.labeled_vertices_map (fun s ls ->
+        ls.Labels.items
+        |> Items.to_seq
+        |> Seq.filter_map (fun (lhs, q) ->
+            if T.Labeled_vars.mem lhs ls.Labels.matches
+            then Some (lhs, rc s q)
+            else None)
+        |> T.Labeled_var_to.of_seq) g.graph
+  }
 
 module Colored_states = struct
   type t = bool * T.States.t
@@ -459,7 +553,7 @@ let earley ~supply t =
       let next =
         if null then
           M.adjacent_multiple from t
-          |> Seq.filter_map (fun (s, ls) -> if Lits.subset ls Lits.call then None else Some (ls, T.States.singleton s))
+          |> Seq.filter_map (fun (s, ls) -> if Lits.is_call ls then None else Some (ls, T.States.singleton s))
           |> R.refine 
           |> R.partitions
           |> Seq.map (fun (ls, to_) -> (ls, (false, to_)))
@@ -469,7 +563,7 @@ let earley ~supply t =
             |> Seq.map (fun (to_, ls) -> (ls, T.States.singleton to_))
             |> R.refine 
             |> R.partitions
-            |> Seq.partition (fun (ls, _) -> Lits.subset ls Lits.call)
+            |> Seq.partition (fun (ls, _) -> Lits.is_call ls)
           in
           Seq.(Seq.map (fun (ls, to_) -> (ls, (false, to_))) others @ Seq.map (fun (ls, to_) -> (ls, (true, closure t to_))) calls)
         end

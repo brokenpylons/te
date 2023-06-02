@@ -1,3 +1,5 @@
+open Te_bot
+
 module type OP = sig
   type +_ t
   val pp: 'a Fmt.t -> 'a t Fmt.t
@@ -23,6 +25,7 @@ module Abstract: sig
   val compare: ('a -> 'a -> int) -> 'a t -> 'a t -> int
 
   val is_nullable: _ t -> bool
+  val is_nothing: _ t -> bool
   val is_nullable': ('a -> bool) -> 'a t -> bool
   val reverse: 'a t -> 'a t
 
@@ -51,7 +54,7 @@ module type CONCRETE = sig
   val derivative: lits -> t -> t
   val derivative': lits list -> t -> t
 
-  val first: t -> lits Seq.t
+  val head: t -> lits Seq.t
   val occur: t -> lits Seq.t
   val simplify: t -> t
 end
@@ -84,4 +87,10 @@ module Porcelan(C: OP): sig
   val (&): 'a t -> 'a t -> 'a t
   val (|..): 'a t -> int -> 'a t
   val (|...): 'a t -> (int * int) -> 'a t
+end
+
+module Kleene(Lits: LITS)(G: Graph.S): sig
+  open Concrete(Lits) 
+  val solve: ('a, t) G.t -> ('a, t) G.t
+  val rev_solve: ('a, t) G.t -> ('a, t) G.t
 end

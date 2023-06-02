@@ -1,5 +1,6 @@
-(* Core set of regular expressions *)
+open Te_bot
 
+(* Core set of regular expressions *)
 module type OP = sig
   type +_ t
   val pp: 'a Fmt.t -> 'a t Fmt.t
@@ -36,7 +37,7 @@ module Abstract = struct
       | Nothing -> Fmt.string ppf "∅"
       | Null -> Fmt.string ppf "ε"
       | Any -> Fmt.string ppf "."
-      | Lits x -> pp_lits ppf x
+      | Lits ls -> pp_lits ppf ls
       | Concat (_, _, x, y) -> Fmt.pf ppf "@[(@[%a@]@ . @[%a@])@]" go x go y
       | Union (_, _, x, y) -> Fmt.pf ppf "@[(@[%a@]@,|@,@[%a@])@]" go x go y   
       | Repeat (_, _, x, i) -> Fmt.pf ppf "@[%a@,@[{%i}@]@]" go x i
@@ -174,7 +175,7 @@ module type CONCRETE = sig
   val derivative: lits -> t -> t
   val derivative': lits list -> t -> t
 
-  val first: t -> lits Seq.t
+  val head: t -> lits Seq.t
   val occur: t -> lits Seq.t
   val simplify: t -> t
 end
@@ -185,12 +186,12 @@ module Concrete(Lits: LITS): CONCRETE with type lits = Lits.t = struct
   type t = Lits.t Abstract.t
   [@@deriving eq, ord, show]
 
-  let first = 
+  let head = 
     let rec go = function
       | Nothing -> Seq.empty
       | Null -> Seq.empty
       | Any -> Seq.empty
-      | Lits p -> Seq.return p
+      | Lits ls -> Seq.return ls
       | Concat (_, _, x, y) when is_nullable x -> Seq.append (go x) (go y)
       | Concat (_, _, x, _) -> go x
       | Union (_, _, x, y) -> Seq.append (go x) (go y)
@@ -199,12 +200,26 @@ module Concrete(Lits: LITS): CONCRETE with type lits = Lits.t = struct
       | Comp (_, _, x) -> go x
     in go
 
+  (*let lower_bound =
+    let rec go = function
+      | Nothing -> 0
+      | Null -> 0
+      | Any -> 1
+      | Lits ls -> 
+      | Concat (_, _, x, y) when is_nullable x -> Seq.append (go x) (go y)
+      | Concat (_, _, x, _) -> go x
+      | Union (_, _, x, y) -> Seq.append (go x) (go y)
+      | Repeat (_, _, x, _) -> go x
+      | Star x -> go x
+      | Comp (_, _, x) -> go x
+    in go*)
+
   let occur =
     let rec go = function
       | Nothing -> Seq.empty
       | Null -> Seq.empty
       | Any -> Seq.empty
-      | Lits p -> Seq.return p
+      | Lits ls -> Seq.return ls
       | Concat (_, _, x, y) -> Seq.append (go x) (go y)
       | Union (_, _, x, y) -> Seq.append (go x) (go y)
       | Repeat (_, _, x, _) -> go x
@@ -213,7 +228,7 @@ module Concrete(Lits: LITS): CONCRETE with type lits = Lits.t = struct
     in go
 
   let rec simplify = function
-    | Union (_, _, x, Union (_, _, y, z)) -> simplify (union (union x y) z)
+    | Union (_, _, x, Union (_, _, y, z)) -> simplify (union (simplify (union x y)) (simplify z))
     | Union (m, h, x, y) ->
       (match simplify x, simplify y with
        | Nothing, x -> x
@@ -267,8 +282,8 @@ module Concrete(Lits: LITS): CONCRETE with type lits = Lits.t = struct
     | Nothing -> nothing
     | Null -> nothing
     | Any -> null
-    | Lits p -> 
-      if Lits.subset s p
+    | Lits ls -> 
+      if Lits.subset s ls
       then null
       else nothing
     | Concat (_, _, x, y) when is_nullable x -> union (concat (derivative s x) y) (derivative s y)
@@ -285,6 +300,7 @@ module Concrete(Lits: LITS): CONCRETE with type lits = Lits.t = struct
 
   let derivative' ss x =
     List.fold_left (Fun.flip derivative) x ss
+
 end
 
   
@@ -345,4 +361,47 @@ module Porcelan(C: OP) = struct
   let (&) x y = inter x y
   let (|..) x i = repeat x i
   let (|...) x (i, j) = interval x i j
+end
+
+module Kleene(Lits: LITS)(G: Graph.S) = struct
+  open Concrete(Lits)
+  open Porcelan(Abstract)
+
+  let labels s p g =
+    try G.edge_label s p g with Not_found -> nothing
+
+  (*let initial =
+      G.labeled_edges_map (fun _ _ ls -> lits ls) g
+      |>
+    in*)
+
+  (*let initial = Seq.fold_left (fun g p ->
+      G.connect p p (union (labels p p g) null) g)
+      g vertices
+    in*)
+
+  (*Seq.product (T.States.to_seq @@ start_multiple m) (T.States.to_seq @@ final m)
+    |> Seq.fold_left (fun e (s, q) -> 
+      R.union (lits' s q g) e)
+    R.nothing*)
+
+  let solve g =
+    let vertices = Seq.memoize @@ G.vertices g in
+    Seq.fold_left (fun g p ->
+        let loop = labels p p g in
+        Seq.fold_left (fun g (s, q) ->
+            let l = simplify @@ labels s p g * star loop * labels p q g + labels s q g in
+            if is_nothing l then g else G.connect s q l g)
+          g (Seq.product vertices vertices))
+      g vertices 
+
+  let rev_solve g =
+    let vertices = Seq.memoize @@ G.vertices g in
+    Seq.fold_left (fun g p ->
+        let loop = labels p p g in
+        Seq.fold_left (fun g (s, q) ->
+            let l = simplify @@ labels p q g  * star loop * labels s p g + labels s q g in
+            if is_nothing l then g else G.connect s q l g)
+          g (Seq.product vertices vertices))
+      g vertices 
 end

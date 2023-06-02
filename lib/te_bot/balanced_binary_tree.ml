@@ -529,6 +529,7 @@ module Map = struct
 
     val merge: (elt -> 'a option -> 'a option -> 'a option) -> 'a t -> 'a t -> 'a t
     val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+    val subset: ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 
     val the: 'a t -> elt * 'a
     val fold: (elt -> 'a -> 'b -> 'b) -> 'b -> 'a t -> 'b
@@ -923,6 +924,20 @@ module Map = struct
         | Some xp' -> join x (f x xp' xp) l r
         | None -> join x xp l r
 
+    let rec subset' eq_p e1 e2 =
+      match e1, e2 with
+      | Nil, _ -> true
+      | _, Nil -> false
+      | Cons (x1, xp1, t1, e1'), Cons (x2, xp2, t2, e2') ->
+        let c = Elt.compare x1 x2 in
+        if c > 0 then
+          subset' eq_p e1 (cons t2 e2')
+        else if c == 0 && eq_p xp1 xp2 then
+          subset' eq_p (cons t1 e1') (cons t2 e2')
+        else false
+
+    let subset eq_p t1 t2 = subset' eq_p (cons t1 Nil) (cons t2 Nil)
+
     let rec filter f = function
       | Empty -> Empty
       | Node (_, x, xp, l, r) as t ->
@@ -985,12 +1000,20 @@ module Map = struct
         let c = Elt.compare x y in
         c = 0 || if c < 0 then mem x l else mem x r
 
-    let rec pp' pp_elt pp_p ppf = function
+    (*let rec pp' pp_elt pp_p ppf = function
       | Nil -> Fmt.string ppf "nil"
       | Cons (x, xp, t, e) ->
         Fmt.pf ppf "@[(%a, %a), %a@]" pp_elt x pp_p xp (pp' pp_elt pp_p) (cons t e)
 
-    let pp pp_elt pp_p ppf t = pp' pp_elt pp_p ppf (cons t Nil)
+    let pp pp_elt pp_p ppf t = pp' pp_elt pp_p ppf (cons t Nil)*)
+
+    let rec pp' sep pp_elt pp_p ppf = function
+      | Nil -> Fmt.nop ppf ""
+      | Cons (x, xp, t, e) ->
+        Fmt.pf ppf (sep ^^ "%a@ %a%a") pp_elt x pp_p xp (pp' "@ " pp_elt pp_p) (cons t e)
+
+    let pp pp_elt pp_p ppf t =
+      Fmt.pf ppf "@[%a@]" (pp' "" pp_elt pp_p) (cons t Nil)
   end
 
   module Height(Elt: ELT) = Make(Elt)(Height_tree)
