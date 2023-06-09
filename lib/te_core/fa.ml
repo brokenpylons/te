@@ -67,6 +67,10 @@ module type FA = sig
 
   val rev: _ t -> Start.multiple t
 
+  val digraph: (T.State.t -> labels -> 'seed) -> ('seed -> labels -> (lits * (unit -> 'seed)) Seq.t -> 'seed) -> Start.single t -> (T.State.t -> 'seed)
+
+  val dijkstra: (T.State.t -> labels -> 'seed) -> ('seed -> labels -> (lits * (unit -> 'seed)) Seq.t -> 'seed) -> Start.single t -> (T.State.t -> 'seed)
+
   module Gen(Index: G.INDEX): sig
     val unfold_multiple: supply:(T.State.t Supply.t) -> ?merge:(lits -> lits -> lits) -> (T.State.t -> Index.elt -> bool * labels * (lits * Index.elt) Seq.t) -> Index.elt list -> Start.multiple t
 
@@ -190,6 +194,12 @@ module Make(Labels: LABELS)(Lits: LITS): FA with type labels = Labels.t and type
 
   let lits q1 q2 m =
     G.edge_label q1 q2 m.graph
+
+  let digraph seed f m =
+    G.digraph seed f m.graph
+
+  let dijkstra seed f m =
+    G.dijkstra seed f m.graph
 
   module Gen(Index: G.INDEX) = struct
     module Graph_gen = G.Gen(Index)

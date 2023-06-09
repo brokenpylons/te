@@ -2,6 +2,8 @@ open! Prelude
 
 module type PARTITION = sig
   type t
+  val compare: t -> t -> int
+  val equal: t -> t -> bool
   val pp: t Fmt.t
 
   val empty: t
@@ -13,17 +15,24 @@ end
 
 module type VALUES = sig
   type t
+  val compare: t -> t -> int
+  val equal: t -> t -> bool
+
   val empty: t
   val union: t -> t -> t
 end
 
 module Abstract(P: PARTITION)(Fun: sig
-    type 'a t 
+    type 'a t
+    val compare: ('a -> 'a -> int) -> 'a t -> 'a t -> int
+    val equal: ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+
     val map: ('a -> 'b) -> 'a t -> 'b t
     val return: 'a -> 'a t
   end) = struct
   type partition = P.t
   type t = {partitions: P.t Fun.t list; considered: P.t}
+  [@@deriving eq, ord]
   type parts = Novel of P.t | Disjoint of P.t | Equal of P.t | Split of P.t * P.t
 
   module Split = struct
@@ -73,6 +82,7 @@ module Set(P: PARTITION): sig
 end = struct
   include Abstract(P)(struct
       type 'a t = 'a
+      [@@deriving eq, ord]
       let map f = f
       let return = Fun.id
     end)
@@ -98,6 +108,13 @@ end
 module Map(P: PARTITION)(V: VALUES): sig
   type t
   type partition = P.t
+  val compare: t -> t -> int
+  val equal: t -> t -> bool
+
+  val empty: t
+  val add: partition -> V.t -> t -> t
+  val union: t -> t -> t
+  val find: partition -> t -> V.t
 
   val refine: (partition * V.t) Seq.t -> t
   val considered: t -> partition
@@ -105,6 +122,7 @@ module Map(P: PARTITION)(V: VALUES): sig
 end = struct
   include Abstract(P)(struct
       type 'a t = 'a * V.t
+      [@@deriving eq, ord]
       let map f (p, vs) = (f p, vs)
       let return p = (p, V.empty)
     end)
@@ -124,6 +142,16 @@ end = struct
       considered
     }
 
+  let union t1 t2 =
+    List.fold_left (fun acc (p, v) -> add p v acc) t1 t2.partitions
+   
+  let find p t =
+    List.fold_left (fun acc (p', v) ->
+        if P.is_empty (P.inter p p')
+        then acc
+        else V.union v acc)
+      V.empty t.partitions
+
   let refine t =
     Seq.fold_left (Fun.flip @@ uncurry add) empty t
 end
@@ -131,6 +159,7 @@ end
 module Hopcroft(P: sig include PARTITION val cardinal: t -> int end) = struct
   module Set = Abstract(P)(struct
       type 'a t = 'a
+      [@@deriving eq, ord]
       let map f = f
       let return = Fun.id
     end)

@@ -4,6 +4,7 @@ module type VERTEX = sig
   type t
 
   val pp: t Fmt.t
+  val equal: t -> t -> bool
   val to_id: t -> Dot.id
 end
 
@@ -17,11 +18,13 @@ module type VERTEX_MAP = sig
   val cardinal: 'a t -> int
 
   val map: (elt -> 'a -> 'b) -> 'a t -> 'b t
+  val iter: (elt -> 'a -> unit) -> 'a t -> unit
 
   val to_seq: 'a t -> (elt * 'a) Seq.t
   val of_seq: (elt * 'a) Seq.t -> 'a t
 
   val domain_disjoint: 'a t -> 'a t -> bool
+  val mem: elt -> _ t -> bool
   val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
 end
 
@@ -38,6 +41,16 @@ module type EDGE_MAP = sig
   val of_seq: (elt * 'a) Seq.t -> 'a t
 
   val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+end
+
+module type KLEENE = sig
+  type t
+
+  val nothing: t 
+  val null: t
+  val union: t -> t -> t
+  val concat: t -> t -> t
+  val start: t
 end
 
 module type S = sig
@@ -118,7 +131,11 @@ module type S = sig
 
   val transpose: ('vl, 'el) t -> ('vl, 'el) t
 
-  val fold: eq:('seed -> 'seed -> bool) -> 'seed -> (vertex -> 'vl * ('el * 'seed) Seq.t -> 'seed) -> ('vl, 'el) t -> (vertex -> 'seed)
+  val fold: eq:('seed -> 'seed -> bool) -> (vertex -> 'vl -> 'seed) -> ('seed -> 'vl -> ('el * 'seed) Seq.t -> 'seed) -> ('vl, 'el) t -> (vertex -> 'seed)
+
+  val dijkstra: (vertex -> 'vl -> 'seed) -> ('seed -> 'vl -> ('el * (unit -> 'seed)) Seq.t -> 'seed) -> ('vl, 'el) t -> (vertex -> 'seed)
+
+  val digraph: (vertex -> 'vl -> 'seed) -> ('seed -> 'vl -> ('el * (unit -> 'seed)) Seq.t -> 'seed) -> ('vl, 'el) t -> (vertex -> 'seed)
 
   val unfold': (unit -> vertex -> 'seed -> 'vl * ('el * vertex * 'seed) Seq.t) -> vertex -> 'seed -> ('vl, 'el) t
 
@@ -284,9 +301,6 @@ module Make
     Vertex_map.to_seq g
     |> Seq.map fst
 
-  (*let clear_vertex_labels g =
-    labeled_vertices_map (fun _ _ -> ()) g*)
-
   let edges g =
     Vertex_map.to_seq g
     |> Seq.flat_map (fun (v, (_, adj)) -> Seq.map (fun (u, _) -> (v, u)) (Edge_map.to_seq adj))
@@ -318,15 +332,66 @@ module Make
     Dot.((Digraph, "g", List.of_seq (Seq.append nodes edges)))
 
   let apply f g t =
-    Vertex_map.map (fun v _ ->
+    Vertex_map.map (fun v x' ->
         let (vl, adj) = Vertex_map.find v g in
-        f v (vl, Seq.map (fun (u, el) -> (el, Vertex_map.find u t)) @@ Edge_map.to_seq adj))
+        f x' vl (Seq.map (fun (u, el) -> (el, Vertex_map.find u t)) @@ Edge_map.to_seq adj))
       t
 
   let fold ~eq seed f g =
-    let seeds = Vertex_map.map (fun _ _ -> seed) g in
+    let seeds = Vertex_map.map (fun v (vl, _) -> seed v vl) g in
     let t = Fixedpoint.run ~eq:(Vertex_map.equal eq) (apply f g) seeds in
     fun v -> Vertex_map.find v t
+
+  let dijkstra seed f' g v' =
+    let b = ref @@ Vertex_map.empty in
+    let f = ref @@ Vertex_map.map (fun v (vl, _) -> seed v vl) g in
+
+    let rec visit v =
+      let (vl, adj) = Vertex_map.find v g in
+      b := Vertex_map.add v () !b;
+      let x = f' (Vertex_map.find v !f) vl (Seq.map (fun (u, el) -> (el, fun () -> 
+          if not @@ Vertex_map.mem u !b
+          then visit u;
+          Vertex_map.find u !f))
+          (Edge_map.to_seq adj))
+      in
+      f := Vertex_map.add v x !f
+    in
+    visit v';
+    Vertex_map.find v' !f
+
+  let digraph seed f' g =
+    let n = ref @@ Vertex_map.map (fun _ _ -> Size.zero) g in
+    let f = ref @@ Vertex_map.map (fun v (vl, _) -> seed v vl) g in
+    let s = Stack.create () in
+
+    let rec unwind v x = 
+      let u = Stack.pop s in
+      if Vertex.equal v u then () else begin
+        n := Vertex_map.add u Size.top !n;
+        f := Vertex_map.add u x !f;
+        unwind v x
+      end
+    in
+    let rec visit v =
+      Stack.push v s;
+      let d = Size.of_int @@ Stack.length s in
+      n := Vertex_map.add v d !n;
+      let (vl, adj) = Vertex_map.find v g in
+      let (d', adj) =
+        Seq.fold_left_map (fun d' (u, el) ->
+            (Size.min d' (Vertex_map.find u !n), (el, fun () ->
+                 if Size.equal (Vertex_map.find u !n) (Size.zero)
+                 then visit u;
+                 Vertex_map.find u !f)))
+          d (Edge_map.to_seq adj)
+      in
+      let x = f' (Vertex_map.find v !f) vl adj in
+      f := Vertex_map.add v x !f;
+      if d = d' then unwind v x
+    in
+    Vertex_map.iter (fun v _ -> visit v) g;
+    fun v -> Vertex_map.find v !f
 
   let unfold' f v start =
     let graph = ref empty in
@@ -407,36 +472,6 @@ module Make
 end
 
 (*let mem_adj adj g = List.for_all (fun (v, _) -> Vertex_map.mem v g) adj
-
-module Index(Elt: sig type t val compare: t -> t -> int end): INDEX with type elt = Elt.t = struct
-  module EltMap = Map.Make(Elt)
-
-  type t = int EltMap.t * int
-  type elt = Elt.t
-
-  let update elt (m, n) = 
-    match EltMap.find_opt elt m with
-    | Some v -> (`Old v, (m, n))
-    | None -> (`New (n, elt), (EltMap.add elt n m, succ n))
-
-  let empty = (EltMap.empty, 0)
-end
-
-let apply f g t =
-  Vertex_map.map (fun v _ ->
-      let (vl, adj) = Vertex_map.find v g in
-      f (vl, List.map (fun (v', el) -> (el, Vertex_map.find v' t)) @@ Edge_map.bindings adj))
-    t
-
-let fold ~eq seed f g =
-  let seeds = Vertex_map.map (fun _ _ -> seed) g in
-  let t = Fixedpoint.run ~eq:(Vertex_map.equal eq) (apply f g) seeds in
-  fun v -> Vertex_map.find v t
-
-let divergent_fold ~iterations seed f g =
-  let seeds = Vertex_map.map (fun _ _ -> seed) g in
-  let t = Fun.iterate iterations (apply f g) seeds in
-  fun v -> Vertex_map.find v t
 
 let isomorphism (type vl) (eq: vl Equal.t) g1 g2 = (* trivial for labeled graphs *)
   let vs1 = vertices g1 in

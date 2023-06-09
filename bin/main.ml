@@ -85,30 +85,41 @@ let () =
       make (n, s) R.(var b * var c * var d + var a * var e);
       make (n, a) (var b);
 
-      make (n, b) (set "x");
+      make (n, b) R.(var b * set "x" * set "x" + null);
       make (n, c) (set "y");
       make (n, d) R.(set "z" + null);
       make (n, e) R.(set "y" * set "z");
     ];
   in
+  let n = Tn.is_nullable ps in
+  Fmt.pr "NULL %a" T.Vars.pp n;
+
+  let fs = Tn.first (Re.Abstract.is_nullable' (Tn.Lits.is_nullable (fun v -> T.Vars.mem v n))) ps in
+  Fmt.pr "FIRST %a" (T.Var_to.pp (Fmt.parens Tn.Lits.pp)) fs;
+  (*let d x y = Tn.Rhs.simplify @@ Tn.Rhs.derivative' T.Vars.empty (Tn.productions ps) (Tn.Lits.is_nullable (fun v -> T.Vars.mem v n)) (Tn.Lits.codes (T.Codes.of_string x)) y in
+  let o = (d "z" (d "y" (d "x" (d "z" (d "y" (d "x" (d "x" (var s)))))))) in
+  Fmt.pr "HERE %b @[%a@]" (Re.Abstract.is_nullable' (Tn.Lits.is_nullable (fun v -> T.Vars.mem v n)) o) Tn.Rhs.pp  o;*)
 
   (*Tn.M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Tn.Lhss.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Tn.Lits.pp x) (Tn.collapse ~supply:T.State.supply @@ Tn.erase_return @@ Tn.subset ~supply:T.State.supply @@ Tn.construct ~supply:T.State.supply s' ps)*)
   (*Tn.M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Tn.Lhss.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Tn.Lits.pp x) (Tn.earley ~supply:T.State.supply @@ Tn.construct ~supply:T.State.supply s' ps)*)
 
   (*Tn.M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Tn.Lhss.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Tn.Lits.pp x) (Tn.minimize ~supply:T.State.supply @@ Tn.collapse ~supply:T.State.supply @@ Tn.erase_return @@ Tn.subset ~supply:T.State.supply @@ Tn.construct ~supply:T.State.supply s' ps)*)
 
-  Fmt.pr "NULL %a" T.Vars.pp (Tn.is_nullable ps);
 
   let x' = Tn.construct s' (Tn.convert_multiple ~supply:T.State.supply ps) in
-  (*let x'' = Tn.convert_multiple ~supply:T.State.supply ps in*)
+  let x'' = Tn.convert_multiple ~supply:T.State.supply ps in
   let x = Tn.collapse ~supply:T.State.supply @@ x' in
   let y = Tn.subset ~supply:T.State.supply @@ x' in
   let (start, z) = Tn.inter y x' in
   let w = Tn.rev_solve @@ Tn.backlog z in
   let rc = Tn.right_context (start, w) in
-  (*let to_start = Tn.to_start y in
+  let to_start = Tn.to_start y in
   let w = Tn.extract_multiple ~supply:T.State.supply x'' to_start y in
-  let w' = Tn.strip ~supply:T.State.supply @@ Tn.construct'' s' (Tn.M.start y) w in
+  Fmt.pr "FIRST.";
+  Tn.first2 w;
+
+
+  (*let w' = Tn.strip ~supply:T.State.supply @@ Tn.construct'' s' (Tn.M.start y) w in
   let w'' = Tn.minimize ~supply:T.State.supply @@ Tn.subset ~supply:T.State.supply @@ w' in
   let z = Tn.inter y x' in*)
   begin

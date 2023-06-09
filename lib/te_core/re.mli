@@ -1,8 +1,8 @@
 open Te_bot
 
 module type OP = sig
-  type +_ t
-  val pp: 'a Fmt.t -> 'a t Fmt.t
+  type (+_, +_) t
+  val pp: 'vs Fmt.t -> 'ls Fmt.t -> ('vs, 'ls) t Fmt.t
 
   val nothing: _ t
   val null: _ t
@@ -10,87 +10,103 @@ module type OP = sig
   val comp_nothing: _ t
   val comp_null: _ t
   val comp_any: _ t
-  val lits: 'a -> 'a t
-  val concat: 'a t -> 'a t -> 'a t
-  val union: 'a t -> 'a t -> 'a t
-  val repeat: 'a t -> int -> 'a t
-  val star: 'a t -> 'a t
-  val comp: 'a t -> 'a t
+  val lits: 'ls -> ('vs, 'ls) t
+  val concat: ('vs, 'ls) t -> ('vs, 'ls) t -> ('vs, 'ls) t
+  val union: ('vs, 'ls) t -> ('vs, 'ls) t -> ('vs, 'ls) t
+  val repeat: ('vs, 'ls) t -> int -> ('vs, 'ls) t
+  val star: ('vs, 'ls) t -> ('vs, 'ls) t
+  val comp: ('vs, 'ls) t -> ('vs, 'ls) t
 end
 
 module Abstract: sig
-  type +_ t
+  type (+_, +_) t
 
-  val equal: ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
-  val compare: ('a -> 'a -> int) -> 'a t -> 'a t -> int
+  val equal: ('vs -> 'vs -> bool) -> ('ls -> 'ls -> bool) -> ('vs, 'ls) t -> ('vs, 'ls) t -> bool
+  val compare: ('vs -> 'vs -> int) -> ('ls -> 'ls -> int) -> ('vs, 'ls) t -> ('vs, 'ls) t -> int
 
   val is_nullable: _ t -> bool
   val is_nothing: _ t -> bool
-  val is_nullable': ('a -> bool) -> 'a t -> bool
-  val reverse: 'a t -> 'a t
+  val is_nullable': ('ls -> bool) -> ('vs, 'ls) t -> bool
+  val reverse: ('vs, 'ls) t -> ('vs, 'ls) t
 
-  include OP with type 'a t := 'a t
+  include OP with type ('vs, 'ls) t := ('vs, 'ls) t
 end
 
-module type LITS = sig
+module type VARS = sig
   type t
   val pp: t Fmt.t
   val equal: t -> t -> bool
   val compare: t -> t -> int
   val subset: t -> t -> bool
+
+  val empty: t
+  val is_empty: t -> bool
+  val inter: t -> t -> t
+  val diff: t -> t -> t
+  val union: t -> t -> t
+end
+
+module type LITS = sig
+  type t
+  type vars
+  val pp: t Fmt.t
+  val equal: t -> t -> bool
+  val compare: t -> t -> int
+  val subset: t -> t -> bool
+  val to_vars: t -> vars
+  val of_vars: vars -> t
 end
 
 module type CONCRETE = sig
+  type vars
   type lits
-  type t = lits Abstract.t
+  type t = (vars, lits) Abstract.t
 
   val pp: t Fmt.t
   val equal: t -> t -> bool
   val compare: t -> t -> int
 
-  val is_nullable: t -> bool
-  val is_nullable': (lits -> bool) -> t -> bool
-  val is_nothing: t -> bool
   val derivative: lits -> t -> t
-  val derivative': lits list -> t -> t
+  val derivative': vars -> (vars -> t) -> (lits -> bool) -> lits -> t -> t
 
-  val head: t -> lits Seq.t
-  val occur: t -> lits Seq.t
+  val first': (t -> bool) -> t -> lits Seq.t
+  val first: t -> lits Seq.t
+  val free: t -> vars
   val simplify: t -> t
 end
 
-module Concrete(Lits: LITS): CONCRETE with type lits = Lits.t 
+module Concrete(Vars: VARS)(Lits: LITS with type vars = Vars.t): CONCRETE with type lits = Lits.t and type vars = Vars.t
 
 module Porcelan(C: OP): sig
-  include OP with type 'a t = 'a C.t
+  include OP with type ('vs, 'ls) t = ('vs, 'ls) C.t
 
-  val comp_lits: 'a -> 'a t
-  val comp_concat: 'a t -> 'a t -> 'a t
-  val comp_union: 'a t -> 'a t -> 'a t
-  val inter: 'a t -> 'a t -> 'a t
-  val comp_repeat: 'a t -> int -> 'a t
-  val comp_star: 'a t -> 'a t
-  val opt: 'a t -> 'a t
-  val comp_opt: 'a t -> 'a t
-  val force: 'a t -> 'a t
-  val diff: 'a t -> 'a t -> 'a t
-  val comp_diff: 'a t -> 'a t -> 'a t
-  val wildcard: 'a t
-  val interval: 'a t -> int -> int -> 'a t
-  val plus: 'a t -> 'a t
-  val not: 'a t -> 'a t
-  val universe: 'a t
-  val nonnull: 'a t
-  val ( * ): 'a t -> 'a t -> 'a t
-  val (+): 'a t -> 'a t -> 'a t
-  val (-): 'a t -> 'a t -> 'a t
-  val (&): 'a t -> 'a t -> 'a t
-  val (|..): 'a t -> int -> 'a t
-  val (|...): 'a t -> (int * int) -> 'a t
+  val comp_lits: 'ls -> ('vs, 'ls) t
+  val comp_concat: ('vs, 'ls) t -> ('vs, 'ls) t -> ('vs, 'ls) t
+  val comp_union: ('vs, 'ls) t -> ('vs, 'ls) t -> ('vs, 'ls) t
+  val inter: ('vs, 'ls) t -> ('vs, 'ls) t -> ('vs, 'ls) t
+  val comp_repeat: ('vs, 'ls) t -> int -> ('vs, 'ls) t
+  val comp_star: ('vs, 'ls) t -> ('vs, 'ls) t
+  val opt: ('vs, 'ls) t -> ('vs, 'ls) t
+  val comp_opt: ('vs, 'ls) t -> ('vs, 'ls) t
+  val force: ('vs, 'ls) t -> ('vs, 'ls) t
+  val diff: ('vs, 'ls) t -> ('vs, 'ls) t -> ('vs, 'ls) t
+  val comp_diff: ('vs, 'ls) t -> ('vs, 'ls) t -> ('vs, 'ls) t
+  val wildcard: ('vs, 'ls) t
+  val interval: ('vs, 'ls) t -> int -> int -> ('vs, 'ls) t
+  val plus: ('vs, 'ls) t -> ('vs, 'ls) t
+  val not: ('vs, 'ls) t -> ('vs, 'ls) t
+  val universe: ('vs, 'ls) t
+  val nonnull: ('vs, 'ls) t
+  val ( * ): ('vs, 'ls) t -> ('vs, 'ls) t -> ('vs, 'ls) t
+  val (+): ('vs, 'ls) t -> ('vs, 'ls) t -> ('vs, 'ls) t
+  val (-): ('vs, 'ls) t -> ('vs, 'ls) t -> ('vs, 'ls) t
+  val (&): ('vs, 'ls) t -> ('vs, 'ls) t -> ('vs, 'ls) t
+  val (|..): ('vs, 'ls) t -> int -> ('vs, 'ls) t
+  val (|...): ('vs, 'ls) t -> (int * int) -> ('vs, 'ls) t
 end
 
-module Kleene(Lits: LITS)(G: Graph.S): sig
-  open Concrete(Lits) 
+module Kleene(Vars: VARS)(Lits: LITS with type vars = Vars.t)(G: Graph.S): sig
+  open Concrete(Vars)(Lits) 
   val solve: ('a, t) G.t -> ('a, t) G.t
   val rev_solve: ('a, t) G.t -> ('a, t) G.t
 end

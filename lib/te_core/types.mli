@@ -43,6 +43,10 @@ module State_to: sig
   include Map.CORE with type elt = State.t
   val pp: 'a Fmt.t -> 'a t Fmt.t
   val subset: ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+  val update: elt -> ('a option -> 'a option) -> 'a t -> 'a t
+  val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+  val inter: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+  val diff: 'a t -> 'a t -> 'a t
 end
 module State_graph: Graph.S with type vertex = State.t
 
@@ -120,8 +124,12 @@ module Vars: sig
 end
 module Var_to: sig
   include Map.CORE with type elt = Var.t
+  val pp: 'a Fmt.t -> 'a t Fmt.t
   val update: elt -> ('a option -> 'a option) -> 'a t -> 'a t
   val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+  val inter: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+  val diff: 'a t -> 'a t -> 'a t
+  val of_seq: (elt * 'a) Seq.t -> 'a t
 end
 
 module Labeled_var: sig
@@ -150,5 +158,7 @@ module Labeled_var_to: sig
   val pp: 'a Fmt.t -> 'a t Fmt.t
   val update: elt -> ('a option -> 'a option) -> 'a t -> 'a t
   val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+  val inter: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+  val diff: 'a t -> 'a t -> 'a t
   val of_seq: (elt * 'a) Seq.t -> 'a t
 end

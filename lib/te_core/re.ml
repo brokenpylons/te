@@ -1,9 +1,10 @@
 open Te_bot
+open! Prelude 
 
 (* Core set of regular expressions *)
 module type OP = sig
-  type +_ t
-  val pp: 'a Fmt.t -> 'a t Fmt.t
+  type (+_, +_) t
+  val pp: 'vs Fmt.t -> 'ls Fmt.t -> ('vs, 'ls) t Fmt.t
 
   val nothing: _ t
   val null: _ t
@@ -11,28 +12,29 @@ module type OP = sig
   val comp_nothing: _ t
   val comp_null: _ t
   val comp_any: _ t
-  val lits: 'a -> 'a t
-  val concat: 'a t -> 'a t -> 'a t
-  val union: 'a t -> 'a t -> 'a t
-  val repeat: 'a t -> int -> 'a t
-  val star: 'a t -> 'a t
-  val comp: 'a t -> 'a t
+  val lits: 'ls -> ('vs, 'ls) t
+  val concat: ('vs, 'ls) t -> ('vs, 'ls) t -> ('vs, 'ls) t
+  val union: ('vs, 'ls) t -> ('vs, 'ls) t -> ('vs, 'ls) t
+  val repeat: ('vs, 'ls) t -> int -> ('vs, 'ls) t
+  val star: ('vs, 'ls) t -> ('vs, 'ls) t
+  val comp: ('vs, 'ls) t -> ('vs, 'ls) t
 end
 
 module Abstract = struct
-  type 'a t =
+  type ('vs, 'ls) t =
     | Nothing
     | Null
     | Any
-    | Lits of 'a
-    | Concat of bool * bool * 'a t * 'a t
-    | Union of bool * bool * 'a t * 'a t
-    | Repeat of bool * bool * 'a t * int
-    | Star of 'a t
-    | Comp of bool * bool * 'a t
+    | Lits of 'ls
+    | Concat of bool * bool * ('vs, 'ls) t * ('vs, 'ls) t
+    | Union of bool * bool * ('vs, 'ls) t * ('vs, 'ls) t
+    | Repeat of bool * bool * ('vs, 'ls) t * int
+    | Star of ('vs, 'ls) t
+    | Comp of bool * bool * ('vs, 'ls) t
+    | Fix of bool * bool * 'vs * ('vs, 'ls) t
   [@@deriving eq, ord]
 
-  let pp pp_lits =
+  let pp pp_vars pp_lits =
     let rec go ppf = function
       | Nothing -> Fmt.string ppf "∅"
       | Null -> Fmt.string ppf "ε"
@@ -43,6 +45,7 @@ module Abstract = struct
       | Repeat (_, _, x, i) -> Fmt.pf ppf "@[%a@,@[{%i}@]@]" go x i
       | Star x -> Fmt.pf ppf "@[(@[%a@]){*}@]" go x
       | Comp (_, _, x) -> Fmt.pf ppf "@[¬(@[%a@])@]" go x
+      | Fix (_, _, vs, x) -> Fmt.pf ppf "@[(@[%a@]){*%a}@]" go x pp_vars vs
     in go
 
   let is_nullable_concat x y =
@@ -85,17 +88,21 @@ module Abstract = struct
     | Repeat (m, _, _, _) -> m
     | Star _ -> true
     | Comp (m, _, _) -> m
+    | Fix (m, _, _, _) -> m
 
-  let rec is_nullable' env = function
-    | Nothing -> false
-    | Null -> true
-    | Any -> false
-    | Lits x -> env x
-    | Concat (_, _, x, y) -> is_nullable_concat (is_nullable' env x) (is_nullable' env y)
-    | Union (_, _, x, y) -> is_nullable_union (is_nullable' env x) (is_nullable' env y)
-    | Repeat (_, _, x, i) -> is_nullable_repeat (is_nullable' env x) i
-    | Star _ -> true
-    | Comp (_, _, x) -> is_nullable_comp (is_nullable' env x)
+  let is_nullable' n =
+    let rec go = function
+      | Nothing -> false
+      | Null -> true
+      | Any -> false
+      | Lits ls -> n ls
+      | Concat (_, _, x, y) -> is_nullable_concat (go x) (go y)
+      | Union (_, _, x, y) -> is_nullable_union (go x) (go y)
+      | Repeat (_, _, x, i) -> is_nullable_repeat (go x) i
+      | Star _ -> true
+      | Comp (_, _, x) -> is_nullable_comp (go x)
+      | Fix (_, _, _, x) -> go x
+    in go
 
   let is_nothing = function
     | Nothing -> true
@@ -107,13 +114,35 @@ module Abstract = struct
     | Repeat (_, h, _, _) -> h
     | Star _ -> false
     | Comp (_, h, _) -> h
+    | Fix (_, h, _, _) -> h
+
+  (*let lower_bound_comp = function
+    | Size.Top -> Size.bot
+    | Size.Bot -> Size.of_int 0
+    | Size.Finite 0 -> Size.of_int 1
+    | Size.Finite _ -> Size.of_int 0
+
+  let lower_bound n b =
+    let rec go = function
+      | Nothing -> Size.bot
+      | Null -> Size.of_int 0
+      | Any -> Size.of_int 1
+      | Lits ls -> b ls
+      | Concat (_, _, x, y) when is_nullable' n x -> Size.(go x + go y)
+      | Concat (_, _, x, _) -> go x
+      | Union (_, _, x, y) -> Size.min (go x) (go y)
+      | Repeat (_, _, x, _) -> go x
+      | Star _ -> Size.of_int 0
+      | Comp (_, _, x) -> lower_bound_comp @@ go x
+    in go*)
 
   let rec reverse = function
     | Concat (m, h, x, y) -> Concat (m, h, reverse y, reverse x)
     | Union (m, h, x, y) -> Union (m, h, reverse x, reverse y)
     | Repeat (m, h, x, i) -> Repeat (m, h, reverse x, i)
     | Star x -> Star (reverse x)
-    | Comp (m, n, x) -> Comp (m, n, reverse x)
+    | Comp (m, h, x) -> Comp (m, h, reverse x)
+    | Fix (m, h, vs, x) -> Fix (m, h, vs, reverse x)
     | x -> x
 
   let nothing =
@@ -143,6 +172,9 @@ module Abstract = struct
   let comp x =
     Comp (is_nullable_comp (is_nullable x), is_nothing_comp (is_nothing x), x)
 
+  let fix vt x = 
+    Fix (is_nullable x, is_nothing x, vt, x)
+
   let comp_nothing =
     Comp (true, false, Nothing)
 
@@ -153,79 +185,87 @@ module Abstract = struct
     Comp (true, false, Any)
 end
 
-module type LITS = sig
+module type VARS = sig
   type t
   val pp: t Fmt.t
   val equal: t -> t -> bool
   val compare: t -> t -> int
   val subset: t -> t -> bool
+
+  val empty: t
+  val is_empty: t -> bool
+  val inter: t -> t -> t
+  val diff: t -> t -> t
+  val union: t -> t -> t
+end
+
+module type LITS = sig
+  type t
+  type vars
+  val pp: t Fmt.t
+  val equal: t -> t -> bool
+  val compare: t -> t -> int
+  val subset: t -> t -> bool
+  val to_vars: t -> vars
+  val of_vars: vars -> t
 end
 
 module type CONCRETE = sig
+  type vars
   type lits
-  type t = lits Abstract.t
+  type t = (vars, lits) Abstract.t
 
   val pp: t Fmt.t
   val equal: t -> t -> bool
   val compare: t -> t -> int
 
-  val is_nullable: t -> bool
-  val is_nullable': (lits -> bool) -> t -> bool
-  val is_nothing: t -> bool
   val derivative: lits -> t -> t
-  val derivative': lits list -> t -> t
+  val derivative': vars -> (vars -> t) -> (lits -> bool) -> lits -> t -> t
 
-  val head: t -> lits Seq.t
-  val occur: t -> lits Seq.t
+  val first': (t -> bool) -> t -> lits Seq.t
+  val first: t -> lits Seq.t
+  (*val occur: t -> lits Seq.t*)
+  val free: t -> vars
   val simplify: t -> t
 end
 
-module Concrete(Lits: LITS): CONCRETE with type lits = Lits.t = struct
-  include Abstract
+module Concrete(Vars: VARS)(Lits: LITS with type vars = Vars.t): 
+  CONCRETE with type lits = Lits.t and type vars = Vars.t = struct
+  open Abstract
+  type vars = Vars.t
   type lits = Lits.t
-  type t = Lits.t Abstract.t
+  type t = (Vars.t, Lits.t) Abstract.t
   [@@deriving eq, ord, show]
 
-  let head = 
+  let first' n = 
     let rec go = function
       | Nothing -> Seq.empty
       | Null -> Seq.empty
       | Any -> Seq.empty
       | Lits ls -> Seq.return ls
-      | Concat (_, _, x, y) when is_nullable x -> Seq.append (go x) (go y)
+      | Concat (_, _, x, y) when n x -> Seq.append (go x) (go y)
       | Concat (_, _, x, _) -> go x
       | Union (_, _, x, y) -> Seq.append (go x) (go y)
       | Repeat (_, _, x, _) -> go x
       | Star x -> go x
       | Comp (_, _, x) -> go x
+      | Fix (_, _, _, x) -> go x
     in go
 
-  (*let lower_bound =
-    let rec go = function
-      | Nothing -> 0
-      | Null -> 0
-      | Any -> 1
-      | Lits ls -> 
-      | Concat (_, _, x, y) when is_nullable x -> Seq.append (go x) (go y)
-      | Concat (_, _, x, _) -> go x
-      | Union (_, _, x, y) -> Seq.append (go x) (go y)
-      | Repeat (_, _, x, _) -> go x
-      | Star x -> go x
-      | Comp (_, _, x) -> go x
-    in go*)
+  let first = 
+    first' is_nullable
 
-  let occur =
-    let rec go = function
-      | Nothing -> Seq.empty
-      | Null -> Seq.empty
-      | Any -> Seq.empty
-      | Lits ls -> Seq.return ls
-      | Concat (_, _, x, y) -> Seq.append (go x) (go y)
-      | Union (_, _, x, y) -> Seq.append (go x) (go y)
-      | Repeat (_, _, x, _) -> go x
-      | Star x -> go x
-      | Comp (_, _, x) -> go x
-    in go
+  let rec free = function
+    | Nothing -> Vars.empty
+    | Null -> Vars.empty
+    | Any -> Vars.empty
+    | Lits ls -> Lits.to_vars ls
+    | Concat (_, _, x, y) -> Vars.union (free x) (free y)
+    | Union (_, _, x, y) -> Vars.union (free x) (free y)
+    | Repeat (_, _, x, _) -> free x
+    | Star x -> free x
+    | Comp (_, _, x) -> free x
+    | Fix (_, _, vs, x) -> Vars.diff (free x) vs
 
   let rec simplify = function
     | Union (_, _, x, Union (_, _, y, z)) -> simplify (union (simplify (union x y)) (simplify z))
@@ -239,7 +279,7 @@ module Concrete(Lits: LITS): CONCRETE with type lits = Lits.t = struct
        | x, y when compare x y > 0 -> Union (m, h, y, x)
        | x, y -> Union (m, h, x, y))
 
-    | Concat (_, _, x, Concat (_, _, y, z)) -> simplify (concat (concat x y) z)
+    | Concat (_, _, x, Concat (_, _, y, z)) -> simplify (concat (simplify (concat x y)) (simplify z))
     | Concat (m, h, x, y) -> 
       (match simplify x, simplify y with
        (*| Union (_, _, Null, x), Star y when equal x y -> simplify (Star x)
@@ -276,6 +316,12 @@ module Concrete(Lits: LITS): CONCRETE with type lits = Lits.t = struct
        | Comp (_, _, x) -> x
        | x -> Comp (m, h, x))
 
+    | Fix (_, _, vs, x) -> 
+      (match simplify x with
+       | x when not (Vars.subset vs (free x)) -> x
+       | Fix (_, _, vs', x) when Vars.equal vs vs' -> fix vs x
+       | x -> fix vs x)
+
     | x -> x
 
   let rec derivative s = function
@@ -297,12 +343,32 @@ module Concrete(Lits: LITS): CONCRETE with type lits = Lits.t = struct
       concat (derivative s x) (star x)
     | Comp (_, _, x) ->
       comp (derivative s x)
+    | Fix (_, _, _, _) -> nothing
 
-  let derivative' ss x =
-    List.fold_left (Fun.flip derivative) x ss
-
+  let rec derivative' b p n s = function
+    | Nothing -> nothing
+    | Null -> nothing
+    | Any -> null
+    | Lits ls -> 
+      let vs = Lits.to_vars ls in
+      let b' = Vars.inter vs b 
+      and f = Vars.diff vs b in
+      union (if Lits.subset s ls then null else nothing)
+        (union (if Vars.is_empty b' then nothing else lits (Lits.of_vars b')) (if Vars.is_empty f then nothing else (derivative' b p n s (fix f (p f)))))
+    | Concat (_, _, x, y) when is_nullable' n x -> union (concat (derivative' b p n s x) y) (derivative' b p n s y)
+    | Concat (_, _, x, y) -> concat (derivative' b p n s x) y
+    | Union (_, _, x, y) -> union (derivative' b p n s x) (derivative' b p n s y)
+    | Repeat (_, _, x, i) -> 
+      (match i with
+       | 0 -> nothing
+       | i -> concat (derivative' b p n s x) (repeat x (pred i)))
+    | Star x ->
+      concat (derivative' b p n s x) (star x)
+    | Comp (_, _, x) ->
+      comp (derivative' b p n s x)
+    | Fix (_, _, vs, y) ->
+      fix vs (derivative' (Vars.union vs b) p (fun vs' -> if Lits.subset (Lits.of_vars vs) vs' then is_nullable y else n vs') s y)
 end
-
   
 module Porcelan(C: OP) = struct
   include C
@@ -363,8 +429,9 @@ module Porcelan(C: OP) = struct
   let (|...) x (i, j) = interval x i j
 end
 
-module Kleene(Lits: LITS)(G: Graph.S) = struct
-  open Concrete(Lits)
+module Kleene(Vars: VARS)(Lits: LITS with type vars = Vars.t)(G: Graph.S) = struct
+  open Abstract
+  open Concrete(Vars)(Lits)
   open Porcelan(Abstract)
 
   let labels s p g =
@@ -390,7 +457,7 @@ module Kleene(Lits: LITS)(G: Graph.S) = struct
     Seq.fold_left (fun g p ->
         let loop = labels p p g in
         Seq.fold_left (fun g (s, q) ->
-            let l = simplify @@ labels s p g * star loop * labels p q g + labels s q g in
+            let l = simplify (labels s p g * star loop * labels p q g + labels s q g) in
             if is_nothing l then g else G.connect s q l g)
           g (Seq.product vertices vertices))
       g vertices 
@@ -400,7 +467,7 @@ module Kleene(Lits: LITS)(G: Graph.S) = struct
     Seq.fold_left (fun g p ->
         let loop = labels p p g in
         Seq.fold_left (fun g (s, q) ->
-            let l = simplify @@ labels p q g  * star loop * labels s p g + labels s q g in
+            let l = simplify (labels p q g * star loop * labels s p g + labels s q g) in
             if is_nothing l then g else G.connect s q l g)
           g (Seq.product vertices vertices))
       g vertices 

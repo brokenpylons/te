@@ -1,5 +1,3 @@
-open! Prelude
-
 module type SET0 = sig
   type t
   val compare: t -> t -> int
@@ -63,34 +61,7 @@ module type S0 = sig
   val diff: t -> t -> t
 end
 
-module Make0(M: MAP)(S: SET0) = struct
-  type key = M.elt
-  type values = S.t
-  type t = S.t M.t
-
-  let compare = M.compare S.compare 
-  let equal = M.equal S.equal
-
-  let empty = M.empty
-  let is_empty = M.is_empty
-  let singleton_multiple = M.singleton
-
-  let domain_mem = M.mem
-
-  let the_multiple = M.the 
-  let fold_multiple = M.fold
-
-  let to_seq_multiple t =
-    fold_multiple (fun x xp -> Seq.cons (x, xp)) Seq.empty t
-
-  let find_multiple = M.find
-
-  let find_multiple_or ~default x t =
-    try find_multiple x t
-    with Not_found -> default
-
-  let diff t1 t2 = M.diff t1 t2
-end
+module Make0(M: MAP)(S: SET0): S0 with type t = S.t M.t and type key = M.elt and type values = S.t
 
 module type S1 = sig
   include S0
@@ -100,17 +71,7 @@ module type S1 = sig
   val (<|>): t -> t -> t
 end
 
-module Make1(M: MAP)(S: SET1) = struct
-  include Make0(M)(S)
-
-  let add_multiple x xp t =
-    M.update x (function Some s -> Some (S.union xp s) | None -> Some xp) t
-
-  let union t1 t2 =
-    M.union (fun _ -> S.union) t1 t2
-
-  let (<|>) = union
-end
+module Make1(M: MAP)(S: SET1): S1 with type t = S.t M.t and type key = M.elt and type values = S.t
 
 module type S2 = sig
   include S1
@@ -128,27 +89,4 @@ module type S2 = sig
   include Set.SEQUENTIAL with type t := t and type elt := elt
 end
 
-module Make2(M: MAP)(S: SET2) = struct
-  include Make1(M)(S)
-  type value = S.elt
-  type elt = M.elt * S.elt
-
-  let singleton k v = M.singleton k (S.singleton v)
-
-  let fold f acc t =
-    M.fold (fun x -> (Fun.flip @@ S.fold (fun xp -> f x xp))) acc t
-
-  let add x xp t =
-    M.update x (function Some s -> Some (S.add xp s) | None -> Some (S.singleton xp)) t
-
-  let inter t1 t2 =
-    M.inter (fun _ -> S.inter) t1 t2
-
-  include Set.Sequential(struct
-      type nonrec t = t
-      type nonrec elt = elt
-      let add (x, xp) t = add x xp t
-      let empty = empty
-      let fold f = fold (fun x xp -> f (x, xp))
-    end)
-end
+module Make2(M: MAP)(S: SET2): S2 with type t = S.t M.t and type key = M.elt and type value = S.elt and type values = S.t

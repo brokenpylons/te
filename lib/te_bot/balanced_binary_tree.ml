@@ -521,7 +521,7 @@ module Map = struct
 
     val find: elt -> 'a t -> 'a
     val find_opt: elt -> 'a t -> 'a option
-    val mem: elt -> 'a t -> bool
+    val mem: elt -> _ t -> bool
     val to_seq: 'a t -> (elt * 'a) Seq.t
     val of_seq: (elt * 'a) Seq.t -> 'a t
 
@@ -529,6 +529,8 @@ module Map = struct
 
     val merge: (elt -> 'a option -> 'a option -> 'a option) -> 'a t -> 'a t -> 'a t
     val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+    val inter: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+    val diff: 'a t -> 'a t -> 'a t
     val subset: ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 
     val the: 'a t -> elt * 'a
@@ -541,6 +543,7 @@ module Map = struct
     val filter: (elt -> 'a -> bool) -> 'a t -> 'a t
     val (&): (elt * 'a) -> 'a t -> 'a t
     val to_fun: 'a t -> (elt -> 'a)
+    val iter: (elt -> 'a -> unit) -> 'a t -> unit
 
     val domain_disjoint: 'a t -> 'a t -> bool
   end
@@ -768,6 +771,11 @@ module Map = struct
 
     let equal eq t1 t2 = equal' eq (cons t1 Nil) (cons t2 Nil)
 
+    let rec iter f = function
+      | Empty -> ()
+      | Node (_, x, xp, l, r) ->
+        iter f l; f x xp; iter f r
+
     let rec fold f acc = function
       | Empty -> acc 
       | Node (_, x, xp, l, r) ->
@@ -923,6 +931,30 @@ module Map = struct
         match s with
         | Some xp' -> join x (f x xp' xp) l r
         | None -> join x xp l r
+
+    let rec inter f t1 t2 =
+      match t1, t2 with
+      | Empty, Empty -> Empty
+      | Empty, _ -> Empty
+      | _, Empty -> Empty
+      | t1, Node (_, x, xp, l2, r2) ->
+        let (s, l1, r1) = split x t1 in
+        let l = inter f l1 l2 
+        and r = inter f r1 r2 in
+        match s with
+        | Some xp' -> join x (f x xp' xp) l r
+        | None -> concat l r
+
+    let rec diff t1 t2 =
+      match t1, t2 with
+      | Empty, Empty -> Empty
+      | Empty, _ -> Empty
+      | _, Empty -> t1
+      | t1, Node (_, x, _, l2, r2) ->
+        let (_, l1, r1) = split x t1 in
+        let l = diff l1 l2 
+        and r = diff r1 r2 in
+        concat l r
 
     let rec subset' eq_p e1 e2 =
       match e1, e2 with

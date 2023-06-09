@@ -130,7 +130,10 @@ module Vars = struct
   include Balanced_binary_tree.Set.Size(Var)
   let pp = pp Var.pp
 end
-module Var_to = Balanced_binary_tree.Map.Size(Var)
+module Var_to = struct
+  include Balanced_binary_tree.Map.Size(Var)
+  let pp pp_p = pp Var.pp pp_p
+end
 
 module Labeled_var = struct
   type t = Var.t * Var.t
