@@ -137,7 +137,7 @@ module type S = sig
 
   val digraph: (vertex -> 'vl -> 'seed) -> ('seed -> 'vl -> ('el * (unit -> 'seed)) Seq.t -> 'seed) -> ('vl, 'el) t -> (vertex -> 'seed)
 
-  val unfold': (unit -> vertex -> 'seed -> 'vl * ('el * vertex * 'seed) Seq.t) -> vertex -> 'seed -> ('vl, 'el) t
+  val unfold: (vertex -> 'seed -> 'vl * ('el * vertex * 'seed) Seq.t) -> vertex -> 'seed -> ('vl, 'el) t
 
   val tie: ((vertex -> 'result) -> vertex -> 'vl -> (vertex * 'el) Seq.t -> 'result) -> ('vl, 'el) t -> (vertex -> 'result)
 
@@ -393,14 +393,14 @@ module Make
     Vertex_map.iter (fun v _ -> visit v) g;
     fun v -> Vertex_map.find v !f
 
-  let unfold' f v start =
+  let unfold f v start =
     let graph = ref empty in
 
     let rec cycle v x = 
       if Vertex_map.mem v !graph
       then v
       else 
-        let (vl, adj) = f () v x in
+        let (vl, adj) = f v x in
         graph := add v vl !graph;
         let adj = Seq.map (fun (el, v, x) -> (el, cycle v x)) adj in
         Seq.iter (fun (el, u) -> graph := connect v u el !graph) adj;

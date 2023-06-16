@@ -46,6 +46,7 @@ module State_to = struct
 end
 module State_graph = Graph.Make(State)(State_to)(State_to)
 
+
 module type INDEX_MAP = sig
   type elt
   type _ t
@@ -97,6 +98,24 @@ end
 
 module State_pair_to = Balanced_binary_tree.Map.Size(State_pair)
 module State_pair_graph = Graph.Make(State_pair)(State_pair_to)(State_pair_to)
+
+module State_partial = struct
+  type t = State.t option
+  [@@deriving ord, eq]
+
+  let pp ppf = function
+    | Some x -> State.pp ppf x
+    | None -> Fmt.string ppf "✖"
+
+  let union x y =
+    match x, y with
+    | Some _, Some _ -> assert false
+    | Some x, None
+    | None, Some x -> Some x
+    | None, None -> None
+
+  let empty = None
+end
 
 module Vertices = struct
   include Balanced_binary_tree.Set.Size(Vertex)

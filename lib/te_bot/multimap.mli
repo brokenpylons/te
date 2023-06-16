@@ -36,6 +36,7 @@ module type MAP = sig
   val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
   val inter: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
   val diff: 'a t -> 'a t -> 'a t
+  val filter: (elt -> 'a -> bool) -> 'a t -> 'a t
 end
 
 module type S0 = sig
@@ -57,6 +58,8 @@ module type S0 = sig
 
   val find_multiple: key -> t -> values
   val find_multiple_or: default:values -> key -> t -> values
+
+  val filter_multiple: (key -> values -> bool) -> t -> t
 
   val diff: t -> t -> t
 end

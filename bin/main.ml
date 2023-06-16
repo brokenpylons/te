@@ -78,17 +78,22 @@ let () =
     ];
   in*)
 
-  let Vector.[s'; s; a; b; c; d; e; n] = T.Var.make ~supply:T.Var.supply Vector.["S'"; "S"; "A"; "b"; "c"; "d"; "e"; "_"] in
+  let Vector.[s'; s; a; b; c; d; e; f; x_; y_; z_; n] = T.Var.make ~supply:T.Var.supply Vector.["S'"; "S"; "A"; "B"; "c"; "d"; "e"; "f"; "x"; "y"; "z"; "_"] in
   let ps = List.to_seq @@ Tn.Production.[
-      make (n, s') R.(var s * plus eof);
+      make (n, s') R.(var s * var f * plus eof);
 
       make (n, s) R.(var b * var c * var d + var a * var e);
       make (n, a) (var b);
 
-      make (n, b) R.(var b * set "x" * set "x" + null);
-      make (n, c) (set "y");
-      make (n, d) R.(set "z" + null);
-      make (n, e) R.(set "y" * set "z");
+      make (n, b) R.(var b * var x_ * var x_ + null);
+      make (n, c) (var y_);
+      make (n, d) R.(var z_ + null);
+      make (n, e) R.(var y_ * var z_);
+
+      make (n, x_) (set "#");
+      make (n, y_) (set "#");
+      make (n, z_) (set "#");
+      make (n, f) (set "#");
     ];
   in
   let n = Tn.is_nullable ps in
@@ -110,13 +115,15 @@ let () =
   let x'' = Tn.convert_multiple ~supply:T.State.supply ps in
   let x = Tn.collapse ~supply:T.State.supply @@ x' in
   let y = Tn.subset ~supply:T.State.supply @@ x' in
-  let (start, z) = Tn.inter y x' in
-  let w = Tn.rev_solve @@ Tn.backlog z in
-  let rc = Tn.right_context (start, w) in
+  (*let (start, z) = Tn.inter y x' in
+  let w = Tn.rev_solve @@ Tn.backlog z in*)
+  (*let rc = Tn.right_context (start, w) in*)
   let to_start = Tn.to_start y in
-  let w = Tn.extract_multiple ~supply:T.State.supply x'' to_start y in
+  let w = Tn.extract_multiple x'' to_start y in
   Fmt.pr "FIRST.";
-  Tn.first2 w;
+  let la = Tn.lookahead w in
+  let token_la = Tn.lookahead_tokens (T.Vars.of_list [c; d; e; f; x_; y_; z_]) la in
+  let nc = Tn.noncannonical ~supply:T.State.supply token_la y in
 
 
   (*let w' = Tn.strip ~supply:T.State.supply @@ Tn.construct'' s' (Tn.M.start y) w in
@@ -132,10 +139,12 @@ let () =
   Fmt.pr "%s@." @@
   Dot.string_of_graph @@
     Tn.M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Tn.Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Tn.Lits.pp x) y;
+  (*Fmt.pr "%s@." @@
+  Dot.string_of_graph @@
+  T.State_pair_graph.to_dot ~string_of_vertex_label:(fun x -> Fmt.to_to_string Tn.Rhs.pp x) ~string_of_edge_label:(fun x -> Fmt.to_to_string Tn.Lits.pp x) z;*)
   Fmt.pr "%s@." @@
   Dot.string_of_graph @@
-  T.State_pair_graph.to_dot ~string_of_vertex_label:(fun x -> Fmt.to_to_string Tn.Rhs.pp x) ~string_of_edge_label:(fun x -> Fmt.to_to_string Tn.Lits.pp x) z;
-  Fmt.pr "%s@." (Tn.rtn_to_string (Tn.lookahead rc y))
+    Tn.M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string T.States.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Tn.Lits.pp x) nc;
 
   (*(*Fmt.pr "%s@." @@
   Dot.string_of_graph @@

@@ -33,11 +33,12 @@ module type SET3 = sig
 end
 
 module type MAP = sig
-  include Map.CORE 
+  include Map.CORE
   val update: elt -> ('a option -> 'a option) -> 'a t -> 'a t
   val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
   val inter: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
   val diff: 'a t -> 'a t -> 'a t
+  val filter: (elt -> 'a -> bool) -> 'a t -> 'a t
 end
 
 module type S0 = sig
@@ -60,6 +61,8 @@ module type S0 = sig
   val find_multiple: key -> t -> values
   val find_multiple_or: default:values -> key -> t -> values
 
+  val filter_multiple: (key -> values -> bool) -> t -> t
+
   val diff: t -> t -> t
 end
 
@@ -79,6 +82,7 @@ module Make0(M: MAP)(S: SET0) = struct
 
   let the_multiple = M.the 
   let fold_multiple = M.fold
+  let filter_multiple = M.filter
 
   let to_seq_multiple t =
     fold_multiple (fun x xp -> Seq.cons (x, xp)) Seq.empty t
