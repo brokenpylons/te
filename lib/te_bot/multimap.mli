@@ -86,10 +86,12 @@ module type S2 = sig
   val fold: (key -> value -> 'acc -> 'acc) -> 'acc -> t -> 'acc
 
   val add: key -> value -> t -> t
+  val the: t -> key * value
 
   val inter: t -> t -> t
 
   include Set.SEQUENTIAL with type t := t and type elt := elt
+  module Set: SET2 with type t = t and type elt = elt
 end
 
 module Make2(M: MAP)(S: SET2): S2 with type t = S.t M.t and type key = M.elt and type value = S.elt and type values = S.t

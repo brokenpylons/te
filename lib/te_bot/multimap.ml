@@ -126,10 +126,12 @@ module type S2 = sig
   val fold: (key -> value -> 'acc -> 'acc) -> 'acc -> t -> 'acc
 
   val add: key -> value -> t -> t
+  val the: t -> key * value
 
   val inter: t -> t -> t
 
   include Set.SEQUENTIAL with type t := t and type elt := elt
+  module Set: SET2 with type t = t and type elt = elt
 end
 
 module Make2(M: MAP)(S: SET2) = struct
@@ -145,14 +147,29 @@ module Make2(M: MAP)(S: SET2) = struct
   let add x xp t =
     M.update x (function Some s -> Some (S.add xp s) | None -> Some (S.singleton xp)) t
 
+  let the t =
+    let (x, xp) = M.the t in
+    (x, S.the xp)
+
   let inter t1 t2 =
     M.inter (fun _ -> S.inter) t1 t2
 
-  include Set.Sequential(struct
-      type nonrec t = t
-      type nonrec elt = elt
-      let add (x, xp) t = add x xp t
-      let empty = empty
-      let fold f = fold (fun x xp -> f (x, xp))
-    end)
+  module X = struct
+    type nonrec t = t
+    type nonrec elt = elt
+    let equal = equal
+    let compare = compare
+    let union = union
+    let add (x, xp) t = add x xp t
+    let empty = empty
+    let fold f = fold (fun x xp -> f (x, xp))
+    let inter = inter
+    let singleton (k, v) = singleton k v
+    let the = the
+  end
+  include Set.Sequential(X)
+  module Set = struct
+    include X
+    include Set.Sequential(X)
+  end
 end

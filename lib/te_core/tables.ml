@@ -3,23 +3,12 @@ open! Prelude
 module T = Types
 open Tn
 
-module Reduction = struct
-  module Strategy = struct
-    type t = Null | Token | Fixed of int | Scan of unit
-    [@@deriving eq, ord]
-  end
-
-  type t = {output: T.Labeled_var.t; strategy: Strategy.t}
-  [@@deriving eq, ord]
-end
-module Reductions = Balanced_binary_tree.Set.Size(Reduction)
-
 module Actions = struct
   type t =
     {
       accept: bool;
       shift: bool;
-      reduce: Reductions.t;
+      reduce: T.Reductions.t;
     }
   [@@deriving eq, ord]
 
@@ -27,20 +16,20 @@ module Actions = struct
     {
       accept = x.accept || y.accept;
       shift = x.shift || y.shift;
-      reduce = Reductions.union x.reduce y.reduce;
+      reduce = T.Reductions.union x.reduce y.reduce;
     }
 
   let empty =
     {
       accept = false;
       shift = false;
-      reduce = Reductions.empty;
+      reduce = T.Reductions.empty;
     }
 
   let is_empty x =
     not x.accept &&
     not x.shift &&
-    Reductions.is_empty x.reduce
+    T.Reductions.is_empty x.reduce
 
   let accept =
     {empty with accept = true}
@@ -52,7 +41,7 @@ module Actions = struct
     {empty with reduce = x}
 end
 
-module Actions_multimap = Lits_multimap(Reductions)
+module Actions_multimap = Lits_multimap(Actions)
 module Goto_partial_map = Lits_multimap(T.State_partial)
 
 module type ITEMS = sig
@@ -65,9 +54,10 @@ module type ITEMS = sig
   val pp: t Fmt.t
   val to_seq: t -> item Seq.t
 
-  val is_nullable: item -> bool
-  val is_final: item -> bool
+  val is_kernel: item -> bool
+  val is_reduce: item -> bool
   val is_right_nulled: item -> bool
+  val shift: item -> Lits.t
   val output: item -> T.Labeled_var.t
   val distance: item -> Size.t
   val shift_lookahead: item -> Lits.t
@@ -76,29 +66,53 @@ module type ITEMS = sig
   val filter2: item -> Lits_multimap(Lits).t
 end
 
-module type MODIFIERS = sig
+module type EXTRA = sig
   val adjacency_restriction: Lits_multimap(Lits).t
   val is_token: T.Labeled_var.t -> bool
 end
 
-module Make(A: Fa.FA)(Items: ITEMS)(Modifiers: MODIFIERS) = struct
+(*module Make(A: Fa.FA)(Items: ITEMS)(Extra: EXTRA) = struct
 
-  let reduce x =
+  let select_strategy x =
+    if Items.is_kernel x then
+      if Items.is_right_nulled x then
+        if Extra.is_token @@ Items.output x then
+          (assert (Items.is_reduce x);
+           Some T.Reduction.Strategy.Token)
+        else
+          match Size.to_int @@ Items.distance x with
+          | Some d -> Some (T.Reduction.Strategy.Fixed d)
+          | None -> failwith "Variable length"
+      else
+        None
+    else if Items.is_reduce x then
+      Some T.Reduction.Strategy.Null
+    else
+      None
 
-  let actions items =
+  let actions_of_item x =
+    let shift =
+      let ls = Items.shift x in
+      if not (Lits.is_empty ls)
+      then Actions_multimap.singleton_multiple ls Actions.shift
+      else Actions_multimap.empty
+    in
+    let reduce =
+      match select_strategy x with
+      | Some strategy ->
+        Actions_multimap.singleton_multiple (Items.reduce_lookahead x)
+          (Actions.reduce (T.Reductions.singleton (T.Reduction.make (Items.output x) strategy)))
+      | None -> Actions_multimap.empty
+    in
+    Actions_multimap.union shift reduce
+
+  let actions_of_items items =
     Items.to_seq items
-    |> Seq.map (fun x ->
-        match Size.to_int @@ Items.distance x with
-        | Some d -> (Items.reduce_lookahead x, Reductions.singleton {output = Items.output x; strategy = Fixed d})
-        | None -> failwith "Variable length"
+    |> Seq.map actions_of_item
+    |> Seq.fold_left Actions_multimap.union Actions_multimap.empty
 
-
-
-
-
-      )
-
-
-
-
-end
+  let actions g =
+    M.states_labels g
+    |> Seq.map (fun (s, items) -> (s, actions_of_items items))
+    |> T.State_to.of_seq
+end*)

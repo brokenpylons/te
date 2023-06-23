@@ -1,0 +1,4 @@
+(executable
+ (public_name te)
+ (name parser)
+ (libraries te_core te_bot))

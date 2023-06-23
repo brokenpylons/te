@@ -13,6 +13,7 @@ module type VERTEX_MAP = sig
   type 'a t
 
   include Map.CORE with type elt := elt and type 'a t := 'a t
+  val add_with: (elt -> elt -> elt) -> ('a -> 'a -> 'a) -> elt -> 'a -> 'a t -> 'a t
 
   val modify: elt -> ('a -> 'a) -> 'a t -> 'a t
   val cardinal: 'a t -> int
@@ -88,6 +89,8 @@ module type S = sig
   val remove_edge: vertex -> vertex -> ('vl, 'el) t -> ('vl, 'el) t
 
   val connect: vertex -> vertex -> 'el -> ('vl, 'el) t -> ('vl, 'el) t
+
+  val connect_with: ('el -> 'el -> 'el) -> vertex -> vertex -> 'el -> ('vl, 'el) t -> ('vl, 'el) t
 
   val link: vertex Seq.t -> vertex Seq.t -> 'el -> ('vl, 'el) t -> ('vl, 'el) t
 

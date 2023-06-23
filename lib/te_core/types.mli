@@ -21,13 +21,14 @@ module Codes: sig
 end
 
 module State: sig
-  type t
+  type t = int
   val compare: t -> t -> int
   val equal: t -> t -> bool
   val to_id: t -> Dot.id
   val pp: t Fmt.t
   val supply: t Supply.t
 end
+
 module States: sig
   type t
   type elt = State.t
@@ -48,6 +49,7 @@ module State_to: sig
   val inter: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
   val diff: 'a t -> 'a t -> 'a t
   val filter: (elt -> 'a -> bool) -> 'a t -> 'a t
+  val of_seq: (elt * 'a) Seq.t -> 'a t
 end
 module State_graph: Graph.S with type vertex = State.t
 
@@ -95,6 +97,7 @@ module Vertex: sig
   type t
   val make: State.t -> int -> t
   val state: t -> State.t
+  val position: t -> int
   val compare: t -> t -> int
   val equal: t -> t -> bool
   val to_id: t -> Dot.id
@@ -108,9 +111,34 @@ module Vertices: sig
   include Set.BINARY with type elt := elt and type t := t
   include Set.SEQUENTIAL with type elt := elt and type t := t
   val pp: t Fmt.t
+  val iter: (elt -> unit) -> t -> unit
 end
-module Vertex_to: Map.CORE with type elt = Vertex.t
+module Vertex_to: sig
+  include Map.CORE with type elt = Vertex.t
+  val update: elt -> ('a option -> 'a option) -> 'a t -> 'a t
+  val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+  val inter: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+  val diff: 'a t -> 'a t -> 'a t
+  val filter: (elt -> 'a -> bool) -> 'a t -> 'a t
+end
 module Vertex_graph: Graph.S with type vertex = Vertex.t
+
+module Edge: sig
+  type t = Vertex.t * Vertex.t
+  val compare: t -> t -> int
+  val equal: t -> t -> bool
+  val pp: t Fmt.t
+end
+
+module Edges: sig
+  type t
+  type elt = Edge.t
+  include Set.CORE with type elt := elt and type t := t
+  include Set.BINARY with type elt := elt and type t := t
+  include Set.SEQUENTIAL with type elt := elt and type t := t
+  val pp: t Fmt.t
+end
+module Edge_to: Map.CORE with type elt = Edge.t
 
 module Var: sig
   type t
@@ -177,15 +205,19 @@ module Labeled_var_to: sig
   val of_seq: (elt * 'a) Seq.t -> 'a t
 end
 
-(*module Reduction: sig
-  type strategy = Fixed of
-  type t
-  val equal: t -> t -> bool
-  val compare: t -> t -> int
-  val labled_var: t -> Labeled_var.t
-  val length: t -> Size.t
-end
+module Reduction: sig
+  module Strategy: sig
+    type t = Fixed of int | Scan of State_pair.t
+    val compare: t -> t -> int
+    val equal: t -> t -> bool
+  end
 
+  type t = private {output: Labeled_var.t; strategy: Strategy.t}
+  val make: Labeled_var.t -> Strategy.t -> t
+
+  val compare: t -> t -> int
+  val equal: t -> t -> bool
+end
 module Reductions: sig
   type t
   type elt = Reduction.t
@@ -193,4 +225,8 @@ module Reductions: sig
   include Set.BINARY with type elt := elt and type t := t
   include Set.SEQUENTIAL with type elt := elt and type t := t
   val pp: t Fmt.t
-end*)
+  val iter: (elt -> unit) -> t -> unit
+  (*val disjoint: t -> t -> bool
+  val subset: t -> t -> bool*)
+end
+

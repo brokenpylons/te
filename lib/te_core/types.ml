@@ -77,11 +77,34 @@ module Vertex = struct
 
   let state = fst
 
+  let position = snd
+
   let pp ppf (state, position) =
     Fmt.pf ppf "%a:%i" State.pp state position
 
   let to_id x = Dot.(String (Fmt.str "%a" pp x))
 end
+
+module Vertices = struct
+  include Balanced_binary_tree.Set.Size(Vertex)
+  let pp = pp Vertex.pp 
+end
+module Vertex_to = Balanced_binary_tree.Map.Size(Vertex)
+module Vertex_graph = Graph.Make(Vertex)(Vertex_to)(Vertex_to)
+
+module Edge = struct
+  type t = Vertex.t * Vertex.t
+  [@@deriving eq, ord]
+
+  let pp ppf (x, y) = 
+    Fmt.pf ppf "@[%a <- %a@]" Vertex.pp x Vertex.pp y
+end
+
+module Edges = struct
+  include Balanced_binary_tree.Set.Size(Edge)
+  let pp = pp Edge.pp 
+end
+module Edge_to = Balanced_binary_tree.Map.Size(Edge)
 
 module State_pair = struct
   type t = State.t * State.t
@@ -117,13 +140,6 @@ module State_partial = struct
   let empty = None
 end
 
-module Vertices = struct
-  include Balanced_binary_tree.Set.Size(Vertex)
-  let pp = pp Vertex.pp 
-end
-module Vertex_to = Balanced_binary_tree.Map.Size(Vertex)
-module Vertex_graph = Graph.Make(Vertex)(Vertex_to)(Vertex_to)
-
 module Var = struct
   type pre = int
   type t = int * string option
@@ -144,7 +160,6 @@ module Var = struct
   let pp ppf (_, label) =
     Fmt.pf ppf "@[%a@]" value_pp label
 end
-
 module Vars = struct
   include Balanced_binary_tree.Set.Size(Var)
   let pp = pp Var.pp
@@ -164,13 +179,28 @@ module Labeled_var = struct
   let pp ppf (z, s) =
     Fmt.pf ppf "@[%a. %a@]" Var.pp z Var.pp s
 end
-
 module Labeled_vars = struct
   include Balanced_binary_tree.Set.Size(Labeled_var)
   let pp = pp Labeled_var.pp
 end
-
 module Labeled_var_to = struct
   include Balanced_binary_tree.Map.Size(Labeled_var)
   let pp pp_p = pp Labeled_var.pp pp_p
 end
+
+module Reduction = struct
+  module Strategy = struct
+    type t = Fixed of int | Scan of State_pair.t
+    [@@deriving eq, ord, show]
+  end
+  type t = {output: Labeled_var.t; strategy: Strategy.t}
+  [@@deriving eq, ord, show]
+
+  let make output strategy = {output; strategy}
+end
+module Reductions = struct
+  include Balanced_binary_tree.Set.Size(Reduction)
+  let pp = pp Reduction.pp
+end
+
+
