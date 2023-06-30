@@ -27,6 +27,7 @@ module State: sig
   val to_id: t -> Dot.id
   val pp: t Fmt.t
   val supply: t Supply.t
+  val fresh_supply: unit -> t Supply.t
 end
 
 module States: sig
@@ -39,6 +40,7 @@ module States: sig
   val disjoint: t -> t -> bool
   val cardinal: t -> int
   val choose: t -> elt option
+  val to_id: t -> Dot.id
 end
 module State_to: sig
   include Map.CORE with type elt = State.t
@@ -50,8 +52,35 @@ module State_to: sig
   val diff: 'a t -> 'a t -> 'a t
   val filter: (elt -> 'a -> bool) -> 'a t -> 'a t
   val of_seq: (elt * 'a) Seq.t -> 'a t
+  val to_seq: 'a t -> (elt * 'a) Seq.t
 end
 module State_graph: Graph.S with type vertex = State.t
+
+module Statess: sig
+  type t
+  type elt = States.t
+  include Set.CORE with type elt := elt and type t := t
+  include Set.BINARY with type elt := elt and type t := t
+  include Set.SEQUENTIAL with type elt := elt and type t := t
+  val pp: t Fmt.t
+  val disjoint: t -> t -> bool
+  val cardinal: t -> int
+  val choose: t -> elt option
+end
+
+module States_to: sig
+  include Map.CORE with type elt = States.t
+  val pp: 'a Fmt.t -> 'a t Fmt.t
+  val subset: ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+  val update: elt -> ('a option -> 'a option) -> 'a t -> 'a t
+  val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+  val inter: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+  val diff: 'a t -> 'a t -> 'a t
+  val filter: (elt -> 'a -> bool) -> 'a t -> 'a t
+  val of_seq: (elt * 'a) Seq.t -> 'a t
+end
+module States_graph: Graph.S with type vertex = States.t
+
 
 module State_pair: sig
   type t = State.t * State.t
@@ -70,11 +99,35 @@ module State_pairs: sig
   val pp: t Fmt.t
 end
 
-module State_pair_to: Map.CORE with type elt = State_pair.t
+module State_pair_to: sig
+  include Map.CORE with type elt = State_pair.t
+  val pp: 'a Fmt.t -> 'a t Fmt.t
+  val of_seq: (elt * 'a) Seq.t -> 'a t
+end
 module State_pair_graph: Graph.S with type vertex = State_pair.t
 
 module State_partial: sig
-  type t
+  type t = State.t option
+  val compare: t -> t -> int
+  val equal: t -> t -> bool
+  val pp: t Fmt.t
+
+  val union: t -> t -> t
+  val empty: t
+end
+
+module State_pair_partial: sig
+  type t = State_pair.t option
+  val compare: t -> t -> int
+  val equal: t -> t -> bool
+  val pp: t Fmt.t
+
+  val union: t -> t -> t
+  val empty: t
+end
+
+module States_partial: sig
+  type t = States.t option
   val compare: t -> t -> int
   val equal: t -> t -> bool
   val pp: t Fmt.t
@@ -95,8 +148,8 @@ module State_index(Map: INDEX_MAP): State_graph.INDEX with type elt = Map.elt
 
 module Vertex: sig
   type t
-  val make: State.t -> int -> t
-  val state: t -> State.t
+  val make: States.t -> int -> t
+  val state: t -> States.t
   val position: t -> int
   val compare: t -> t -> int
   val equal: t -> t -> bool
@@ -115,6 +168,7 @@ module Vertices: sig
 end
 module Vertex_to: sig
   include Map.CORE with type elt = Vertex.t
+  val pp: 'a Fmt.t -> 'a t Fmt.t
   val update: elt -> ('a option -> 'a option) -> 'a t -> 'a t
   val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
   val inter: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
@@ -197,12 +251,14 @@ end
 module Labeled_var_to: sig
   include Map.CORE with type elt = Labeled_var.t
   val pp: 'a Fmt.t -> 'a t Fmt.t
+  val map: (elt -> 'a -> 'b) -> 'a t -> 'b t
   val update: elt -> ('a option -> 'a option) -> 'a t -> 'a t
   val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
   val inter: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
   val diff: 'a t -> 'a t -> 'a t
   val filter: (elt -> 'a -> bool) -> 'a t -> 'a t
   val of_seq: (elt * 'a) Seq.t -> 'a t
+  val to_seq: 'a t -> (elt * 'a) Seq.t
 end
 
 module Reduction: sig

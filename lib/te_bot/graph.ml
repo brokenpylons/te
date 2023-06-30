@@ -352,7 +352,7 @@ module Make
     let rec visit v =
       let (vl, adj) = Vertex_map.find v g in
       b := Vertex_map.add v () !b;
-      let x = f' (Vertex_map.find v !f) vl (Seq.map (fun (u, el) -> (el, fun () -> 
+      let x = f' (Vertex_map.find v !f) vl (Seq.map (fun (u, el) -> (el, fun () ->
           if not @@ Vertex_map.mem u !b
           then visit u;
           Vertex_map.find u !f))

@@ -44,7 +44,7 @@ let () =
   let t =
     Tables.{
       start = 1;
-      goto = (fun s x ->
+      goto = (fun s x -> 
           (match s, x with
            | 1, Null -> Some 2
            | 2, (Code x) when T.Codes.mem x (cs "y") -> Some 3

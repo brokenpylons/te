@@ -16,6 +16,7 @@ module type STATES = sig
   type elt
   include Set.CORE with type elt := elt and type t := t
   include Set.SEQUENTIAL with type elt := elt and type t := t
+  val union: t -> t -> t
 end
 
 module type S0 = sig
@@ -47,9 +48,17 @@ module type S0 = sig
   val states: _ t -> state Seq.t
   val state_mem: state -> _ t -> bool
   val transitions: (_, _, 'lits) t -> (state * state * 'lits) Seq.t
+  val adjacency_list: (_, 'labels, 'lits) t -> ((state * 'labels) * (state * 'lits) Seq.t) Seq.t
   val labels: state -> ('a, 'labels, 'lits) t -> 'labels
   val lits: state -> state -> ('a, 'labels, 'lits) t -> 'lits
+  val all_lits: (_, _, 'lits) t -> 'lits Seq.t
   val adjacent: state -> (_, _, 'lits) t -> (state * 'lits) Seq.t
+  val merge: merge_labels:('labels -> 'labels -> 'labels) -> merge_lits:('lits -> 'lits -> 'lits) -> (_, 'labels, 'lits) t -> (_, 'labels, 'lits) t -> (Start.multiple, 'labels, 'lits) t
+  val sum:  ('a, 'labels, 'lits) t -> ('b, 'labels, 'lits) t -> (Start.multiple, 'labels, 'lits) t
+  val empty: (Start.multiple, 'labels, 'lits) t
+  val homomorphism: ('lits -> 'lits) -> ('a, 'labels, 'lits) t -> ('a, 'labels, 'lits) t
+  val states_labels: ('a, 'labels, 'lits) t -> (state * 'labels) Seq.t
+  val map_states_labels: (state -> 'labels1 -> 'labels2) -> ('a, 'labels1, 'lits) t -> ('a, 'labels2, 'lits) t
 
   val rev: (_, 'labels, 'lits) t -> (Start.multiple, 'labels, 'lits) t
 
@@ -64,6 +73,12 @@ module type S0 = sig
   val dijkstra: (state -> 'labels -> 'seed) ->
     ('seed -> 'labels -> ('lits * (unit -> 'seed)) Seq.t -> 'seed) ->
     (Start.single, 'labels, 'lits) t ->
+    (state -> 'seed)
+
+  val fold: eq:('seed -> 'seed -> bool) ->
+    (state -> 'labels -> 'seed) ->
+    ('seed -> 'labels -> ('lits *  'seed) Seq.t -> 'seed) ->
+    (_, 'labels, 'lits) t ->
     (state -> 'seed)
 
   val to_dot: string_of_labels:('labels -> string) -> string_of_lits:('lits -> string) -> (_, 'labels, 'lits) t -> Dot.graph
@@ -132,11 +147,18 @@ module Make0(State: STATE)(States: STATES with type elt = State.t)(G: Graph.S wi
   let transitions a =
     G.labeled_edges a.graph
 
+  let adjacency_list a =
+    G.adjacency_list a.graph
+
   let labels q m =
     G.vertex_label q m.graph
 
   let lits q1 q2 m =
     G.edge_label q1 q2 m.graph
+
+
+  let all_lits  m =
+    G.edge_labels m.graph
 
   let adjacent q a =
     G.adjacent q a.graph
@@ -147,6 +169,36 @@ module Make0(State: STATE)(States: STATES with type elt = State.t)(G: Graph.S wi
       final = start_multiple a;
       graph = G.transpose a.graph
     }
+
+  let empty =
+    {
+      start = Multiple States.empty;
+      final = States.empty;
+      graph = G.empty;
+    }
+
+  let merge ~merge_labels ~merge_lits m1 m2 =
+    {
+      start = Start.Multiple (States.union (start_multiple m1) (start_multiple m2));
+      final = States.union m1.final m2.final;
+      graph = G.merge ~merge_vertex_label:merge_labels ~merge_edge_label:merge_lits m1.graph m2.graph;
+    }
+
+  let sum m1 m2 =
+    {
+      start = Start.Multiple (States.union (start_multiple m1) (start_multiple m2));
+      final = States.union m1.final m2.final;
+      graph = G.sum m1.graph m2.graph;
+    }
+
+  let states_labels m =
+    G.labeled_vertices m.graph
+
+  let map_states_labels f m =
+    {m with graph = G.labeled_vertices_map f m.graph}
+
+  let homomorphism f m =
+    {m with graph = G.labeled_edges_map (fun _ _ ls -> f ls) m.graph}
 
   let unfold_step ~final f q x =
     let (is_final, vl, y) = f q x in
@@ -167,6 +219,9 @@ module Make0(State: STATE)(States: STATES with type elt = State.t)(G: Graph.S wi
 
   let dijkstra seed f a =
     G.dijkstra seed f a.graph
+
+  let fold ~eq seed f a =
+    G.fold ~eq seed f a.graph
 
   let to_dot ~string_of_labels ~string_of_lits a =
     let node q l last labels = Dot.(node (State.to_id q) ~attrs:[
@@ -219,8 +274,6 @@ module type FA = sig
 
   val skeleton: (_, 'labels, 'lits) t -> ('labels, 'lits) G.t
 
-  val states_labels: ('a, 'labels, 'lits) t -> (T.State.t * 'labels) Seq.t
-  val homomorphism: ('lits -> 'lits) -> ('a, 'labels, 'lits) t -> ('a, 'labels, 'lits) t
 
   (*val is_final_multiple: T.States.t -> ('a, 'labels, 'lits) t -> bool
   val adjacent_multiple: T.States.t -> ('a, 'labels, 'lits) t -> (T.State.t * 'lits) Seq.t
@@ -229,9 +282,6 @@ module type FA = sig
   val goto: T.State.t -> ('lits -> bool) -> ('a, 'labels, 'lits) t -> T.States.t
 
   val link: ?merge:('lits -> 'lits -> 'lits) -> T.States.t -> T.States.t -> 'lits -> ('a, 'labels, 'lits) t -> ('a, 'labels, 'lits) t
-
-  val sum: ('a, 'labels, 'lits) t -> ('b, 'labels, 'lits) t -> (Start.multiple, 'labels, 'lits) t
-  val empty: (Start.multiple, 'labels, 'lits) t
 
   module Gen(Index: G.INDEX): sig
     val unfold_multiple: supply:(T.State.t Supply.t) -> ?merge:('lits -> 'lits -> 'lits) -> (T.State.t -> Index.elt -> bool * 'labels * ('lits * Index.elt) Seq.t) -> Index.elt list -> (Start.multiple, 'labels, 'lits) t
@@ -245,31 +295,11 @@ module Make: FA = struct
 
   let skeleton m = m.graph
 
-  let empty =
-    {
-      start = Multiple T.States.empty;
-      final = T.States.empty;
-      graph = G.empty;
-    }
-
-  let sum = fun m1 m2 ->
-    {
-      start = Start.Multiple (T.States.union (start_multiple m1) (start_multiple m2));
-      final = T.States.union m1.final m2.final;
-      graph = G.sum m1.graph m2.graph;
-    }
-
   let link ?(merge = Fun.const) f t ls m =
     {
       m with
       graph = G.link_with merge (T.States.to_seq f) (T.States.to_seq t) ls m.graph;
     }
-
-  let states_labels m =
-    G.labeled_vertices m.graph
-
-  let homomorphism f m =
-    {m with graph = G.labeled_edges_map (fun _ _ ls -> f ls) m.graph}
 
   let goto from f m =
     adjacent from m

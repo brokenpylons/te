@@ -138,13 +138,13 @@ end = struct
   let add splitter v t =
     let Split.{partitions; considered} = split splitter t in
     {
-      partitions = processes (V.union v) partitions; 
+      partitions = List.sort (on P.compare fst) @@ processes (V.union v) partitions;
       considered
     }
 
   let union t1 t2 =
     List.fold_left (fun acc (p, v) -> add p v acc) t1 t2.partitions
-   
+
   let find p t =
     List.fold_left (fun acc (p', v) ->
         if P.is_empty (P.inter p p')

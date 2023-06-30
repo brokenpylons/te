@@ -70,6 +70,7 @@ module type S1 = sig
   include S0
 
   val add_multiple: key -> values -> t -> t
+  val of_seq_multiple: (key * values) Seq.t -> t
   val union: t -> t -> t
   val (<|>): t -> t -> t
 end

@@ -100,6 +100,7 @@ module type S1 = sig
   include S0
 
   val add_multiple: key -> values -> t -> t
+  val of_seq_multiple: (key * values) Seq.t -> t
   val union: t -> t -> t
   val (<|>): t -> t -> t
 end
@@ -109,6 +110,13 @@ module Make1(M: MAP)(S: SET1) = struct
 
   let add_multiple x xp t =
     M.update x (function Some s -> Some (S.union xp s) | None -> Some xp) t
+
+  let add_seq_multiple s t =
+    Seq.fold_left (fun t (k, v) -> add_multiple k v t) t s
+
+  let of_seq_multiple s = 
+    add_seq_multiple s empty
+
 
   let union t1 t2 =
     M.union (fun _ -> S.union) t1 t2
