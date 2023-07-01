@@ -2,19 +2,28 @@ open Te_bot
 open! Prelude
 module T = Types
 
+module Path = struct
+  type t = T.Vertex.t * T.Node.t list
+  [@@deriving ord, show]
+end
+module Paths = struct
+  include Balanced_binary_tree.Set.Size(Path)
+  let pp = pp Path.pp
+end
+
 module Gss = struct
   module G = T.Vertex_graph
-  type t = (unit, unit) G.t
+  type t = (unit, T.Node.t option) G.t
   let singleton v = G.singleton v ()
 
-  let push u v g =
+  let push u v n g =
     assert (not (G.vertex_mem u g));
     g
     |> G.add u ()
-    |> G.connect u v ()
+    |> G.connect u v n
 
-  let connect u v g =
-    G.connect u v () g
+  let connect u v n g =
+    G.connect u v n g
 
   let contains u g =
     G.vertex_mem u g
@@ -22,11 +31,16 @@ module Gss = struct
   let contains_edge u v g =
     G.edge_mem u v g
 
-  let adjacent v g =
+  let node u v g =
+    G.edge_label u v g
+
+  let adjacent v ns g =
     G.adjacent v g
-    |> Seq.map (fun (w, _) -> w)
-    |> T.Vertices.of_seq
+    |> Seq.map (fun (w, n) -> (w, (!!n :: ns)))
+    |> Paths.of_seq
 end
+
+module Forest = T.Node_packed_forest
 
 module type S = sig
   type t
@@ -37,15 +51,15 @@ end
 module type TABLES = sig
   type t
   type actions
-  type state := T.State.t
-  type states := T.States.t
+  type states := T.State.t
+  type statess := T.States.t
 
   type symbol = Null | Code of T.Code.t | Var of T.Var.t
 
-  val start: t -> states 
-  val actions: t -> states -> symbol -> actions 
-  val goto: t -> states -> symbol -> states option
-  val back: t -> state * state -> state -> (state * state) option
+  val start: t -> statess 
+  val actions: t -> statess -> symbol -> actions 
+  val goto: t -> statess -> symbol -> statess option
+  val back: t -> states * states -> states -> (states * states) option
 
   val shift: actions -> bool
   val matches: actions -> T.Labeled_vars.t
@@ -63,7 +77,9 @@ module Make(Tables: TABLES) = struct
   class driver (t: Tables.t) =
     let bottom = T.Vertex.make (Tables.start t) 0 in object(self)
     val mutable stack = Gss.singleton bottom
+    val mutable forest = Forest.empty
     val mutable reduce = Segments.singleton bottom bottom
+    val mutable null = Segments.empty
     val mutable read0 = Segments.empty
     val mutable read1 = Segments.empty
     val mutable subclasses = Subclasses.singleton 0 bottom
@@ -77,29 +93,41 @@ module Make(Tables: TABLES) = struct
       | Tables.Code x -> T.Code.pp ppf x
       | Tables.Var x -> T.Var.pp ppf x
 
-    method private successors v l d =
+    method private successors v ns paths d =
       if Int.equal d 0
-      then T.Vertices.singleton v
-      else T.Vertices.fold (fun v' -> T.Vertices.union @@ self#successors v' (Gss.adjacent v' stack) (pred d)) T.Vertices.empty l
+      then Paths.singleton (v, ns)
+      else Paths.fold (fun (v', ns') -> Paths.union @@ self#successors v' ns' (Gss.adjacent v' ns' stack) (pred d)) Paths.empty paths
 
-    method private scan_back v l p =
-      Fmt.pr "SB %a %a@," T.Vertex.pp v (Fmt.parens T.Vertices.pp) l;
-      if T.Vertices.is_empty l
-      then T.Vertices.singleton v
-      else T.Vertices.fold (fun v' -> 
-          T.Vertices.union @@
+    method private scan_back v ns paths p =
+      Fmt.pr "SB %a %a@," T.Vertex.pp v (Fmt.parens Paths.pp) paths;
+      if Paths.is_empty paths
+      then Paths.singleton (v, ns)
+      else Paths.fold (fun (v', ns') -> 
+          Paths.union @@
           T.States.fold (fun s ->
-              T.Vertices.union @@
+              Paths.union @@
               match Tables.back t p s with
-              | Some p' -> self#scan_back v' (Gss.adjacent v' stack) p'
-              | None -> T.Vertices.singleton v)
-            T.Vertices.empty (T.Vertex.state v'))
-          T.Vertices.empty l
+              | Some p' -> self#scan_back v' ns' (Gss.adjacent v' ns' stack) p'
+              | None -> Paths.singleton (v, ns))
+            Paths.empty (T.Vertex.states v'))
+          Paths.empty paths
+
+    method private collect_null v d =
+      if Int.equal d 0
+      then [[]]
+      else
+        try
+        let f = Segments.find_multiple v null in
+        List.concat_map (fun v' ->
+            let n = !!(Gss.node v' v stack) in
+            List.map (fun ns -> n :: ns) (self#collect_null v' (pred d)))
+          (T.Vertices.to_list f)
+        with Not_found -> [[]]
 
     method private actor ~null v l xs = 
       Fmt.pr "actor %b %a %a %a@," null T.Vertex.pp v T.Vertices.pp l (Fmt.list self#pp_symbol) xs;
       List.iter (fun x ->
-          let a = Tables.actions t (T.Vertex.state v) x in
+          let a = Tables.actions t (T.Vertex.states v) x in
           (if Tables.shift a then
              match x with
              | Var x ->
@@ -122,16 +150,21 @@ module Make(Tables: TABLES) = struct
         xs
 
     method private null v output xs =
-      (match Tables.goto t (T.Vertex.state v) (Var (T.Labeled_var.var output)) with
+      (match Tables.goto t (T.Vertex.states v) (Var (T.Labeled_var.var output)) with
        | Some s ->
          let pos = T.Vertex.position v in
          let u = T.Vertex.make s pos in
+         let n = T.Node.make output pos pos in
          Fmt.pr "NULL %a %a -> %a %a@," T.Vertex.pp v T.Vertex.pp u T.Labeled_var.pp output (Fmt.list self#pp_symbol) xs;
          if Gss.contains u stack && not (Gss.contains_edge u v stack) then begin
-           stack <- Gss.connect u v stack
+           stack <- Gss.connect u v (Some n) stack;
+           forest <- Forest.add n forest;
+           null <- Segments.add v u null;
          end else if not (Gss.contains u stack) then begin
            subclasses <- Subclasses.add pos u subclasses;
-           stack <- Gss.push u v stack;
+           stack <- Gss.push u v (Some n) stack;
+           forest <- Forest.add n forest;
+           null <- Segments.add v u null;
            self#actor ~null:true u (T.Vertices.singleton v) xs;
            orders <- Orders'.add_multiple v (Orders'.find_multiple_or ~default:Orders.empty u orders) orders
          end
@@ -140,19 +173,22 @@ module Make(Tables: TABLES) = struct
     method private shift v l output =
       Seq.iter (fun w ->
           Seq.iter (fun v' ->
-              (match Tables.goto t (T.Vertex.state v') (Var (T.Labeled_var.var output)) with
+              (match Tables.goto t (T.Vertex.states v') (Var (T.Labeled_var.var output)) with
                | Some s ->
                  let pos = T.Vertex.position v in
                  let u = T.Vertex.make s pos in
+                 let n = T.Node.make output (T.Vertex.position v') pos in
                  Fmt.pr "SHIFT %a %a %a %a -> %a@," T.Vertex.pp v T.Vertex.pp w T.Vertex.pp v' T.Vertex.pp u T.Labeled_var.pp output;
                  if Gss.contains u stack && not (Gss.contains_edge u v' stack) then begin
-                   stack <- Gss.connect u v' stack;
+                   stack <- Gss.connect u v' (Some n) stack;
+                   forest <- Forest.add n forest;
                    reduce <- Segments.add u v' reduce;
                    self#expand u
                  end else if not (Gss.contains u stack) then begin
                    reduce <- Segments.add u v' reduce;
                    subclasses <- Subclasses.add pos u subclasses;
-                   stack <- Gss.push u v' stack;
+                   stack <- Gss.push u v' (Some n) stack;
+                   forest <- Forest.add n forest;
                    self#expand u
                  end
                | None -> ()))
@@ -170,42 +206,49 @@ module Make(Tables: TABLES) = struct
         (T.Vertices.to_seq l)
 
     method private reduce v l r xs =
-      let ws = T.Vertices.to_seq @@ match r.strategy with
-        | Fixed d -> self#successors v l d
-        | Scan p -> self#scan_back v l p
+      let paths = T.Vertices.fold (fun v' -> Paths.add (v', [!!(Gss.node v v' stack)])) Paths.empty l in
+      let paths = Paths.to_seq @@ match r.strategy with
+        | Fixed d -> self#successors v [] paths d
+        | Scan p -> self#scan_back v [] paths p
       in
-      Seq.iter (fun w ->
-          (match Tables.goto t (T.Vertex.state w) (Var (T.Labeled_var.var r.output)) with
+      Seq.iter (fun (w, ns) ->
+          (match Tables.goto t (T.Vertex.states w) (Var (T.Labeled_var.var r.output)) with
            | Some s ->
              let pos = T.Vertex.position v in
              let u = T.Vertex.make s pos in
+             let n = T.Node.make r.output (T.Vertex.position w) pos in
              Fmt.pr "REDUCE %a %a %a -> %a@," T.Vertex.pp v T.Vertex.pp w T.Vertex.pp u T.Labeled_var.pp r.output;
              if Gss.contains u stack && not (Gss.contains_edge u w stack) then begin
-               stack <- Gss.connect u w stack;
+               stack <- Gss.connect u w (Some n) stack;
+               forest <- Forest.add n forest;
                self#actor ~null:false u (T.Vertices.singleton w) xs;
                orders <- Orders'.add_multiple v (Orders'.find_multiple_or ~default:Orders.empty u orders) orders
              end else if not (Gss.contains u stack) then begin
                subclasses <- Subclasses.add pos u subclasses;
-               stack <- Gss.push u w stack;
+               stack <- Gss.push u w (Some n) stack;
+               forest <- Forest.add n forest;
                self#actor ~null:false u (T.Vertices.singleton w) xs;
                orders <- Orders'.add_multiple v (Orders'.find_multiple_or ~default:Orders.empty u orders) orders
-             end
+             end;
+             List.iter (fun ns' ->
+                 forest <- Forest.pack n () (ns @ ns') forest)
+               (self#collect_null u 1)
            | None -> ()))
-        ws
+        paths
 
     method private expand v =
-      match Tables.goto t (T.Vertex.state v) Null with
+      match Tables.goto t (T.Vertex.states v) Null with
       | Some s ->
         (let pos = T.Vertex.position v in
          let u = T.Vertex.make s pos in
          Fmt.pr "EXPAND %a %a@," T.Vertex.pp v T.Vertex.pp u;
          if Gss.contains u stack then begin
            read1 <- Segments.add u v read1;
-           stack <- Gss.connect u v stack
+           stack <- Gss.connect u v None stack
          end else begin
            read1 <- Segments.add u v read1;
            subclasses <- Subclasses.add pos u subclasses;
-           stack <- Gss.push u v stack
+           stack <- Gss.push u v None stack
          end)
       | None -> ()
 
@@ -221,23 +264,26 @@ module Make(Tables: TABLES) = struct
       Fmt.pr "AFTER %a@," (T.Vertex_to.pp (Fmt.parens T.Vertices.pp)) read0;
       Seq.iter (fun (w, l) ->
           Seq.iter (fun v ->
-              match Tables.goto t (T.Vertex.state w) x with
+              match Tables.goto t (T.Vertex.states w) x with
               | Some s ->
                 let pos = succ @@ T.Vertex.position w in
                 let u = T.Vertex.make s pos in
                 Fmt.pr "READ %a %a %a -> %a@," T.Vertex.pp w T.Vertex.pp v T.Vertex.pp u self#pp_symbol x;
                 if Gss.contains u stack then begin
                   read1 <- Segments.add u v read1;
-                  stack <- Gss.connect u v stack
+                  stack <- Gss.connect u v None stack
                 end else begin
                   read1 <- Segments.add u v read1;
                   subclasses <- Subclasses.add pos u subclasses;
-                  stack <- Gss.push u v stack
+                  stack <- Gss.push u v None stack
                 end
               | None -> ())
             (T.Vertices.to_seq l))
         (Segments.to_seq_multiple read0)
     end
+
+    method forest =
+      forest
 
     method to_dot =
        let subgraphs = Subclasses.fold_multiple (fun position subclass subgraphs ->
@@ -247,7 +293,7 @@ module Make(Tables: TABLES) = struct
           |> List.map (fun v ->
               Dot.(node (T.Vertex.to_id v) ~attrs:[
                   "xlabel" => String (Int.to_string @@ T.Vertex.position v);
-                  "label" => String (Fmt.to_to_string T.States.pp (T.Vertex.state v));
+                  "label" => String (Fmt.to_to_string T.States.pp (T.Vertex.states v));
                 ]))
         in
         let attrs = Dot.[
@@ -262,7 +308,7 @@ module Make(Tables: TABLES) = struct
       |> List.of_seq
       |> List.map (fun (v1, v2, n) ->
           Dot.(edge Directed (T.Vertex.to_id v1) (T.Vertex.to_id v2) ~attrs:[
-              "label" => String (Unit.to_string n)
+              "label" => String (Fmt.str "%a" (Fmt.option T.Node.pp) n)
             ]))
     in
     let attrs = Dot.[

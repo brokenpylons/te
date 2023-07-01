@@ -17,8 +17,6 @@ module Codes = struct
   include Comp_set.Make(Balanced_binary_tree.Set.Size(Code))
   let pp = pp Code.pp
 
-
-
   let of_string s =
     let rec go i =
       if i >= String.length s then
@@ -89,7 +87,7 @@ module Vertex = struct
 
   let make state position = (state, position)
 
-  let state = fst
+  let states = fst
 
   let position = snd
 
@@ -218,7 +216,7 @@ module Labeled_var = struct
   type t = Var.t * Var.t
   [@@deriving eq, ord] 
 
-  let node = fst
+  let label = fst
   let var = snd 
 
   let pp ppf (z, s) =
@@ -232,6 +230,21 @@ module Labeled_var_to = struct
   include Balanced_binary_tree.Map.Size(Labeled_var)
   let pp pp_p = pp Labeled_var.pp pp_p
 end
+
+module Node = struct
+  type t = Labeled_var.t * int * int
+  [@@deriving eq, ord]
+
+  let make state start stop = (state, start, stop)
+  let labeled_var (lv, _, _) = lv
+
+  let pp ppf (lv, start, stop) =
+    Fmt.pf ppf "%a:%i:%i" Labeled_var.pp lv start stop
+
+  let to_id x = Dot.(String (Fmt.str "%a" pp x))
+end
+module Node_to = Balanced_binary_tree.Map.Size(Node)
+module Node_packed_forest = Packed_forest.Make(Node)(Node_to)
 
 module Reduction = struct
   module Strategy = struct

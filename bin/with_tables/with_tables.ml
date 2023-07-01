@@ -70,7 +70,8 @@ let _ =
   d#read (c "x");
   d#read (c "x");
   d#read (c "x");*)
-  Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot)
+  Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);
+  Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))
 
 
 

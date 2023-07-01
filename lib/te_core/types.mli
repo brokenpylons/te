@@ -149,7 +149,7 @@ module State_index(Map: INDEX_MAP): State_graph.INDEX with type elt = Map.elt
 module Vertex: sig
   type t
   val make: States.t -> int -> t
-  val state: t -> States.t
+  val states: t -> States.t
   val position: t -> int
   val compare: t -> t -> int
   val equal: t -> t -> bool
@@ -233,7 +233,7 @@ module Labeled_var: sig
   val equal: t -> t -> bool
   val compare: t -> t -> int
   val var: t -> Var.t
-  val node: t -> Var.t
+  val label: t -> Var.t
   val pp: t Fmt.t
 end
 
@@ -260,6 +260,18 @@ module Labeled_var_to: sig
   val of_seq: (elt * 'a) Seq.t -> 'a t
   val to_seq: 'a t -> (elt * 'a) Seq.t
 end
+
+module Node: sig
+  type t
+  val make: Labeled_var.t -> int -> int -> t
+  val labeled_var: t -> Labeled_var.t
+
+  val compare: t -> t -> int
+  val equal: t -> t -> bool
+  val to_id: t -> Dot.id
+  val pp: t Fmt.t
+end
+module Node_packed_forest: Packed_forest.S with type node = Node.t
 
 module Reduction: sig
   module Strategy: sig
