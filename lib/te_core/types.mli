@@ -263,25 +263,25 @@ end
 
 module Node: sig
   type t
-  val make: Labeled_var.t -> int -> int -> t
-  val labeled_var: t -> Labeled_var.t
+  val make: Var.t -> int -> int -> t
+  val var: t -> Var.t
 
   val compare: t -> t -> int
   val equal: t -> t -> bool
   val to_id: t -> Dot.id
   val pp: t Fmt.t
 end
-module Node_packed_forest: Packed_forest.S with type node = Node.t
+module Node_packed_forest: Packed_forest.S with type node = Node.t and type labels = Vars.t
 
 module Reduction: sig
   module Strategy: sig
-    type t = Fixed of int | Scan of State_pair.t
+    type t = Null | Fixed of int | Scan of State_pair.t
     val compare: t -> t -> int
     val equal: t -> t -> bool
   end
 
-  type t = private {output: Labeled_var.t; strategy: Strategy.t}
-  val make: Labeled_var.t -> Strategy.t -> t
+  type t = private {output: Labeled_var.t; strategy: Strategy.t; reminder: Var.t list list}
+  val make: Labeled_var.t -> Strategy.t -> Var.t list list -> t
 
   val compare: t -> t -> int
   val equal: t -> t -> bool

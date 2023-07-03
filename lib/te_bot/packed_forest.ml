@@ -45,21 +45,32 @@ end
 
 module type S = sig
   type node
-  type 'nl adjacents = ('nl * node list) list
-  type 'nl t
+  type labels
+  type adjacents = (labels * node list) list
+  type t
 
-  val adjacent: node -> 'nl t -> node list list
-  val empty: _ t
-  val add: node -> 'nl t -> 'nl t
-  val pack: node -> 'nl -> node list -> 'nl t -> 'nl t
-  val to_dot: 'nl t -> Dot.graph
+  val adjacent: node -> t -> node list list
+  val empty: t
+  val add: node -> t -> t
+  val pack: node -> labels -> node list -> t -> t
+  val to_dot: t -> Dot.graph
 end
 
-module Make(Node: NODE)(Node_map: NODE_MAP with type elt = Node.t): S with type node = Node.t = struct
+module type LABELS = sig
+  type t
+  val pp: t Fmt.t
+
+  val subset: t -> t -> bool
+  val union: t -> t -> t
+  val empty: t
+end
+
+module Make(Node: NODE)(Labels: LABELS)(Node_map: NODE_MAP with type elt = Node.t): S with type node = Node.t and type labels = Labels.t = struct
   type node = Node.t
-  type 'nl adjacents = ('nl * Node.t list) list
-  type 'nl ctx = 'nl adjacents
-  type 'nl t = 'nl ctx Node_map.t
+  type labels = Labels.t
+  type adjacents = (Labels.t * Node.t list) list
+  type ctx = adjacents
+  type t = ctx Node_map.t
 
   let adjacent n t =
     let adjs = Node_map.find n t in
@@ -73,14 +84,17 @@ module Make(Node: NODE)(Node_map: NODE_MAP with type elt = Node.t): S with type 
   let pack n nl adj t =
     let adjs = Node_map.find n t in
     if List.exists (fun (_, adj') -> List.equal Node.equal adj adj') adjs
-    then t
+    then Node_map.add n (List.map (fun (nl', adj') -> 
+        if List.equal Node.equal adj adj'
+        then  (Labels.union nl nl', adj')
+        else (nl', adj')) adjs) t
     else Node_map.add n ((nl, adj) :: adjs) t
 
   let to_dot f =
     let ctxs = Node_map.to_seq f in
 
     let nodes = Seq.map (fun (n, adjs) ->
-        let ports = List.mapi (fun i _ -> Dot.RecordPortString (Int.to_string i, "")) adjs in
+        let ports = List.mapi (fun i (lbls, _) -> Dot.RecordPortString (Int.to_string i, Fmt.str "%a" Labels.pp lbls)) adjs in
         Dot.(node (Node.to_id n) ~attrs:[
             "shape" => Id "record";
             "label" => String (string_of_record [Record [RecordString (Fmt.str "%a" Node.pp n); Record ports]])

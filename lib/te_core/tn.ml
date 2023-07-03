@@ -1258,7 +1258,7 @@ let collapse' t =
 
 module Builder = struct
   module Item_rhs' = struct
-    type t = {base: Item_rhs.t; right_nulled: bool; shift_lookahead: Lits.t; reduce_lookahead: Lits.t; distance: Size.t; next: Lits.t; next_null: (T.Labeled_var.t * Lits.t) list; state_pair: T.State_pair.t}
+    type t = {base: Item_rhs.t; right_nulled: bool; shift_lookahead: Lits.t; reduce_lookahead: Lits.t; distance: Size.t; next: Lits.t; next_null: (T.Labeled_var.t * Lits.t) list; state_pair: T.State_pair.t; reminder: T.Var.t list list}
     [@@deriving eq, ord]
   end
 
@@ -1282,6 +1282,7 @@ module Builder = struct
     let reduce_lookahead (_, rhs) = rhs.Item_rhs'.reduce_lookahead
     let distance (_, rhs) = rhs.Item_rhs'.distance
     let state_pair (_, rhs) = rhs.Item_rhs'.state_pair
+    let reminder (_, rhs) = rhs.Item_rhs'.reminder
   end
 
   let make ~tokens start ps =
@@ -1361,16 +1362,25 @@ module Builder = struct
                       @@ M.adjacent rhs.Item_rhs.state 
                       @@ T.Labeled_var_to.find lhs ps_to;
                     next_null = List.of_seq @@
-                        Seq.flat_map (fun (s, ls) ->
-                            if Lits.is_null ls then
-                              let nc_items = M''.labels s nc in
-                              T.State_to.to_seq nc_items |> Seq.flat_map (fun (s, items) ->
-                                  Items.to_seq items |> Seq.filter_map (fun (lhs, rhs) ->
-                                      if not rhs.Item_rhs.kernel && rhs.Item_rhs.reduce then
-                                        Some (lhs, Enhanced_lits.strip @@ (la lhs s rhs.Item_rhs.state).reduce_lookahead)
-                                      else None))
-                            else Seq.empty)
+                      Seq.flat_map (fun (s, ls) ->
+                          if Lits.is_null ls then
+                            let nc_items = M''.labels s nc in
+                            T.State_to.to_seq nc_items |> Seq.flat_map (fun (s, items) ->
+                                Items.to_seq items |> Seq.filter_map (fun (lhs, rhs) ->
+                                    if not rhs.Item_rhs.kernel && rhs.Item_rhs.reduce then
+                                      Some (lhs, Enhanced_lits.strip @@ (la lhs s rhs.Item_rhs.state).reduce_lookahead)
+                                    else None))
+                          else Seq.empty)
                         (M''.adjacent r nc);
+                    reminder =
+                      if not @@ T.Vars.mem (T.Labeled_var.var lhs) tokens && (la lhs s rhs.Item_rhs.state).right_nulled && not (R.is_nullable rhs.Item_rhs.tail) then begin
+                        Fmt.pr "%a" Rhs.pp rhs.Item_rhs.tail;
+                        rhs.Item_rhs.tail
+                        |> Rhs.to_seq (fun ls -> T.Vars.to_seq ls.Lits.vars)
+                        |> Seq.map List.of_seq
+                        |> List.of_seq end
+                      else
+                        [[]];
                     right_nulled = (la lhs s rhs.Item_rhs.state).right_nulled;
                     shift_lookahead = Enhanced_lits.strip @@ (la lhs s rhs.Item_rhs.state).shift_lookahead;
                     reduce_lookahead = Enhanced_lits.strip @@ (la lhs s rhs.Item_rhs.state).reduce_lookahead;

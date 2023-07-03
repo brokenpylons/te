@@ -24,11 +24,13 @@ let _ =
       make (n, x) (set "x");
       make (n, d) (set "$");
     ];*)
-  let Vector.[s'; s; a; b; n] = T.Var.make ~supply:T.Var.supply Vector.["S'"; "S"; "A"; "B"; "_"] in
+  let Vector.[s'; s; a; b; n; spesh] = T.Var.make ~supply:T.Var.supply Vector.["S'"; "S"; "A"; "B"; "_"; "%"] in
   let ps = List.to_seq @@ Tn.Production.[
       make (n, s') R.(var s * (plus (var b)));
-      make (n, s) R.(var s * var s + var a * var a);
+      make (n, s) R.(var s * var s);
+      make (spesh, s) R.(var a * var a);
       make (n, a) R.(star (set "x"));
+      make (spesh, a) R.(star (set "y"));
       make (n, b) (set "$");
     ];
   in
@@ -42,8 +44,8 @@ let _ =
   let d = new X.driver t in
   d#read (c "x");
   d#read (c "x");
-  d#read (c "x");
-  d#read (c "x");
+  d#read (c "y");
+  d#read (c "y");
 
   d#read (c "$");
   d#read (c "$");

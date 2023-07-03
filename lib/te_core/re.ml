@@ -227,6 +227,8 @@ module type CONCRETE = sig
   (*val occur: t -> lits Seq.t*)
   val free: t -> vars
   val simplify: t -> t
+
+  val to_seq: (lits -> 'a Seq.t) -> t -> 'a Seq.t Seq.t
 end
 
 module Concrete(Vars: VARS)(Lits: LITS with type vars = Vars.t): 
@@ -368,8 +370,31 @@ module Concrete(Vars: VARS)(Lits: LITS with type vars = Vars.t):
       comp (derivative' b p n s x)
     | Fix (_, _, vs, y) ->
       fix vs (derivative' (Vars.union vs b) p (fun vs' -> if Lits.subset (Lits.of_vars vs) vs' then is_nullable y else n vs') s y)
+
+  exception Undefined
+
+  let rec to_seq f = function
+    | Nothing -> Seq.empty
+    | Null -> Seq.return Seq.empty
+    | Any -> raise Undefined
+    | Lits ls -> Seq.return (f ls)
+    | Concat (_, _, x, y) ->
+      Seq.map (uncurry Seq.append)
+      @@ Seq.product (to_seq f x) (to_seq f y)
+    | Union (_, _, x, y) ->
+      Seq.append (to_seq f x) (to_seq f y)
+    | Repeat (_, _, x, i) ->
+      Seq.concat
+      @@ Seq.take i
+      @@ Seq.repeat (to_seq f x)
+    | Star _ ->
+      raise Undefined
+      (*Seq.concat
+      @@ Seq.repeat (to_seq f x)*)
+    | Comp _ -> raise Undefined
+    | Fix _ -> raise Undefined
 end
-  
+
 module Porcelan(C: OP) = struct
   include C
 

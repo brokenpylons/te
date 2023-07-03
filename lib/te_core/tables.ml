@@ -10,7 +10,7 @@ module Actions = struct
       shift: bool;
       matches: T.Labeled_vars.t;
       predictions: T.Labeled_vars.t;
-      null: T.Labeled_vars.t;
+      null: T.Reductions.t;
       reduce: T.Reductions.t;
     }
   [@@deriving eq, ord, show]
@@ -21,7 +21,7 @@ module Actions = struct
       shift = x.shift || y.shift;
       matches = T.Labeled_vars.union x.matches y.matches;
       predictions = T.Labeled_vars.union x.predictions y.predictions;
-      null = T.Labeled_vars.union x.null y.null;
+      null = T.Reductions.union x.null y.null;
       reduce = T.Reductions.union x.reduce y.reduce;
     }
 
@@ -31,7 +31,7 @@ module Actions = struct
       shift = false;
       matches = T.Labeled_vars.empty;
       predictions = T.Labeled_vars.empty;
-      null = T.Labeled_vars.empty;
+      null = T.Reductions.empty;
       reduce = T.Reductions.empty;
     }
 
@@ -40,7 +40,7 @@ module Actions = struct
     not x.shift &&
     T.Labeled_vars.is_empty x.matches &&
     T.Labeled_vars.is_empty x.predictions &&
-    T.Labeled_vars.is_empty x.null &&
+    T.Reductions.is_empty x.null &&
     T.Reductions.is_empty x.reduce
 
   let accept =
@@ -98,6 +98,7 @@ module type ITEMS = sig
   val state_pair: item -> T.State.t * T.State.t
   val shift_lookahead: item -> Lits.t
   val reduce_lookahead: item -> Lits.t
+  val reminder: item -> T.Var.t list list
 
   (*val filter: item -> Lits.t
   val filter2: item -> Lits_multimap(Lits).t*)
@@ -140,21 +141,21 @@ module Make(A: Fa.S0 with type state = T.States.t)(B: Fa.S0 with type state = T.
     let null =
       if not (T.Vars.mem (T.Labeled_var.var @@ Items.output x) tokens) && not (Items.is_kernel x) && Items.is_right_nulled x then
         Actions_multimap.singleton_multiple (Items.reduce_lookahead x)
-          (Actions.null (T.Labeled_vars.singleton (Items.output x)))
+          (Actions.null (T.Reductions.singleton (T.Reduction.make (Items.output x) Null (Items.reminder x))))
       else Actions_multimap.empty
     in
     let shift_null =
       Items.null x
       |> Seq.map (fun (output, la) ->
           Actions_multimap.singleton_multiple la
-            (Actions.null (T.Labeled_vars.singleton output)))
+            (Actions.null (T.Reductions.singleton (T.Reduction.make output Null [[]]))))
       |> Seq.fold_left Actions_multimap.union Actions_multimap.empty
     in
     let reduce =
       match select_strategy ~tokens x with
       | Some strategy ->
         Actions_multimap.singleton_multiple (Items.reduce_lookahead x)
-          (Actions.reduce (T.Reductions.singleton (T.Reduction.make (Items.output x) strategy)))
+          (Actions.reduce (T.Reductions.singleton (T.Reduction.make (Items.output x) strategy (Items.reminder x))))
       | None -> Actions_multimap.empty
     in
     Actions_multimap.(shift <|> matches <|> predictions <|> null <|> shift_null <|> reduce)

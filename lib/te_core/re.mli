@@ -73,6 +73,8 @@ module type CONCRETE = sig
   val first: t -> lits Seq.t
   val free: t -> vars
   val simplify: t -> t
+
+  val to_seq: (lits -> 'a Seq.t) -> t -> 'a Seq.t Seq.t
 end
 
 module Concrete(Vars: VARS)(Lits: LITS with type vars = Vars.t): CONCRETE with type lits = Lits.t and type vars = Vars.t

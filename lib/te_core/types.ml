@@ -232,29 +232,29 @@ module Labeled_var_to = struct
 end
 
 module Node = struct
-  type t = Labeled_var.t * int * int
+  type t = Var.t * int * int
   [@@deriving eq, ord]
 
   let make state start stop = (state, start, stop)
-  let labeled_var (lv, _, _) = lv
+  let var (v, _, _) = v
 
-  let pp ppf (lv, start, stop) =
-    Fmt.pf ppf "%a:%i:%i" Labeled_var.pp lv start stop
+  let pp ppf (v, start, stop) =
+    Fmt.pf ppf "%a:%i:%i" Var.pp v start stop
 
   let to_id x = Dot.(String (Fmt.str "%a" pp x))
 end
 module Node_to = Balanced_binary_tree.Map.Size(Node)
-module Node_packed_forest = Packed_forest.Make(Node)(Node_to)
+module Node_packed_forest = Packed_forest.Make(Node)(Vars)(Node_to)
 
 module Reduction = struct
   module Strategy = struct
-    type t = Fixed of int | Scan of State_pair.t
+    type t = Null | Fixed of int | Scan of State_pair.t
     [@@deriving eq, ord, show]
   end
-  type t = {output: Labeled_var.t; strategy: Strategy.t}
+  type t = {output: Labeled_var.t; strategy: Strategy.t; reminder: Var.t list list}
   [@@deriving eq, ord, show]
 
-  let make output strategy = {output; strategy}
+  let make output strategy reminder = {output; strategy; reminder}
 end
 module Reductions = struct
   include Balanced_binary_tree.Set.Size(Reduction)
