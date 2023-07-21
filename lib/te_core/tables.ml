@@ -8,6 +8,7 @@ module Actions = struct
     {
       accept: bool;
       shift: bool;
+      orders: T.Vars.t;
       matches: T.Labeled_vars.t;
       predictions: T.Labeled_vars.t;
       null: T.Reductions.t;
@@ -19,6 +20,7 @@ module Actions = struct
     {
       accept = x.accept || y.accept;
       shift = x.shift || y.shift;
+      orders = T.Vars.union x.orders y.orders;
       matches = T.Labeled_vars.union x.matches y.matches;
       predictions = T.Labeled_vars.union x.predictions y.predictions;
       null = T.Reductions.union x.null y.null;
@@ -29,6 +31,7 @@ module Actions = struct
     {
       accept = false;
       shift = false;
+      orders = T.Vars.empty;
       matches = T.Labeled_vars.empty;
       predictions = T.Labeled_vars.empty;
       null = T.Reductions.empty;
@@ -38,6 +41,7 @@ module Actions = struct
   let is_empty x =
     not x.accept &&
     not x.shift &&
+    T.Vars.is_empty x.orders &&
     T.Labeled_vars.is_empty x.matches &&
     T.Labeled_vars.is_empty x.predictions &&
     T.Reductions.is_empty x.null &&
@@ -48,6 +52,9 @@ module Actions = struct
 
   let shift =
     {empty with shift = true}
+
+  let orders x =
+    {empty with orders = x}
 
   let matches x =
     {empty with matches = x}
@@ -67,8 +74,8 @@ module Actions_multimap = struct
   let pp = pp Actions.pp
 end
 module Goto_partial_map = struct
-  include Lits_multimap(T.States_partial)
-  let pp = pp T.States_partial.pp
+  include Lits_multimap(T.Statess)
+  let pp = pp T.Statess.pp
 end
 module Back_map = struct
   include Multimap.Make1(T.State_to)(T.State_pair_partial)
@@ -126,6 +133,16 @@ module Make(A: Fa.S0 with type state = T.States.t)(B: Fa.S0 with type state = T.
       then Actions_multimap.singleton_multiple ls Actions.shift
       else Actions_multimap.empty
     in
+    let orders =
+      let ls = Items.shift x in
+      if not (Lits.is_empty ls)
+      then 
+        T.Vars.fold (fun v acc ->
+            Actions_multimap.union acc @@
+            Actions_multimap.singleton_multiple (Lits.var v) (Actions.orders (T.Vars.singleton v)))
+           Actions_multimap.empty ls.Lits.vars
+      else Actions_multimap.empty
+    in
     let matches =
       if T.Vars.mem (T.Labeled_var.var @@ Items.output x) tokens && Items.is_reduce x && Items.is_kernel x then
         Actions_multimap.singleton_multiple (Items.reduce_lookahead x)
@@ -158,7 +175,7 @@ module Make(A: Fa.S0 with type state = T.States.t)(B: Fa.S0 with type state = T.
           (Actions.reduce (T.Reductions.singleton (T.Reduction.make (Items.output x) strategy (Items.reminder x))))
       | None -> Actions_multimap.empty
     in
-    Actions_multimap.(shift <|> matches <|> predictions <|> null <|> shift_null <|> reduce)
+    Actions_multimap.(shift <|> orders <|> matches <|> predictions <|> null <|> shift_null <|> reduce)
 
   let actions_of_items ~tokens items =
     Items.to_seq items
@@ -175,7 +192,7 @@ module Make(A: Fa.S0 with type state = T.States.t)(B: Fa.S0 with type state = T.
     |> Seq.map (fun ((s, _), adj) ->
         Fmt.pr ">>>%a (%a)@." T.States.pp s (Fmt.seq (Fmt.pair T.States.pp Lits.pp)) adj;
         (s, adj
-            |> Seq.map (fun (p, x) -> (x, Some p))
+            |> Seq.map (fun (p, x) -> (x, T.Statess.singleton p))
             |> Goto_partial_map.of_seq_multiple))
     |> T.States_to.of_seq
 
@@ -211,6 +228,9 @@ module Make(A: Fa.S0 with type state = T.States.t)(B: Fa.S0 with type state = T.
         back = back b;
       }
 
+    let actions_union = Actions.union
+    let actions_empty = Actions.empty
+
     let lits_of_symbol = function
       | Code x -> Lits.code x
       | Var x -> Lits.var x
@@ -236,6 +256,9 @@ module Make(A: Fa.S0 with type state = T.States.t)(B: Fa.S0 with type state = T.
 
     let shift a =
       a.Actions.shift
+
+    let orders a =
+      a.Actions.orders
 
     let reduce a =
       a.Actions.reduce

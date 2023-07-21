@@ -66,6 +66,7 @@ module Statess: sig
   val disjoint: t -> t -> bool
   val cardinal: t -> int
   val choose: t -> elt option
+  val iter: (elt -> unit) -> t -> unit
 end
 
 module States_to: sig
@@ -212,9 +213,11 @@ module Vars: sig
   include Set.BINARY with type elt := elt and type t := t
   include Set.SEQUENTIAL with type elt := elt and type t := t
   val pp: t Fmt.t
+  val disjoint: t -> t -> bool
   val subset: t -> t -> bool
   val exists: (elt -> bool) -> t -> bool
   val choose: t -> elt option
+  val iter: (elt -> unit) -> t -> unit
 end
 module Var_to: sig
   include Map.CORE with type elt = Var.t

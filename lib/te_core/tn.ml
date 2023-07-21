@@ -253,7 +253,7 @@ module Lits_multimap(S: SET): MULTIMAP with type key = Lits.t and type values = 
       try find_multiple k t
       with Not_found -> S.empty
 
-  let union x y = 
+  let union x y =
     {
       eof = S.union x.eof y.eof;
       call = V.union x.call y.call;
@@ -268,7 +268,7 @@ module Lits_multimap(S: SET): MULTIMAP with type key = Lits.t and type values = 
   let add_seq_multiple s t =
     Seq.fold_left (fun t (k, v) -> add_multiple k v t) t s
 
-  let of_seq_multiple s = 
+  let of_seq_multiple s =
     add_seq_multiple s empty
 end
 
@@ -594,10 +594,64 @@ let construct s' ps =
     final = Acc.find_multiple s' finals;
     graph = M.skeleton (Seq.fold_left (fun t (from, _to_, ls) ->
         T.Vars.fold (fun x t ->
+            try
             t
             |> M.link ~merge:Lits.union (T.States.singleton from) (Acc.find_multiple x starts) (Lits.call @@ T.Vars.singleton x)
+            with Not_found -> t
             (*|> M.link ~merge:Lits.union (Acc.find_multiple x finals) (T.States.singleton to_) (Lits.return (T.Vars.singleton x))*))
           t ls.Lits.vars)
+        t (M.transitions t))
+  }
+
+let extend m ~tokens ds =
+  let starts = Seq.fold_left (fun starts (lhs, rhs) ->
+      let s = T.Labeled_var.var lhs in
+      Acc.add s (M.start rhs) starts)
+      Acc.empty ds
+  in
+  let t = Seq.fold_left (Fun.flip @@ M.sum % Production.rhs) M.{m with start = M.Start.Multiple (M.start_multiple m)} ds in
+  M.{
+    m with
+    graph = M.skeleton @@
+      Seq.fold_left (fun t (from , _, ls) ->
+          T.Vars.fold (fun x t ->
+              t
+              |> M.link ~merge:Lits.union (T.States.singleton from) (Acc.find_multiple x starts) (Lits.call @@ T.Vars.singleton x))
+            t (T.Vars.inter tokens ls.Lits.vars))
+        t (M.transitions t)
+  }
+
+let construct_all tokens s' ps =
+  let starts, finals = Seq.fold_left (fun (starts, finals) (lhs, rhs) ->
+      let s = T.Labeled_var.var lhs in
+      Acc.add s (M.start rhs) starts, Acc.add_multiple s (M.final rhs) finals)
+      (Acc.empty, Acc.empty) ps
+  in
+  let t = Seq.fold_left (Fun.flip @@ M.sum % Production.rhs) M.empty ps in
+  M.{
+    start = M.Start.Single (T.States.the (Acc.find_multiple s' starts));
+    final = Acc.find_multiple s' finals;
+    graph = M.skeleton (Seq.fold_left (fun t (from, _to_, ls) ->
+        let t = if not (T.Vars.disjoint tokens ls.Lits.vars)
+        then
+          T.Vars.fold (fun x t ->
+              (try
+                 t
+                 |> M.link ~merge:Lits.union (T.States.singleton from) (Acc.find_multiple x starts) (Lits.call @@ T.Vars.singleton x)
+               with Not_found -> t)
+              (*|> M.link ~merge:Lits.union (Acc.find_multiple x finals) (T.States.singleton to_) (Lits.return (T.Vars.singleton x))*)
+            )
+            t tokens
+        else t
+       in
+        T.Vars.fold (fun x t ->
+            try
+            t
+            |> M.link ~merge:Lits.union (T.States.singleton from) (Acc.find_multiple x starts) (Lits.call @@ T.Vars.singleton x)
+            with Not_found -> t
+            (*|> M.link ~merge:Lits.union (Acc.find_multiple x finals) (T.States.singleton to_) (Lits.return (T.Vars.singleton x))*))
+          t (T.Vars.diff ls.Lits.vars tokens)
+      )
         t (M.transitions t))
   }
 
@@ -1159,6 +1213,49 @@ let noncannonical token_lookahead t =
       (M.is_final_multiple from t, labels, next))
     (M.start_multiple t) (M.start_multiple t)
 
+let noncannonical2 token_lookahead t =
+  M.{
+    t with
+    graph =
+      (Seq.fold_left (fun g from ->
+           let la =
+             (M.labels from t)
+             |> Items.to_seq
+             |> Seq.map (fun (lhs, rhs) -> token_lookahead lhs from (rhs.Item_rhs.state))
+             |> Seq.fold_left Enhanced_lits.union Enhanced_lits.empty
+           in
+           let nc' = Enhanced_lits.to_seq la
+                     |> Seq.flat_map (fun (s, ls) ->
+                         let ls = Lits.vars ls.Lits.vars in
+                         (Seq.flat_map (fun (_, ls') ->
+                              if Lits.subset ls' ls then
+                                (*Seq.append*) (* XXX: for infinite lookahead version *)
+                                (Seq.map (fun (q, ls'') ->
+                                     (q, Lits.scan (ls''.Lits.scan)))
+                                    (M.adjacent s t))
+                                (*(Seq.return (p, ls'))*)
+                              else Seq.empty)
+                             (M.adjacent s t)))
+           in
+           Seq.fold_left (fun g (s, ls) ->
+               if not (Lits.is_empty ls) then
+                 T.State_graph.connect from s ls g
+               else g)
+             g nc')
+          t.M.graph (M.states t))
+  }
+
+let upgrade t =
+  M''.unfold (fun _ from ->
+      let next =
+        M.adjacent_multiple from t
+        |> Seq.map (fun (s, ls) ->
+            (ls, T.States.singleton s, T.States.singleton s))
+      in
+      let labels = T.States.fold (fun s -> Items_nc.add_multiple s (M.labels s t)) Items_nc.empty from in
+      (M.is_final_multiple from t, labels, next))
+    (T.States.singleton (M.start t)) (T.States.singleton (M.start t))
+
 let back ~is_token eps =
   M'.rev @@
   Seq.fold_left (fun g (lhs, rhs) ->
@@ -1285,10 +1382,13 @@ module Builder = struct
     let reminder (_, rhs) = rhs.Item_rhs'.reminder
   end
 
-  let make ~tokens start ps =
-    let ps' = convert_multiple ~supply:T.State.supply ps in
-    let ps_to = T.Labeled_var_to.of_seq ps' in
-    let m = construct start ps' in
+  let make ~tokens start ps ds =
+    let supply1, supply2 = Supply.split2 T.State.supply in
+    let ps' = convert_multiple ~supply:supply1 ps in
+    let ds' = convert_multiple ~supply:supply2 ds in
+    let ps_to = T.Labeled_var_to.of_seq Seq.(ps' @ ds') in
+    let m = construct_all tokens start Seq.(ps' @ ds') in
+    (*let m = extend m ~tokens ds' in *)
     let m = M.homomorphism (fun lits -> if Lits.is_call lits && T.Vars.subset lits.call tokens then Lits.scan (lits.call) else lits) m in
 
     Fmt.pr "%s@." @@
@@ -1302,7 +1402,7 @@ module Builder = struct
     M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Lits.pp x) m';
 
     let to_start = to_start m' in
-    let eps = extract_multiple ps' to_start m' in
+    let eps = extract_multiple Seq.(ps' @ ds') to_start m' in
 
     Seq.iter (fun ((q, lv), x) ->
         Fmt.pr "(%a %a) %s@." T.State.pp q T.Labeled_var.pp lv @@
@@ -1317,7 +1417,7 @@ module Builder = struct
     let _nl = nullable analysis in
 
     Fmt.pr "DIST@.";
-    let dist = distance_multiple ps' in
+    let dist = distance_multiple Seq.(ps' @ ds') in
 
     Seq.iter (fun (lhs, rhs) ->
         let d = T.Labeled_var_to.find lhs dist in
@@ -1348,6 +1448,145 @@ module Builder = struct
     Fmt.pr "%s@." @@
     Dot.string_of_graph @@
     M'.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Enhanced_lits.pp x) b;
+
+    (*let supply1, supply2 = Supply.split2 T.State.supply in
+    let ps' = convert_multiple ~supply:supply1 ps in
+    let ds' = convert_multiple ~supply:supply2 ds in
+    let ps_to = T.Labeled_var_to.of_seq Seq.(ps' @ ds') in
+    let m = construct start Seq.(ps' @ ds') in
+    (*let m = extend m ~tokens ds' in *)
+    let m = M.homomorphism (fun lits -> if Lits.is_call lits && T.Vars.subset lits.call tokens then Lits.scan (lits.call) else lits) m in
+
+    Fmt.pr "%s@." @@
+    Dot.string_of_graph @@
+    M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Lits.pp x) m;
+
+    let m' = subset ~supply:T.State.supply m in
+
+    Fmt.pr "%s@." @@
+    Dot.string_of_graph @@
+    M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Lits.pp x) m';
+
+    let to_start = to_start m' in
+    let eps = extract_multiple Seq.(ps' @ ds') to_start m' in
+
+    Seq.iter (fun ((q, lv), x) ->
+        Fmt.pr "(%a %a) %s@." T.State.pp q T.Labeled_var.pp lv @@
+        Dot.string_of_graph @@
+        M'.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Enhanced_lits.pp x) x)
+      eps;
+
+    Fmt.pr "LA@.";
+    let analysis = run_analysis eps in
+    let lb = lookback eps in
+    let la = lookahead' lb analysis in
+    let _nl = nullable analysis in
+
+    Fmt.pr "DIST@.";
+    let dist = distance_multiple Seq.(ps' @ ds') in
+
+    Seq.iter (fun (lhs, rhs) ->
+        let d = T.Labeled_var_to.find lhs dist in
+        Fmt.pr "%s@." @@
+        Dot.string_of_graph @@
+        M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Size.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Lits.pp x) (M.map_states_labels (fun s _ -> d s) rhs))
+      ps';
+
+    Fmt.pr "TOKEN LA@.";
+    let token_la = lookahead_tokens tokens la in
+
+    Fmt.pr "NC@.";
+    let nc = noncannonical token_la m' in
+    Fmt.pr "%s@." @@
+    Dot.string_of_graph @@
+    M''.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string (T.State_to.pp Items.pp) x) ~string_of_lits:(fun x -> Fmt.to_to_string Lits.pp x) nc;
+
+    Fmt.pr "NC@.";
+    let nc = M''.homomorphism (fun lits -> if Lits.is_scan lits then {lits with null = true; scan = T.Vars.empty} else lits) nc in
+
+    let nc = collapse' nc in
+
+    Fmt.pr "%s@." @@
+    Dot.string_of_graph @@
+    M''.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string (T.State_to.pp Items.pp) x) ~string_of_lits:(fun x -> Fmt.to_to_string Lits.pp x) nc;
+
+    let b = back ~is_token:(fun v -> T.Vars.mem v tokens) eps in
+    Fmt.pr "%s@." @@
+    Dot.string_of_graph @@
+    M'.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Enhanced_lits.pp x) b;*)
+
+    (*let supply1, supply2 = Supply.split2 T.State.supply in
+    let ps' = convert_multiple ~supply:supply1 ps in
+    let ds' = convert_multiple ~supply:supply2 ds in
+    let ps_to = T.Labeled_var_to.of_seq Seq.(ps' @ ds') in
+    let m = construct start ps' in
+
+    Fmt.pr "%s@." @@
+    Dot.string_of_graph @@
+    M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Lits.pp x) m;
+
+    let m' = subset ~supply:T.State.supply m in
+
+    let m' = extend m' ~tokens ds' in 
+    let m' = M.homomorphism (fun lits -> if Lits.is_call lits && T.Vars.subset lits.call tokens then Lits.scan (lits.call) else lits) m' in
+
+    Fmt.pr "%s@." @@
+    Dot.string_of_graph @@
+    M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Lits.pp x) m';
+
+    let to_start = to_start m' in
+    let eps = extract_multiple Seq.(ps' @ ds') to_start m' in
+
+    Seq.iter (fun ((q, lv), x) ->
+        Fmt.pr "(%a %a) %s@." T.State.pp q T.Labeled_var.pp lv @@
+        Dot.string_of_graph @@
+        M'.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Enhanced_lits.pp x) x)
+      eps;
+
+    Fmt.pr "LA@.";
+    let analysis = run_analysis eps in
+    let lb = lookback eps in
+    let la = lookahead' lb analysis in
+    let _nl = nullable analysis in
+
+    Fmt.pr "DIST@.";
+    let dist = distance_multiple Seq.(ps' @ ds') in
+
+    Seq.iter (fun (lhs, rhs) ->
+        let d = T.Labeled_var_to.find lhs dist in
+        Fmt.pr "%s@." @@
+        Dot.string_of_graph @@
+        M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Size.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Lits.pp x) (M.map_states_labels (fun s _ -> d s) rhs))
+      ps';
+
+    Fmt.pr "TOKEN LA@.";
+    let token_la = lookahead_tokens tokens la in
+
+    Fmt.pr "NC'''@.";
+    let nc =noncannonical2 token_la m' in
+
+    Fmt.pr "%s@." @@
+    Dot.string_of_graph @@
+    M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string (Items.pp) x) ~string_of_lits:(fun x -> Fmt.to_to_string Lits.pp x) nc;
+
+    let nc = upgrade nc in
+    Fmt.pr "%s@." @@
+    Dot.string_of_graph @@
+    M''.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string (T.State_to.pp Items.pp) x) ~string_of_lits:(fun x -> Fmt.to_to_string Lits.pp x) nc;
+
+    Fmt.pr "NC@.";
+    let nc = M''.homomorphism (fun lits -> if Lits.is_scan lits then {lits with null = true; scan = T.Vars.empty} else lits) nc in
+
+    (*let nc = collapse' nc in*)
+
+    Fmt.pr "%s@." @@
+    Dot.string_of_graph @@
+    M''.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string (T.State_to.pp Items.pp) x) ~string_of_lits:(fun x -> Fmt.to_to_string Lits.pp x) nc;
+
+    let b = back ~is_token:(fun v -> T.Vars.mem v tokens) eps in
+    Fmt.pr "%s@." @@
+    Dot.string_of_graph @@
+    M'.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Enhanced_lits.pp x) b;*)
 
     let t = M''.map_states_labels (fun r nc_items ->
         T.State_to.fold (fun s items acc ->

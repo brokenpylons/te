@@ -24,19 +24,23 @@ let _ =
       make (n, x) (set "x");
       make (n, d) (set "$");
     ];*)
-  let Vector.[s'; s; a; b; n; spesh] = T.Var.make ~supply:T.Var.supply Vector.["S'"; "S"; "A"; "B"; "_"; "%"] in
+  let Vector.[s'; s; a; b; n; spesh; super] = T.Var.make ~supply:T.Var.supply Vector.["S'"; "S"; "A"; "B"; "_"; "%"; "^"] in
   let ps = List.to_seq @@ Tn.Production.[
       make (n, s') R.(var s * (plus (var b)));
       make (n, s) R.(var s * var s);
-      make (spesh, s) R.(var a * var a);
+      make (spesh, s) R.(var a * var a)
+    ];
+  in
+  let ds = List.to_seq @@ Tn.Production.[
       make (n, a) R.(star (set "x"));
+      make (super, a) (set "x");
       make (spesh, a) R.(star (set "y"));
       make (n, b) (set "$");
     ];
   in
   let tokens = T.Vars.of_list [a; b] in
 
-  let (b, g) = Tn.Builder.make ~tokens s' ps in
+  let (b, g) = Tn.Builder.make ~tokens s' ps ds in
   let t = Tables.V1.Unoptimized.make ~tokens g b in
   Fmt.pr "%a" Tables.V1.Unoptimized.pp t;
 
@@ -46,10 +50,15 @@ let _ =
   d#read (c "x");
   d#read (c "y");
   d#read (c "y");
+  d#read (c "$");
 
+  (*d#load (v a);*)
+  (*d#read (c "y");
+  d#read (c "y");*)
+
+  (*d#read (c "$");
   d#read (c "$");
-  d#read (c "$");
-  d#read (c "$");
+  d#read (c "$");*)
   Fmt.pr "@]";
 
   (*d#clear;
