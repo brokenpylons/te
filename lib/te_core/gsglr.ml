@@ -230,6 +230,11 @@ module Make(Tables: TABLES) = struct
         (T.Vertices.to_seq l);*)
 
     method read x = begin
+      Fmt.pr "@,COMPLETE %a@," self#pp_symbol x;
+      Fmt.pr "R %a@," (T.Vertex_to.pp (Fmt.parens T.Vertices.pp)) read1;
+      Seq.iter (fun (w, l) ->
+          self#actor ~null:false w l [x])
+        (Segments.to_seq_multiple read1);
       read0 <- read1;
       read1 <- Segments.empty;
       Fmt.pr "AFTER %a@," (T.Vertex_to.pp (Fmt.parens T.Vertices.pp)) read0;
@@ -249,12 +254,7 @@ module Make(Tables: TABLES) = struct
                   read1 <- Segments.add u v read1
                 end))
             (T.Vertices.to_seq l))
-        (Segments.to_seq_multiple read0);
-      Fmt.pr "@,COMPLETE %a@," self#pp_symbol x;
-      Fmt.pr "R %a@," (T.Vertex_to.pp (Fmt.parens T.Vertices.pp)) read1;
-      Seq.iter (fun (w, l) ->
-          self#actor ~null:false w l [x])
-        (Segments.to_seq_multiple read1);
+        (Segments.to_seq_multiple read0)
     end
 
     method forest =

@@ -24,21 +24,28 @@ let _ =
       make (n, x) (set "x");
       make (n, d) (set "$");
     ];*)
-  let Vector.[s'; s; a; b; n; spesh; super] = T.Var.make ~supply:T.Var.supply Vector.["S'"; "S"; "A"; "B"; "_"; "%"; "^"] in
+  let Vector.[s'; s; _x; a; b; z; n; _spesh; _super] = T.Var.make ~supply:T.Var.supply Vector.["S'"; "S"; "X"; "A"; "B"; "Z"; "_"; "%"; "^"] in
   let ps = List.to_seq @@ Tn.Production.[
       make (n, s') R.(var s * (plus (var b)));
-      make (n, s) R.(var s * var s);
-      make (spesh, s) R.(var a * var a)
+      make (n, s) R.(var z * var a * var z * var b);
+      (*make (n, s) R.(var s * var s);
+      make (spesh, s) R.(var a * var a);
+      make (super, s) R.(var z * var x * var z * var s);
+      make (n, x) (var a);*)
     ];
   in
   let ds = List.to_seq @@ Tn.Production.[
-      make (n, a) R.(star (set "x"));
+      make (n, a) (set "a");
+      make (n, b) (set "b");
+      make (n, z) (set "z");
+      (*make (n, a) R.(star (set "x"));
       make (super, a) (set "x");
       make (spesh, a) R.(star (set "y"));
-      make (n, b) (set "$");
+      make (n, z) (set "z");
+      make (n, b) (set "$");*)
     ];
   in
-  let tokens = T.Vars.of_list [a; b] in
+  let tokens = T.Vars.of_list [a; b; z] in
 
   let (b, g) = Tn.Builder.make ~tokens s' ps ds in
   let t = Tables.V1.Unoptimized.make ~tokens g b in
@@ -46,11 +53,12 @@ let _ =
 
   Fmt.pr "@.@[<v>";
   let d = new X.driver t in
-  d#read (c "x");
-  d#read (c "x");
-  d#read (c "y");
-  d#read (c "y");
-  d#read (c "$");
+  d#read (c "z");
+  d#read (c "a");
+  d#read (c "z");
+  d#read (c "b");
+  d#read (c "b");
+  d#read (c "b");
 
   (*d#load (v a);*)
   (*d#read (c "y");

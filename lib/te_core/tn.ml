@@ -1383,7 +1383,7 @@ module Builder = struct
   end
 
   let make ~tokens start ps ds =
-    let supply1, supply2 = Supply.split2 T.State.supply in
+    (*let supply1, supply2 = Supply.split2 T.State.supply in
     let ps' = convert_multiple ~supply:supply1 ps in
     let ds' = convert_multiple ~supply:supply2 ds in
     let ps_to = T.Labeled_var_to.of_seq Seq.(ps' @ ds') in
@@ -1447,9 +1447,9 @@ module Builder = struct
     let b = back ~is_token:(fun v -> T.Vars.mem v tokens) eps in
     Fmt.pr "%s@." @@
     Dot.string_of_graph @@
-    M'.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Enhanced_lits.pp x) b;
+    M'.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Enhanced_lits.pp x) b;*)
 
-    (*let supply1, supply2 = Supply.split2 T.State.supply in
+    let supply1, supply2 = Supply.split2 T.State.supply in
     let ps' = convert_multiple ~supply:supply1 ps in
     let ds' = convert_multiple ~supply:supply2 ds in
     let ps_to = T.Labeled_var_to.of_seq Seq.(ps' @ ds') in
@@ -1486,6 +1486,7 @@ module Builder = struct
     let dist = distance_multiple Seq.(ps' @ ds') in
 
     Seq.iter (fun (lhs, rhs) ->
+        Fmt.pr "-- %a@." T.Labeled_var.pp lhs;
         let d = T.Labeled_var_to.find lhs dist in
         Fmt.pr "%s@." @@
         Dot.string_of_graph @@
@@ -1496,7 +1497,9 @@ module Builder = struct
     let token_la = lookahead_tokens tokens la in
 
     Fmt.pr "NC@.";
-    let nc = noncannonical token_la m' in
+    let nc = noncannonical2 token_la m' in
+    let nc = upgrade nc in
+
     Fmt.pr "%s@." @@
     Dot.string_of_graph @@
     M''.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string (T.State_to.pp Items.pp) x) ~string_of_lits:(fun x -> Fmt.to_to_string Lits.pp x) nc;
@@ -1504,7 +1507,7 @@ module Builder = struct
     Fmt.pr "NC@.";
     let nc = M''.homomorphism (fun lits -> if Lits.is_scan lits then {lits with null = true; scan = T.Vars.empty} else lits) nc in
 
-    let nc = collapse' nc in
+    (*let nc = collapse' nc in*)
 
     Fmt.pr "%s@." @@
     Dot.string_of_graph @@
@@ -1513,7 +1516,7 @@ module Builder = struct
     let b = back ~is_token:(fun v -> T.Vars.mem v tokens) eps in
     Fmt.pr "%s@." @@
     Dot.string_of_graph @@
-    M'.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Enhanced_lits.pp x) b;*)
+    M'.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Enhanced_lits.pp x) b;
 
     (*let supply1, supply2 = Supply.split2 T.State.supply in
     let ps' = convert_multiple ~supply:supply1 ps in
