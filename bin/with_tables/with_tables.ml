@@ -10,9 +10,13 @@ let set x = R.lits Tn.Lits.(codes (T.Codes.of_string x))
 
 let var x = R.lits Tn.Lits.(var x)
 
+let eof = R.lits Tn.Lits.(eof)
+
 (*let eof = R.lits Tn.Lits.eof*)
 
-let c s = Tables.V1.Unoptimized.Code (T.Codes.the @@ T.Codes.of_string s)
+let c s = T.Symbol.Code (T.Codes.the @@ T.Codes.of_string s)
+
+let eof_ = T.Symbol.Eof
 
 let _ =
   (*let Vector.[s'; s; a; b; x; d; n] = T.Var.make ~supply:T.Var.supply Vector.["S'"; "S"; "A"; "B"; "x"; "$"; "_"] in
@@ -26,7 +30,7 @@ let _ =
     ];*)
   let Vector.[s'; s; _x; a; b; z; n; _spesh; _super] = T.Var.make ~supply:T.Var.supply Vector.["S'"; "S"; "X"; "A"; "B"; "Z"; "_"; "%"; "^"] in
   let ps = List.to_seq @@ Tn.Production.[
-      make (n, s') R.(var s * (plus (var b)));
+      make (n, s') R.(var s * (plus eof));
       make (n, s) R.(var z * var a * var z * var b);
       (*make (n, s) R.(var s * var s);
       make (spesh, s) R.(var a * var a);
@@ -57,8 +61,8 @@ let _ =
   d#read (c "a");
   d#read (c "z");
   d#read (c "b");
-  d#read (c "b");
-  d#read (c "b");
+  d#read (eof_);
+  d#read (eof_);
 
   (*d#load (v a);*)
   (*d#read (c "y");

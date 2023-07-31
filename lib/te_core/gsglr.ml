@@ -54,7 +54,7 @@ module type TABLES = sig
   type states := T.States.t
   type statess := T.Statess.t
 
-  type symbol = Null | Code of T.Code.t | Var of T.Var.t
+  type symbol := T.Symbol.t
 
   val start: t -> states
   val actions: t -> states -> symbol -> actions 
@@ -78,6 +78,7 @@ module Orders = Multimap.Make2(T.Var_to)(T.Vertices)
 module Orders' = Multimap.Make2(T.Vertex_to)(Orders.Set)
 
 module Make(Tables: TABLES) = struct
+
   class driver (t: Tables.t) =
     let bottom = T.Vertex.make (Tables.start t) 0 in object(self)
     val mutable stack = Gss.singleton bottom
@@ -85,17 +86,14 @@ module Make(Tables: TABLES) = struct
     val mutable reduce = Segments.singleton bottom bottom
     val mutable read0 = Segments.empty
     val mutable read1 = Segments.empty
+    val mutable shift0 = Segments.empty
+    val mutable shift1 = Segments.empty
     val mutable subclasses = Subclasses.singleton 0 bottom
     val mutable starters = Subclasses.empty
     val mutable orders = Orders'.empty
 
     initializer
       self#expand bottom
-
-    method private pp_symbol ppf = function
-      | Tables.Null -> Fmt.string ppf "NULL"
-      | Tables.Code x -> T.Code.pp ppf x
-      | Tables.Var x -> T.Var.pp ppf x
 
     method private successors v ns paths d =
       if Int.equal d 0
@@ -129,14 +127,14 @@ module Make(Tables: TABLES) = struct
       | Null -> Paths.singleton (v, [])
 
     method private actor ~null v l xs = 
-      Fmt.pr "actor %b %a %a %a@," null T.Vertex.pp v T.Vertices.pp l (Fmt.list self#pp_symbol) xs;
+      Fmt.pr "actor %b %a %a %a@," null T.Vertex.pp v T.Vertices.pp l (Fmt.list T.Symbol.pp) xs;
       let a = List.fold_left (fun acc x -> Tables.actions_union (Tables.actions t (T.Vertex.states v) x) acc) Tables.actions_empty xs in
       T.Vars.iter (fun x ->
            Fmt.pr "ORDER %a %a@," T.Vertex.pp v T.Var.pp x;
            orders <- Orders'.add_multiple v (Orders.singleton x v) orders)
         (Tables.orders a);
       if not (T.Labeled_vars.is_empty @@ Tables.matches a) then begin
-        self#prediction l (List.map (fun output -> Tables.Var (T.Labeled_var.var output)) (T.Labeled_vars.to_list @@ Tables.predictions a));
+        self#prediction l (List.map (fun output -> T.Symbol.Var (T.Labeled_var.var output)) (T.Labeled_vars.to_list @@ Tables.predictions a));
       end;
       if not null then begin
         T.Reductions.iter (fun r ->
@@ -167,6 +165,7 @@ module Make(Tables: TABLES) = struct
               if not (Gss.contains_edge u v' stack) then begin
                 stack <- Gss.connect u v' (Some n) stack;
                 reduce <- Segments.add u v' reduce;
+                shift1 <- Segments.add u v' shift1;
                 forest <- Forest.add n forest;
               end;
               forest <- Forest.pack n (T.Vars.singleton @@ T.Labeled_var.label output) [] forest))
@@ -177,7 +176,7 @@ module Make(Tables: TABLES) = struct
     method private prediction l xs =
       Seq.iter (fun w ->
           if not (Orders'.domain_mem w orders) then begin
-            Fmt.pr "PREDICTION %a %a@," T.Vertex.pp w (Fmt.list self#pp_symbol) xs;
+            Fmt.pr "PREDICTION %a %a@," T.Vertex.pp w (Fmt.list T.Symbol.pp) xs;
             self#actor ~null:false w (Segments.find_multiple w reduce) xs
           end)
         (T.Vertices.to_seq l)
@@ -197,6 +196,7 @@ module Make(Tables: TABLES) = struct
              if not (Gss.contains_edge u w stack) then begin
                stack <- Gss.connect u w (Some n) stack;
                forest <- Forest.add n forest;
+               shift1 <- Segments.add u w shift1;
                self#actor ~null:(match r.strategy with Null -> true | _ -> false) u (T.Vertices.singleton w) xs;
                orders <- Orders'.add_multiple v (Orders'.find_multiple_or ~default:Orders.empty u orders) orders
              end;
@@ -230,13 +230,19 @@ module Make(Tables: TABLES) = struct
         (T.Vertices.to_seq l);*)
 
     method read x = begin
-      Fmt.pr "@,COMPLETE %a@," self#pp_symbol x;
+      Fmt.pr "@,COMPLETE %a@," T.Symbol.pp x;
       Fmt.pr "R %a@," (T.Vertex_to.pp (Fmt.parens T.Vertices.pp)) read1;
+      Fmt.pr "S %a@," (T.Vertex_to.pp (Fmt.parens T.Vertices.pp)) shift1;
       Seq.iter (fun (w, l) ->
           self#actor ~null:false w l [x])
         (Segments.to_seq_multiple read1);
+      Seq.iter (fun (w, l) ->
+          self#actor ~null:false w l [x])
+        (Segments.to_seq_multiple shift1);
       read0 <- read1;
       read1 <- Segments.empty;
+      shift0 <- shift1;
+      shift1 <- Segments.empty;
       Fmt.pr "AFTER %a@," (T.Vertex_to.pp (Fmt.parens T.Vertices.pp)) read0;
       Seq.iter (fun (w, l) ->
           Seq.iter (fun v ->
@@ -244,7 +250,7 @@ module Make(Tables: TABLES) = struct
               T.Statess.iter (fun s ->
                 let pos = succ @@ T.Vertex.position w in
                 let u = T.Vertex.make s pos in
-                Fmt.pr "READ %a %a %a -> %a@," T.Vertex.pp w T.Vertex.pp v T.Vertex.pp u self#pp_symbol x;
+                Fmt.pr "READ %a %a %a -> %a@," T.Vertex.pp w T.Vertex.pp v T.Vertex.pp u T.Symbol.pp x;
                 if not (Gss.contains u stack) then begin
                   stack <- Gss.add u stack;
                   subclasses <- Subclasses.add pos u subclasses;
@@ -254,7 +260,24 @@ module Make(Tables: TABLES) = struct
                   read1 <- Segments.add u v read1
                 end))
             (T.Vertices.to_seq l))
-        (Segments.to_seq_multiple read0)
+        (Segments.to_seq_multiple read0);
+      Fmt.pr "LOADER %a@," (T.Vertex_to.pp (Fmt.parens T.Vertices.pp)) shift0;
+      Seq.iter (fun (w, _) ->
+          Tables.goto t (T.Vertex.states w) x |>
+          T.Statess.iter (fun s ->
+              let pos = succ @@ T.Vertex.position w in
+              let u = T.Vertex.make s pos in
+              Fmt.pr "LOAD %a %a %a -> %a@," T.Vertex.pp w T.Vertex.pp w T.Vertex.pp u T.Symbol.pp x;
+              if not (Gss.contains u stack) then begin
+                stack <- Gss.add u stack;
+                subclasses <- Subclasses.add pos u subclasses;
+              end;
+              if not (Gss.contains_edge u w stack) then begin
+                stack <- Gss.connect u w None stack;
+                reduce <- Segments.add u w reduce;
+                shift1 <- Segments.add u w shift1;
+              end))
+        (Segments.to_seq_multiple shift0)
     end
 
     method forest =

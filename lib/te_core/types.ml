@@ -261,4 +261,18 @@ module Reductions = struct
   let pp = pp Reduction.pp
 end
 
+module Symbol = struct
+  type t = Null | Eof | Code of Code.t | Var of Var.t
+  [@@deriving eq, ord]
 
+  let pp ppf = function
+    | Eof -> Fmt.string ppf "$"
+    | Null -> Fmt.string ppf "NULL"
+    | Code x -> Code.pp ppf x
+    | Var x -> Var.pp ppf x
+end
+
+module Symbol_to = struct
+  include Balanced_binary_tree.Map.Size(Symbol)
+  let pp pp_p = pp Symbol.pp pp_p
+end

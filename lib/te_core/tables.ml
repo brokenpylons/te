@@ -209,7 +209,6 @@ module Make(A: Fa.S0 with type state = T.States.t)(B: Fa.S0 with type state = T.
     val make: tokens:T.Vars.t -> (A.Start.single, Items.t, Lits.t) A.t -> (B.Start.multiple, _, _) B.t -> t
     val pp: t Fmt.t
   end = struct
-    type symbol = Null | Code of T.Code.t | Var of T.Var.t
     type actions = Actions.t
     type t =
       {
@@ -232,9 +231,10 @@ module Make(A: Fa.S0 with type state = T.States.t)(B: Fa.S0 with type state = T.
     let actions_empty = Actions.empty
 
     let lits_of_symbol = function
-      | Code x -> Lits.code x
-      | Var x -> Lits.var x
-      | Null -> Lits.null
+      | T.Symbol.Eof -> Lits.eof
+      | T.Symbol.Code x -> Lits.code x
+      | T.Symbol.Var x -> Lits.var x
+      | T.Symbol.Null -> Lits.null
 
     let start t =
       t.start

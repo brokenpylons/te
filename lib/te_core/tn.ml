@@ -965,7 +965,10 @@ let run_analysis ps =
   let cs =
     ps
     |> Seq.flat_map (fun (_, (rhs: _ M'.t)) ->
-        Seq.map (fun (s, lits) -> Enhanced_lits.singleton s (Lits.codes @@ lits.Lits.codes))
+        Seq.map (fun (s, lits) -> Enhanced_lits.singleton s 
+                    (let cs = Lits.codes @@ lits.Lits.codes in
+                     let eof = if lits.Lits.eof then Lits.eof else Lits.empty in
+                     Lits.union cs eof))
           (Seq.flat_map Enhanced_lits.to_seq (M'.all_lits rhs)))
     |> Seq.fold_left (fun acc x ->
         X.add_multiple x x acc) X.empty

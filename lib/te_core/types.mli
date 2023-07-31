@@ -301,3 +301,19 @@ module Reductions: sig
   val subset: t -> t -> bool*)
 end
 
+module Symbol: sig
+  type t = Null | Eof | Code of Code.t | Var of Var.t
+  val compare: t -> t -> int
+  val equal: t -> t -> bool
+  val pp: t Fmt.t
+end
+
+module Symbol_to: sig
+  include Map.CORE with type elt = Symbol.t
+  val pp: 'a Fmt.t -> 'a t Fmt.t
+  val update: elt -> ('a option -> 'a option) -> 'a t -> 'a t
+  val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+  val inter: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
+  val diff: 'a t -> 'a t -> 'a t
+  val filter: (elt -> 'a -> bool) -> 'a t -> 'a t
+end
