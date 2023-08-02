@@ -597,8 +597,29 @@ let construct s' ps =
             try
             t
             |> M.link ~merge:Lits.union (T.States.singleton from) (Acc.find_multiple x starts) (Lits.call @@ T.Vars.singleton x)
-            with Not_found -> t
-            (*|> M.link ~merge:Lits.union (Acc.find_multiple x finals) (T.States.singleton to_) (Lits.return (T.Vars.singleton x))*))
+            (*|> M.link ~merge:Lits.union (Acc.find_multiple x finals) (T.States.singleton to_) (Lits.return (T.Vars.singleton x))*)
+            with Not_found -> t)
+          t ls.Lits.vars)
+        t (M.transitions t))
+  }
+
+let construct2 s' ps =
+  let starts, finals = Seq.fold_left (fun (starts, finals) (lhs, rhs) ->
+      let s = T.Labeled_var.var lhs in
+      Acc.add s (M.start rhs) starts, Acc.add_multiple s (M.final rhs) finals)
+      (Acc.empty, Acc.empty) ps
+  in
+  let t = Seq.fold_left (Fun.flip @@ M.sum % Production.rhs) M.empty ps in
+  M.{
+    start = M.Start.Single (T.States.the (Acc.find_multiple s' starts));
+    final = Acc.find_multiple s' finals;
+    graph = M.skeleton (Seq.fold_left (fun t (from, to_, ls) ->
+        T.Vars.fold (fun x t ->
+            try
+            t
+            |> M.link ~merge:Lits.union (T.States.singleton from) (Acc.find_multiple x starts) (Lits.call @@ T.Vars.singleton x)
+            |> M.link ~merge:Lits.union (Acc.find_multiple x finals) (T.States.singleton to_) (Lits.return (T.Vars.singleton x))
+            with Not_found -> t)
           t ls.Lits.vars)
         t (M.transitions t))
   }
@@ -1216,6 +1237,28 @@ let noncannonical token_lookahead t =
       (M.is_final_multiple from t, labels, next))
     (M.start_multiple t) (M.start_multiple t)
 
+let add_backlinks right_nulled lookback t =
+  M.{
+    t with
+    graph =
+      (Seq.fold_left (fun g from ->
+           (M.labels from t)
+           |> Items.to_seq
+           |> Seq.flat_map (fun (lhs, rhs) ->
+               if right_nulled lhs from rhs.Item_rhs.state
+               then lookback lhs from rhs.Item_rhs.state
+               else Seq.empty)
+           |> Seq.fold_left (fun g (s, lv) ->
+               Seq.fold_left (fun g (p, ls) ->
+                   if T.Vars.mem (T.Labeled_var.var lv) ls.Lits.vars then
+                     let ls' = try T.State_graph.edge_label from p g with Not_found -> Lits.empty in
+                     T.State_graph.connect from p (Lits.union ls' (Lits.return (T.Vars.singleton (T.Labeled_var.var lv)))) g
+                   else g)
+               g (M.adjacent s t))
+             g)
+           t.M.graph (M.states t))
+  }
+
 let noncannonical2 token_lookahead t =
   M.{
     t with
@@ -1484,6 +1527,8 @@ module Builder = struct
     let lb = lookback eps in
     let la = lookahead' lb analysis in
     let _nl = nullable analysis in
+
+    let m' = add_backlinks (fun lhs s q -> (la lhs s q).right_nulled) lb m' in
 
     Fmt.pr "DIST@.";
     let dist = distance_multiple Seq.(ps' @ ds') in

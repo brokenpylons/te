@@ -14,7 +14,7 @@ let eof = R.lits Tn.Lits.(eof)
 
 (*let eof = R.lits Tn.Lits.eof*)
 
-let c s = T.Symbol.Code (T.Codes.the @@ T.Codes.of_string s)
+let c_ s = T.Symbol.Code (T.Codes.the @@ T.Codes.of_string s)
 
 let eof_ = T.Symbol.Eof
 
@@ -28,7 +28,24 @@ let _ =
       make (n, x) (set "x");
       make (n, d) (set "$");
     ];*)
-  let Vector.[s'; s; _x; a; b; z; n; _spesh; _super] = T.Var.make ~supply:T.Var.supply Vector.["S'"; "S"; "X"; "A"; "B"; "Z"; "_"; "%"; "^"] in
+
+  let Vector.[s'; s; a; b; c; d; n] = T.Var.make ~supply:T.Var.supply Vector.["S'"; "S"; "A"; "B"; "C"; "D"; "_"] in
+  let ps = List.to_seq @@ Tn.Production.[
+      make (n, s') R.(var s * plus eof);
+      make (n, s) R.(((var a + var b) * plus (var c)));
+      make (n, b) R.((var d * var b) + null);
+    ];
+  in
+  let ds = List.to_seq @@ Tn.Production.[
+      make (n, a) (set "a");
+      make (n, c) (set "c");
+      make (n, d) (set "d");
+    ];
+  in
+  let tokens = T.Vars.of_list [a; c; d] in
+
+
+  (*let Vector.[s'; s; _x; a; b; z; n; _spesh; _super] = T.Var.make ~supply:T.Var.supply Vector.["S'"; "S"; "X"; "A"; "B"; "Z"; "_"; "%"; "^"] in
   let ps = List.to_seq @@ Tn.Production.[
       make (n, s') R.(var s * (plus eof));
       make (n, s) R.(var z * var a * var z * var b);
@@ -49,7 +66,7 @@ let _ =
       make (n, b) (set "$");*)
     ];
   in
-  let tokens = T.Vars.of_list [a; b; z] in
+  let tokens = T.Vars.of_list [a; b; z] in*)
 
   let (b, g) = Tn.Builder.make ~tokens s' ps ds in
   let t = Tables.V1.Unoptimized.make ~tokens g b in
@@ -57,10 +74,10 @@ let _ =
 
   Fmt.pr "@.@[<v>";
   let d = new X.driver t in
-  d#read (c "z");
-  d#read (c "a");
-  d#read (c "z");
-  d#read (c "b");
+  d#read (c_ "a");
+  d#read (c_ "c");
+  d#read (c_ "c");
+  d#read (c_ "c");
   d#read (eof_);
   d#read (eof_);
 
