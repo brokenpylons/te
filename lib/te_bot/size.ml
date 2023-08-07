@@ -1,6 +1,7 @@
 (* Natural numbers extended with lower and upper bound *)
 
 type t = Bot | Finite of int | Top
+[@@deriving eq, ord]
 
 exception Undefined
 
@@ -110,11 +111,11 @@ let (>) u v =
   | Top, _ -> true
   | _, _ -> false
 
-let equal = (=)
+(*let equal = (=)
 let compare u v = 
   if u < v then -1
   else if u > v then 1
-  else 0
+  else 0*)
 
 let (<>) u v = not (u = v)
 let (>=) u v = not (u < v)

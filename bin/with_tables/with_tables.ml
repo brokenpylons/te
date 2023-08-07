@@ -29,21 +29,35 @@ let _ =
       make (n, d) (set "$");
     ];*)
 
-  let Vector.[s'; s; a; b; c; d; n] = T.Var.make ~supply:T.Var.supply Vector.["S'"; "S"; "A"; "B"; "C"; "D"; "_"] in
+  (*let Vector.[s'; s; a; b; c; d; n] = T.Var.make ~supply:T.Var.supply Vector.["S'"; "S"; "A"; "B"; "C"; "D"; "_"] in
   let ps = List.to_seq @@ Tn.Production.[
       make (n, s') R.(var s * plus eof);
-      make (n, s) R.(((var a + var b) * plus (var c)));
-      make (n, b) R.((var d * var b) + null);
+      make (n, s) R.(var b * set "x" * set "y" * var c);
+      make (n, b) (var a);
+      make (n, c) (var d);
     ];
   in
   let ds = List.to_seq @@ Tn.Production.[
       make (n, a) (set "a");
-      make (n, c) (set "c");
       make (n, d) (set "d");
     ];
   in
-  let tokens = T.Vars.of_list [a; c; d] in
+  let tokens = T.Vars.of_list [a; d] in*)
 
+  
+  let Vector.[s'; s; a'; b'; c'; i'; n] = T.Var.make ~supply:T.Var.supply Vector.["S'"; "S"; "a"; "b"; "c"; "i"; "_"] in
+
+  let ps = List.to_seq @@ Tn.Production.[
+      make (n, s') R.(var s * plus eof);
+      make (n, s)  R.(star (var a' + var b') * var i' + var c' + var i');
+      make (n, a') (set "x");
+      make (n, b') R.(set "x" * set "x");
+      make (n, c') R.(set "x" * var c' + set "x");
+      make (n, i') R.(plus (set "x"));
+    ]
+  in
+  let ds = List.to_seq @@ [] in
+  let tokens = T.Vars.of_list [] in
 
   (*let Vector.[s'; s; _x; a; b; z; n; _spesh; _super] = T.Var.make ~supply:T.Var.supply Vector.["S'"; "S"; "X"; "A"; "B"; "Z"; "_"; "%"; "^"] in
   let ps = List.to_seq @@ Tn.Production.[
@@ -74,10 +88,9 @@ let _ =
 
   Fmt.pr "@.@[<v>";
   let d = new X.driver t in
-  d#read (c_ "a");
-  d#read (c_ "c");
-  d#read (c_ "c");
-  d#read (c_ "c");
+  d#read (c_ "x");
+  d#read (c_ "x");
+  d#read (c_ "x");
   d#read (eof_);
   d#read (eof_);
 

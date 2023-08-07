@@ -202,6 +202,7 @@ module Var: sig
   val equal: t -> t -> bool
   val pp: t Fmt.t
   val supply: pre Supply.t
+  val dummy: t
 
   val make: supply:(pre Supply.t) -> (string, 'a) Vector.t -> (t, 'a) Vector.t 
 end

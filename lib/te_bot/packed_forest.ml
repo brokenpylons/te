@@ -22,6 +22,7 @@ module type NODE_MAP = sig
   val equal: ('a -> 'a -> bool) ->  'a t ->  'a t -> bool
   val cardinal:  'a t -> int
 
+  val mem: elt ->  _ t -> bool
   val find: elt ->  'a t -> 'a
 
   val empty:  'a t
@@ -52,6 +53,7 @@ module type S = sig
   val adjacent: node -> t -> node list list
   val empty: t
   val add: node -> t -> t
+  val mem: node -> t -> bool
   val pack: node -> labels -> node list -> t -> t
   val to_dot: t -> Dot.graph
 end
@@ -77,6 +79,8 @@ module Make(Node: NODE)(Labels: LABELS)(Node_map: NODE_MAP with type elt = Node.
     List.map snd adjs
 
   let empty = Node_map.empty
+
+  let mem n t = Node_map.mem n t
 
   let add n t =
     Node_map.add n [] t

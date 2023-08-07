@@ -136,6 +136,21 @@ module Abstract = struct
       | Comp (_, _, x) -> lower_bound_comp @@ go x
     in go*)
 
+  let is_infinite =
+    let rec go = function
+      | Nothing -> true
+      | Null -> false
+      | Any -> false
+      | Lits _ -> false
+      | Concat (_, _, x, y) when is_nullable x -> go x || go y
+      | Concat (_, _, x, _) -> go x
+      | Union (_, _, x, y) -> go x || go y
+      | Repeat (_, _, x, _) -> go x
+      | Star _ -> true
+      | Comp (_, _, x) -> not (go x)
+      | Fix (_, _, _, _) -> true
+    in go
+
   let rec reverse = function
     | Concat (m, h, x, y) -> Concat (m, h, reverse y, reverse x)
     | Union (m, h, x, y) -> Union (m, h, reverse x, reverse y)

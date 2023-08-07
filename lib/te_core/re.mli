@@ -26,6 +26,7 @@ module Abstract: sig
 
   val is_nullable: _ t -> bool
   val is_nothing: _ t -> bool
+  val is_infinite: _ t -> bool
   val is_nullable': ('ls -> bool) -> ('vs, 'ls) t -> bool
   val reverse: ('vs, 'ls) t -> ('vs, 'ls) t
 

@@ -65,6 +65,7 @@ module type TABLES = sig
   val actions_empty: actions
 
   val shift: actions -> bool
+  val shift_code: actions -> bool
   val orders: actions -> T.Vars.t
   val matches: actions -> T.Labeled_vars.t
   val predictions: actions -> T.Labeled_vars.t
@@ -74,7 +75,7 @@ end
 
 module Subclasses = Multimap.Make2(Balanced_binary_tree.Map.Size(Int))(T.Vertices)
 module Segments = Multimap.Make2(T.Vertex_to)(T.Vertices)
-module Orders = Multimap.Make2(T.Symbol_to)(T.Vertices)
+module Orders = Multimap.Make2(T.Var_to)(T.Vertices)
 module Orders' = Multimap.Make2(T.Vertex_to)(Orders.Set)
 
 module Make(Tables: TABLES) = struct
@@ -87,7 +88,7 @@ module Make(Tables: TABLES) = struct
     val mutable read0 = Segments.empty
     val mutable read1 = Segments.empty
     val mutable shift0 = Segments.empty
-    val mutable shift1 = Segments.empty
+    val mutable shift1 = Segments.singleton bottom bottom
     val mutable subclasses = Subclasses.singleton 0 bottom
     val mutable starters = Subclasses.empty
     val mutable orders = Orders'.empty
@@ -128,12 +129,16 @@ module Make(Tables: TABLES) = struct
 
     method private actor ~null v l xs = 
       Fmt.pr "actor %b %a %a %a@," null T.Vertex.pp v T.Vertices.pp l (Fmt.list T.Symbol.pp) xs;
-      List.iter (fun x ->
+      (*List.iter (fun x ->
           if Tables.shift @@ Tables.actions t (T.Vertex.states v) x then begin
             Fmt.pr "ORDER %a %a@," T.Vertex.pp v T.Symbol.pp x;
             orders <- Orders'.add_multiple v (Orders.singleton x v) orders
-          end) xs;
+          end) xs;*)
       let a = List.fold_left (fun acc x -> Tables.actions_union (Tables.actions t (T.Vertex.states v) x) acc) Tables.actions_empty xs in
+      T.Vars.iter (fun x ->
+          Fmt.pr "ORDER %a %a@," T.Vertex.pp v T.Var.pp x;
+          orders <- Orders'.add_multiple v (Orders.singleton x v) orders)
+        (Tables.orders a);
       if not (T.Labeled_vars.is_empty @@ Tables.matches a) then begin
         self#prediction l (List.map (fun output -> T.Symbol.Var (T.Labeled_var.var output)) (T.Labeled_vars.to_list @@ Tables.predictions a));
       end;
@@ -149,7 +154,27 @@ module Make(Tables: TABLES) = struct
               let pos = T.Vertex.position v in
               self#shift pos w output)
             (T.Vertices.to_seq l))
-        (T.Labeled_vars.to_seq @@ Tables.matches a)
+        (T.Labeled_vars.to_seq @@ Tables.matches a);
+      List.iter (fun x ->
+          if (match x with T.Symbol.Eof -> true | T.Symbol.Code _ -> true | _ -> false) && Tables.shift_code @@ Tables.actions t (T.Vertex.states v) x then begin
+            Tables.goto t (T.Vertex.states v) x |>
+            T.Statess.iter (fun s ->
+                let pos = succ @@ T.Vertex.position v in
+                let u = T.Vertex.make s pos in
+                let n = T.Node.make T.Var.dummy (T.Vertex.position v) pos in
+                Fmt.pr "LOAD %a %a %a -> %a@," T.Vertex.pp v T.Vertex.pp v T.Vertex.pp u T.Symbol.pp x;
+                if not (Gss.contains u stack) then begin
+                  stack <- Gss.add u stack;
+                  subclasses <- Subclasses.add pos u subclasses;
+                  self#expand u
+                end;
+                if not (Gss.contains_edge u v stack) then begin
+                  stack <- Gss.connect u v (Some n) stack;
+                  reduce <- Segments.add u v reduce;
+                  shift1 <- Segments.add u v shift1;
+                  forest <- Forest.add n forest;
+                end)
+          end) xs
 
     method private shift pos w output =
       Seq.iter (fun v' ->
@@ -171,7 +196,7 @@ module Make(Tables: TABLES) = struct
               end;
               forest <- Forest.pack n (T.Vars.singleton @@ T.Labeled_var.label output) [] forest))
         (Orders'.find_multiple_or ~default:Orders.empty w orders
-         |> Orders.find_multiple_or ~default:T.Vertices.empty (T.Symbol.Var (T.Labeled_var.var output))
+         |> Orders.find_multiple_or ~default:T.Vertices.empty (T.Labeled_var.var output)
          |> T.Vertices.to_seq)
 
     method private prediction l xs =
@@ -194,13 +219,14 @@ module Make(Tables: TABLES) = struct
                stack <- Gss.add u stack;
                subclasses <- Subclasses.add pos u subclasses
              end;
-             if not (Gss.contains_edge u w stack) then begin
+             if not (Gss.contains_edge u w stack) || not (Forest.mem n forest) then begin
                stack <- Gss.connect u w (Some n) stack;
                forest <- Forest.add n forest;
                (*shift1 <- Segments.add u w shift1;*)
                self#actor ~null:(match r.strategy with Null -> true | _ -> false) u (T.Vertices.singleton w) xs;
                orders <- Orders'.add_multiple v (Orders'.find_multiple_or ~default:Orders.empty u orders) orders
              end;
+             Fmt.pr "NODE %a@." T.Node.pp n;
              List.iter (fun ns' ->
                  forest <- Forest.pack n (T.Vars.singleton @@ T.Labeled_var.label r.output) (ns @ ns') forest)
                (self#enumerate pos r.reminder)))
@@ -237,14 +263,15 @@ module Make(Tables: TABLES) = struct
       Seq.iter (fun (w, l) ->
           self#actor ~null:false w l [x])
         (Segments.to_seq_multiple read1);
-      Seq.iter (fun (w, l) ->
-          self#actor ~null:false w l [x])
-        (Segments.to_seq_multiple shift1);
       read0 <- read1;
       read1 <- Segments.empty;
       shift0 <- shift1;
       shift1 <- Segments.empty;
       Fmt.pr "AFTER %a@," (T.Vertex_to.pp (Fmt.parens T.Vertices.pp)) read0;
+      Seq.iter (fun (w, l) ->
+          if Tables.shift_code @@ Tables.actions t (T.Vertex.states w) x then
+          self#actor ~null:false w l [x])
+        (Segments.to_seq_multiple shift0);
       Seq.iter (fun (w, l) ->
           Seq.iter (fun v ->
               Tables.goto t (T.Vertex.states w) x |>
@@ -262,7 +289,7 @@ module Make(Tables: TABLES) = struct
                 end))
             (T.Vertices.to_seq l))
         (Segments.to_seq_multiple read0);
-      Fmt.pr "LOADER %a@," (T.Vertex_to.pp (Fmt.parens T.Vertices.pp)) shift0;
+      (*Fmt.pr "LOADER %a@," (T.Vertex_to.pp (Fmt.parens T.Vertices.pp)) shift0;
       Seq.iter (fun (w, _) ->
           Seq.iter (fun v -> 
               Tables.goto t (T.Vertex.states v) x |>
@@ -282,7 +309,7 @@ module Make(Tables: TABLES) = struct
           (Orders'.find_multiple_or ~default:Orders.empty w orders
            |> Orders.find_multiple_or ~default:T.Vertices.empty x
            |> T.Vertices.to_seq))
-        (Segments.to_seq_multiple shift0)
+        (Segments.to_seq_multiple shift0)*)
     end
 
     method forest =

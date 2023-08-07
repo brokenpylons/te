@@ -190,11 +190,13 @@ module Var = struct
 
   let supply = Supply.numbers ()
 
-  let make ~supply labels = 
+  let make ~supply labels =
     snd @@ Vector.fold_left_map (fun supply label ->
         let (x, supply) = Supply.get supply in
         (supply, (x, Some label)))
       supply labels
+
+  let dummy = (-1, None)
 
   let value_pp ppf = function
     | Some label -> Fmt.string ppf label

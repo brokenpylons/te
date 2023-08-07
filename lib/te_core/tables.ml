@@ -8,6 +8,7 @@ module Actions = struct
     {
       accept: bool;
       shift: bool;
+      shift_code: bool;
       orders: T.Vars.t;
       matches: T.Labeled_vars.t;
       predictions: T.Labeled_vars.t;
@@ -20,6 +21,7 @@ module Actions = struct
     {
       accept = x.accept || y.accept;
       shift = x.shift || y.shift;
+      shift_code = x.shift_code || y.shift_code;
       orders = T.Vars.union x.orders y.orders;
       matches = T.Labeled_vars.union x.matches y.matches;
       predictions = T.Labeled_vars.union x.predictions y.predictions;
@@ -31,6 +33,7 @@ module Actions = struct
     {
       accept = false;
       shift = false;
+      shift_code = false;
       orders = T.Vars.empty;
       matches = T.Labeled_vars.empty;
       predictions = T.Labeled_vars.empty;
@@ -52,6 +55,9 @@ module Actions = struct
 
   let shift =
     {empty with shift = true}
+
+  let shift_code =
+    {empty with shift_code = true}
 
   let orders x =
     {empty with orders = x}
@@ -103,6 +109,8 @@ module type ITEMS = sig
 
   val distance: item -> Size.t
   val state_pair: item -> T.State.t * T.State.t
+  val first: item -> T.Var.t -> Lits.t
+  val shift_code: item -> bool
   val shift_lookahead: item -> Lits.t
   val reduce_lookahead: item -> Lits.t
   val reminder: item -> T.Var.t list list
@@ -136,11 +144,16 @@ module Make(A: Fa.S0 with type state = T.States.t)(B: Fa.S0 with type state = T.
     let orders =
       let ls = Items.shift x in
       if not (Lits.is_empty ls)
-      then 
+      then
         T.Vars.fold (fun v acc ->
             Actions_multimap.union acc @@
-            Actions_multimap.singleton_multiple (Lits.var v) (Actions.orders (T.Vars.singleton v)))
+            Actions_multimap.singleton_multiple (Items.first x v) (Actions.orders (T.Vars.singleton v)))
            Actions_multimap.empty ls.Lits.vars
+      else Actions_multimap.empty
+    in
+    let shift_code =
+      if Items.shift_code x then
+        Actions_multimap.singleton_multiple (Items.shift_lookahead x) Actions.shift_code
       else Actions_multimap.empty
     in
     let matches =
@@ -175,7 +188,7 @@ module Make(A: Fa.S0 with type state = T.States.t)(B: Fa.S0 with type state = T.
           (Actions.reduce (T.Reductions.singleton (T.Reduction.make (Items.output x) strategy (Items.reminder x))))
       | None -> Actions_multimap.empty
     in
-    Actions_multimap.(shift <|> orders <|> matches <|> predictions <|> null <|> shift_null <|> reduce)
+    Actions_multimap.(shift <|> orders <|> shift_code <|> matches <|> predictions <|> null <|> shift_null <|> reduce)
 
   let actions_of_items ~tokens items =
     Items.to_seq items
@@ -256,6 +269,9 @@ module Make(A: Fa.S0 with type state = T.States.t)(B: Fa.S0 with type state = T.
 
     let shift a =
       a.Actions.shift
+
+    let shift_code a =
+      a.Actions.shift_code
 
     let orders a =
       a.Actions.orders

@@ -512,32 +512,26 @@ let label rhs is_start is_final is_dead lhs q =
   Items.singleton lhs Item_rhs.{state = q; tail = rhs; kernel = not is_start; dead = is_dead; reduce = is_final}
 
 module Dist_rhs = struct
-  type t = int * Rhs.t
+  type t = Size.t * Rhs.t
   [@@deriving ord]
 end
 module Dist_rhs_to = Balanced_binary_tree.Map.Size(Dist_rhs)
 
-module Lead_rhs = struct
-  type t = bool * Rhs.t
-  [@@deriving ord]
-end
-module Lead_rhs_to = Balanced_binary_tree.Map.Size(Lead_rhs)
-
 let convert ~supply (lhs, rhs') =
-  let module Gen = M.Gen(T.State_index(Lead_rhs_to)) in
-  (lhs, Gen.unfold ~supply ~merge:Lits.union (fun q (_, rhs) ->
-       let is_start = rhs == rhs' 
+  let module Gen = M.Gen(T.State_index(Dist_rhs_to)) in
+  (lhs, Gen.unfold ~supply ~merge:Lits.union (fun q (dist, rhs) ->
+       let is_start = rhs == rhs'
        and is_final = R.is_nullable rhs
        and is_dead = R.is_nothing rhs in
        let next = Seq.filter_map (fun ls ->
            let d = Rhs.simplify @@ Rhs.derivative ls rhs in
            if R.is_nothing d
            then None
-           else Some (ls, (false, d)))
+           else Some (ls, ((if R.is_infinite d then Size.top else Size.succ dist), d)))
            (refine @@ Rhs.first rhs)
        in
        (is_final, label rhs is_start is_final is_dead lhs q, next))
-      (true, rhs'))
+      (Size.zero, rhs'))
 
 let convert_multiple ~supply ps =
   Seq.zip (Supply.split supply) ps
@@ -914,6 +908,10 @@ module Analysis(L: LITS)(Lhs: LHS with type vars = L.vars)(A: Fa.S0)(Multimap: f
     let (lazy nullable) = r.nullable_per_state in
     Lhs_to.find lhs nullable q
 
+  let first_per_lits lhs r =
+    let (lazy first) = r.first_per_lits in
+    First.M.find_multiple_or_empty lhs first
+
   let follow_per_lits lhs r =
     let (lazy follow) = r.follow_per_lits in
     Follow.M.find_multiple_or_empty lhs follow
@@ -956,6 +954,9 @@ let lookahead' lb r lv s q =
 
 let nullable r q ls =
   Enhanced_analysis.nullable_per_lits (Enhanced_lits.singleton q ls) r
+
+let first' r q ls =
+  Enhanced_analysis.first_per_lits (Enhanced_lits.singleton q ls) r
 
 module Symbol_analysis = struct
   type t = {symbols: Enhanced_lits.t; nonterminal: Enhanced_lits.t} (* terminal: Enhanced_lits.t}*)
@@ -1401,7 +1402,7 @@ let collapse' t =
 
 module Builder = struct
   module Item_rhs' = struct
-    type t = {base: Item_rhs.t; right_nulled: bool; shift_lookahead: Lits.t; reduce_lookahead: Lits.t; distance: Size.t; next: Lits.t; next_null: (T.Labeled_var.t * Lits.t) list; state_pair: T.State_pair.t; reminder: T.Var.t list list}
+    type t = {base: Item_rhs.t; right_nulled: bool; shift_lookahead: Lits.t; reduce_lookahead: Lits.t; first: Lits.t T.Var_to.t; shift_code: bool; distance: Size.t; next: Lits.t; next_null: (T.Labeled_var.t * Lits.t) list; state_pair: T.State_pair.t; reminder: T.Var.t list list}
     [@@deriving eq, ord]
   end
 
@@ -1421,6 +1422,10 @@ module Builder = struct
     let is_right_nulled (_, rhs) = rhs.Item_rhs'.right_nulled
     let shift (_, rhs) = rhs.Item_rhs'.next
     let null (_, rhs) = List.to_seq @@ rhs.Item_rhs'.next_null
+    let first (_, rhs) v =
+      Fmt.pr "FIRST %a %a@." T.Var.pp v (T.Var_to.pp Lits.pp) rhs.Item_rhs'.first;
+      T.Var_to.find v rhs.Item_rhs'.first
+    let shift_code (_, rhs) = rhs.Item_rhs'.shift_code
     let shift_lookahead (_, rhs) = rhs.Item_rhs'.shift_lookahead
     let reduce_lookahead (_, rhs) = rhs.Item_rhs'.reduce_lookahead
     let distance (_, rhs) = rhs.Item_rhs'.distance
@@ -1527,6 +1532,7 @@ module Builder = struct
     let lb = lookback eps in
     let la = lookahead' lb analysis in
     let _nl = nullable analysis in
+    let fr = first' analysis in
 
     let m' = add_backlinks (fun lhs s q -> (la lhs s q).right_nulled) lb m' in
 
@@ -1672,6 +1678,21 @@ module Builder = struct
                       else
                         [[]];
                     right_nulled = (la lhs s rhs.Item_rhs.state).right_nulled;
+                    first =
+                      Var_to_lits.of_seq_multiple
+                      @@ Seq.flat_map (fun (_, el) ->
+                          T.Vars.to_seq el.Lits.vars
+                          |> Seq.map (fun v -> (v, Enhanced_lits.strip @@ fr s (Lits.var v))))
+                      @@ M.adjacent rhs.Item_rhs.state
+                      @@ T.Labeled_var_to.find lhs ps_to;
+                    shift_code =
+                      not @@ T.Vars.mem (T.Labeled_var.var lhs) tokens &&
+                      (la lhs s rhs.Item_rhs.state).shift_lookahead
+                      |> Enhanced_lits.to_seq
+                      |> Seq.exists (fun (q, ls) ->
+                          (not (T.Codes.is_empty ls.Lits.codes) || ls.Lits.eof) &&
+                          let is = M.labels q m' in
+                          Seq.exists (fun (lhs, _) -> not @@ T.Vars.mem (T.Labeled_var.var lhs) tokens) (Items.to_seq is));
                     shift_lookahead = Enhanced_lits.strip @@ (la lhs s rhs.Item_rhs.state).shift_lookahead;
                     reduce_lookahead = Enhanced_lits.strip @@ (la lhs s rhs.Item_rhs.state).reduce_lookahead;
                     distance = (T.Labeled_var_to.find lhs dist) rhs.Item_rhs.state;
