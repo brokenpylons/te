@@ -1678,12 +1678,10 @@ module Builder = struct
                     reminder =
                       if not @@ T.Vars.mem (T.Labeled_var.var lhs) tokens && (la lhs s rhs.Item_rhs.state).right_nulled && not (R.is_nullable rhs.Item_rhs.tail) then begin
                         Fmt.pr "%a" Rhs.pp rhs.Item_rhs.tail;
-                        (*rhs.Item_rhs.tail
-                        |> Rhs.to_seq (fun ls -> Seq.map Lits.var @@ T.Vars.to_seq ls.Lits.vars)
+                        rhs.Item_rhs.tail
+                        |> Rhs.to_seq ~eq:T.Var.equal (fun ls -> T.Vars.to_seq ls.Lits.vars)
                         |> Seq.map List.of_seq
-                        |> List.of_seq end*)
-                        [[]]
-                        end
+                        |> List.of_seq end
                       else
                         [[]];
                     right_nulled = (la lhs s rhs.Item_rhs.state).right_nulled;

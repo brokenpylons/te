@@ -213,7 +213,7 @@ module type CONCRETE = sig
   (*val occur: t -> lits Seq.t*)
   val simplify: t -> t
 
-  val to_seq: (lits -> lits Seq.t) -> t -> lits Seq.t Seq.t
+  val to_seq: eq:('a -> 'a -> bool) -> (lits -> 'a Seq.t) -> t -> 'a Seq.t Seq.t
 end
 
 module Concrete(Lits: LITS):
@@ -321,23 +321,23 @@ module Concrete(Lits: LITS):
     | Seq.Nil, Seq.Cons (x, xs) -> Seq.cons x xs
     | Seq.Nil, Seq.Nil -> Seq.empty
 
-  let rec to_seq f = function
+  let rec to_seq ~eq f = function
     | Nothing -> Seq.empty
     | Null -> Seq.return Seq.empty
     | Any -> raise Undefined
     | Lits ls -> Seq.map Seq.return (f ls)
     | Concat (_, _, x, y) ->
       merge (fun x y tail ->
-          Seq.cons (Seq.append x y) tail) 
-        (to_seq f x) (to_seq f y)
+          Seq.cons (Seq.append x y) tail)
+        (to_seq ~eq f x) (to_seq ~eq f y)
     | Union (_, _, x, y) ->
       merge (fun x y tail ->
-          if Seq.equal Lits.equal x y
+          if Seq.equal eq x y
           then Seq.cons x tail
           else if Seq.length x < Seq.length y
           then Seq.cons x (Seq.cons y tail)
           else Seq.cons y (Seq.cons x tail))
-        (to_seq f x) (to_seq f y)
+        (to_seq ~eq f x) (to_seq ~eq f y)
     | Repeat (_, _, _x, _i) ->
       raise Undefined
       (*Seq.map (uncurry (@))
