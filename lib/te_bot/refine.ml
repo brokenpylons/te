@@ -196,7 +196,7 @@ module Hopcroft(P: sig include PARTITION val cardinal: t -> int end) = struct
 
   let pivot {active = a; inactive = i} = 
     match a.partitions with
-    | p :: ps -> 
+    | p :: ps ->
       Some (p, {
           active = {partitions = ps; considered = a.considered};
           inactive = {partitions = p :: i.partitions; considered = i.considered}

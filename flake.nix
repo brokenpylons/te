@@ -33,7 +33,7 @@
               ocp-indent
             ];
             inputsFrom = [
-              self.packages.${system}.fp_cert
+              self.packages.${system}.te
             ];
           };
         };
