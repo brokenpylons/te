@@ -274,7 +274,7 @@ module Lits_multimap(S: SET): MULTIMAP with type key = Lits.t and type values = 
     add_seq_multiple s empty
 end
 
-module R = Re.Porcelan
+module R = Re.Abstract
 module Rhs = Re.Concrete(Lits)
 module Rhs_to = Balanced_binary_tree.Map.Size(Rhs)
 
@@ -1679,7 +1679,7 @@ module Builder = struct
                       if not @@ T.Vars.mem (T.Labeled_var.var lhs) tokens && (la lhs s rhs.Item_rhs.state).right_nulled && not (R.is_nullable rhs.Item_rhs.tail) then begin
                         Fmt.pr "%a" Rhs.pp rhs.Item_rhs.tail;
                         rhs.Item_rhs.tail
-                        |> Rhs.to_seq ~eq:T.Var.equal (fun ls -> T.Vars.to_seq ls.Lits.vars)
+                        |> R.to_seq ~cmp:T.Var.compare (fun ls -> T.Vars.to_seq ls.Lits.vars)
                         |> Seq.map List.of_seq
                         |> List.of_seq end
                       else

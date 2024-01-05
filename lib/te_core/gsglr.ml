@@ -61,7 +61,7 @@ module type TABLES = sig
   val goto: t -> states -> symbol -> statess
   val back: t -> state * state -> state -> (state * state) option
 
-  val actions_union: actions -> actions -> actions
+  val actions_union: actions -> actions -> actions (* XXX: Replace with a struct *)
   val actions_empty: actions
 
   val shift: actions -> bool
@@ -279,6 +279,9 @@ module Make(Tables: TABLES) = struct
 
     method forest =
       forest
+
+    method trace =
+      trace
 
     method to_dot =
       let subgraphs = Subclasses.fold_multiple (fun position subclass subgraphs ->

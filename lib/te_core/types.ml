@@ -21,7 +21,7 @@ module Codes = struct
     let rec go i =
       if i >= String.length s then
         empty
-      else 
+      else
         let d = String.get_utf_8_uchar s i in
         if Uchar.utf_decode_is_valid d
         then add (Uchar.to_int @@ Uchar.utf_decode_uchar d) (go (i + Uchar.utf_decode_length d))

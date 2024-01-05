@@ -272,7 +272,7 @@ module Set = struct
     let rec fold f acc = function
       | Empty -> acc 
       | Node (_, y, l, r) ->
-        fold f (f y (fold f acc l)) r
+        fold f (f y (fold f acc r)) l
 
     let rec for_all f = function
       | Empty -> true

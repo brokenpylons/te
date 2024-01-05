@@ -1,25 +1,6 @@
 open Te_bot
 open! Prelude 
 
-(* Core set of regular expressions *)
-module type OP = sig
-  type +_ t
-  val pp: 'ls Fmt.t -> 'ls t Fmt.t
-
-  val nothing: _ t
-  val null: _ t
-  val any: _ t
-  val comp_nothing: _ t
-  val comp_null: _ t
-  val comp_any: _ t
-  val lits: 'ls -> 'ls t
-  val concat: 'ls t -> 'ls t -> 'ls t
-  val union: 'ls t -> 'ls t -> 'ls t
-  val repeat: 'ls t -> int -> 'ls t
-  val star: 'ls t -> 'ls t
-  val comp: 'ls t -> 'ls t
-end
-
 module Abstract = struct
   type 'ls t =
     | Nothing
@@ -111,26 +92,6 @@ module Abstract = struct
     | Star _ -> false
     | Comp (_, h, _) -> h
 
-  (*let lower_bound_comp = function
-    | Size.Top -> Size.bot
-    | Size.Bot -> Size.of_int 0
-    | Size.Finite 0 -> Size.of_int 1
-    | Size.Finite _ -> Size.of_int 0
-
-  let lower_bound n b =
-    let rec go = function
-      | Nothing -> Size.bot
-      | Null -> Size.of_int 0
-      | Any -> Size.of_int 1
-      | Lits ls -> b ls
-      | Concat (_, _, x, y) when is_nullable' n x -> Size.(go x + go y)
-      | Concat (_, _, x, _) -> go x
-      | Union (_, _, x, y) -> Size.min (go x) (go y)
-      | Repeat (_, _, x, _) -> go x
-      | Star _ -> Size.of_int 0
-      | Comp (_, _, x) -> lower_bound_comp @@ go x
-    in go*)
-
   let is_infinite =
     let rec go = function
       | Nothing -> true
@@ -188,170 +149,111 @@ module Abstract = struct
 
   let comp_any =
     Comp (true, false, Any)
-end
-
-module type LITS = sig
-  type t
-  val pp: t Fmt.t
-  val equal: t -> t -> bool
-  val compare: t -> t -> int
-  val subset: t -> t -> bool
-end
-
-module type CONCRETE = sig
-  type lits
-  type t = (lits) Abstract.t
-
-  val pp: t Fmt.t
-  val equal: t -> t -> bool
-  val compare: t -> t -> int
-
-  val derivative: lits -> t -> t
-
-  val first': (t -> bool) -> t -> lits Seq.t
-  val first: t -> lits Seq.t
-  (*val occur: t -> lits Seq.t*)
-  val simplify: t -> t
-
-  val to_seq: eq:('a -> 'a -> bool) -> (lits -> 'a Seq.t) -> t -> 'a Seq.t Seq.t
-end
-
-module Concrete(Lits: LITS):
-  CONCRETE with type lits = Lits.t = struct
-  open Abstract
-  type lits = Lits.t
-  type t = Lits.t Abstract.t
-  [@@deriving eq, ord, show]
-
-  let first' n = 
-    let rec go = function
-      | Nothing -> Seq.empty
-      | Null -> Seq.empty
-      | Any -> Seq.empty
-      | Lits ls -> Seq.return ls
-      | Concat (_, _, x, y) when n x -> Seq.append (go x) (go y)
-      | Concat (_, _, x, _) -> go x
-      | Union (_, _, x, y) -> Seq.append (go x) (go y)
-      | Repeat (_, _, x, _) -> go x
-      | Star x -> go x
-      | Comp (_, _, x) -> go x
-    in go
-
-  let first = 
-    first' is_nullable
-
-  let rec simplify = function
-    | Union (_, _, x, Union (_, _, y, z)) -> simplify (union (simplify (union x y)) (simplify z))
-    | Union (m, h, x, y) ->
-      (match simplify x, simplify y with
-       | Nothing, x -> x
-       | x, Nothing -> x
-       | Comp (_, _, Nothing), _ -> comp_nothing
-       | _, Comp (_, _, Nothing) -> comp_nothing
-       | x, y when equal x y -> x
-       | x, y when compare x y > 0 -> Union (m, h, y, x)
-       | x, y -> Union (m, h, x, y))
-
-    | Concat (_, _, x, Concat (_, _, y, z)) -> simplify (concat (simplify (concat x y)) (simplify z))
-    | Concat (m, h, x, y) -> 
-      (match simplify x, simplify y with
-       (*| Union (_, _, Null, x), Star y when equal x y -> simplify (Star x)
-       | Star x, Union (_, _, Null, y) when equal x y -> simplify (Star x)*)
-       | Nothing, _ -> nothing
-       | _, Nothing -> nothing
-       | Null, x -> x
-       | x, Null -> x
-       | Comp (_, _, Nothing), Comp (_, _, Nothing) -> comp_nothing
-       | Comp (_, _, Null), Comp (_, _, Null) -> comp_null
-       | x, y -> Concat (m, h, x, y))
-
-    | Repeat (_, _, _, 0) -> null
-    | Repeat (m, h, x, i) -> 
-      (match simplify x with
-       | Nothing -> nothing
-       | Null -> nothing
-       | Comp (_, _, Nothing) -> comp_nothing
-       | Comp (_, _, Null) -> comp_null
-       | x -> Repeat (m, h, x, i))
-
-    | Star x ->
-      (match simplify x with
-       (*| Union (_, _, Null, x) -> simplify (Star x)*)
-       | Null -> null
-       | Nothing -> null
-       | Comp (_, _, Nothing) -> comp_nothing
-       | Comp (_, _, Null) -> comp_nothing
-       | Star x -> x
-       | x -> Star x)
-
-    | Comp (m, h, x) -> 
-      (match simplify x with
-       | Comp (_, _, x) -> x
-       | x -> Comp (m, h, x))
-
-    | x -> x
-
-  let rec derivative s = function
-    | Nothing -> nothing
-    | Null -> nothing
-    | Any -> null
-    | Lits ls -> 
-      if Lits.subset s ls
-      then null
-      else nothing
-    | Concat (_, _, x, y) when is_nullable x -> union (concat (derivative s x) y) (derivative s y)
-    | Concat (_, _, x, y) -> concat (derivative s x) y
-    | Union (_, _, x, y) -> union (derivative s x) (derivative s y)
-    | Repeat (_, _, x, i) -> 
-      (match i with
-       | 0 -> nothing
-       | i -> concat (derivative s x) (repeat x (pred i)))
-    | Star x ->
-      concat (derivative s x) (star x)
-    | Comp (_, _, x) ->
-      comp (derivative s x)
 
   exception Undefined
 
-  let rec merge cons' xs ys =
+  (*let rec merge cons' xs ys =
     match xs (), ys () with
-    | Seq.Cons (x, xs), Seq.Cons(y, ys) ->
+    | Seq.Cons (x, xs), Seq.Cons (y, ys) ->
       cons' x y (merge cons' xs ys)
     | Seq.Cons (x, xs), Seq.Nil
     | Seq.Nil, Seq.Cons (x, xs) -> Seq.cons x xs
-    | Seq.Nil, Seq.Nil -> Seq.empty
+    | Seq.Nil, Seq.Nil -> Seq.empty*)
 
-  let rec to_seq ~eq f = function
-    | Nothing -> Seq.empty
-    | Null -> Seq.return Seq.empty
-    | Any -> raise Undefined
-    | Lits ls -> Seq.map Seq.return (f ls)
-    | Concat (_, _, x, y) ->
-      merge (fun x y tail ->
-          Seq.cons (Seq.append x y) tail)
-        (to_seq ~eq f x) (to_seq ~eq f y)
-    | Union (_, _, x, y) ->
-      merge (fun x y tail ->
-          if Seq.equal eq x y
-          then Seq.cons x tail
-          else if Seq.length x < Seq.length y
-          then Seq.cons x (Seq.cons y tail)
-          else Seq.cons y (Seq.cons x tail))
-        (to_seq ~eq f x) (to_seq ~eq f y)
-    | Repeat (_, _, _x, _i) ->
-      raise Undefined
+  (*let rec product cons' ~cmp xs ys =
+    match xs (), ys () with
+    | Seq.Cons (x, xs), Seq.Cons (y, ys) ->
+
+
+
+      cons' x y (merge cons' xs ys)
+    | Seq.Cons (x, xs), Seq.Nil
+    | Seq.Nil, Seq.Cons (x, xs) -> Seq.cons x xs
+    | Seq.Nil, Seq.Nil -> Seq.empty*)
+
+
+  let rec insert cmp r1 t =
+    (match Seq.uncons r1 with
+     | None -> t
+     | Some (x, r1) ->
+       (match Seq.uncons t with
+        | None -> Seq.return (Seq.cons x r1)
+        | Some (r2, t) ->
+          (match Seq.uncons r2 with
+           | None -> t
+           | Some (y, r2) ->
+             let c = Int.compare (Seq.length x) (Seq.length y) in
+               (if c <= 0 then
+                  Seq.cons (Seq.cons x r1) (Seq.cons (Seq.cons y r2) t)
+               else
+                 Seq.cons (Seq.cons y r2) (insert cmp (Seq.cons x r1) t)))))
+
+
+  let rec fair_concat cmp t =
+    match Seq.uncons t with
+    | None -> Seq.empty
+    | Some (r1, t) ->
+      (match Seq.uncons r1 with
+       | None -> fair_concat cmp t
+       | Some (x11, r1) ->
+         (match Seq.uncons r1 with
+          | None -> fun () -> Seq.Cons (x11, fair_concat cmp t)
+          | Some (x12, r1) ->
+            (match Seq.uncons t with
+             | None -> Seq.cons x11 (Seq.cons x12 r1)
+             | Some (r2, t) ->
+               (match Seq.uncons r2 with
+                | None -> fair_concat cmp (Seq.cons (Seq.cons x11 (Seq.cons x12 r1)) t)
+                | Some (x21, r2) ->
+                  let t = insert cmp (Seq.cons x12 r1) (Seq.cons (Seq.cons x21 r2) t) in
+                  fun () -> Seq.Cons (x11, fair_concat cmp t)))))
+
+
+  let merge cmp xs ys =
+    match Seq.uncons xs, Seq.uncons ys with
+    | Some (x, _), Some (y, _) ->
+      let c = Int.compare (Seq.length x) (Seq.length y) in
+      if c <= 0 then
+        fair_concat cmp
+          (Seq.cons xs (Seq.cons ys Seq.empty))
+      else
+        fair_concat cmp
+          (Seq.cons ys (Seq.cons xs Seq.empty))
+    | Some (_, _), None -> xs
+    | None, Some (_, _) -> ys
+    | None, None -> Seq.empty
+
+  let to_seq ~cmp (f: 'a -> 'b Seq.t) =
+    let rec go: 'a t -> 'b Seq.t Seq.t = function
+      | Nothing -> Seq.empty
+      | Null -> Seq.return Seq.empty
+      | Any -> raise Undefined
+      | Lits ls -> Seq.map Seq.return (f ls)
+      | Concat (_, _, x, y) ->
+        let xs = go x in
+        let ys = go y in
+        fair_concat cmp
+        (Seq.map (fun x ->
+            Seq.map (fun y -> Seq.append x y) ys)
+          xs)
+      | Union (_, _, x, y) ->
+        merge cmp (go x) (go y)
+      | Repeat (_, _, _x, _i) ->
+        raise Undefined
       (*Seq.map (uncurry (@))
-      @@ Seq.take i
-      @@ Seq.repeat (to_seq f x)*)
-    | Star _ ->
-      raise Undefined
-      (*Seq.concat
-      @@ Seq.repeat (to_seq f x)*)
-    | Comp _ -> raise Undefined
-end
-
-module Porcelan = struct
-  include Abstract
+        @@ Seq.take i
+        @@ Seq.repeat (to_seq f x)*)
+      | Star x ->
+        let xs = go x in
+        fair_concat cmp
+        (Seq.unfold (fun acc ->
+            Some (acc, fair_concat cmp
+              (Seq.map (fun x ->
+                   Seq.map (fun y -> Seq.append x y) acc)
+                  xs)))
+          (Seq.return Seq.empty))
+      | Comp _ -> raise Undefined
+    in go
 
   let comp_lits x =
     comp (lits x)
@@ -409,45 +311,144 @@ module Porcelan = struct
   let (|...) x (i, j) = interval x i j
 end
 
+module type LITS = sig
+  type t
+  val pp: t Fmt.t
+  val equal: t -> t -> bool
+  val compare: t -> t -> int
+  val subset: t -> t -> bool
+end
+
+module type CONCRETE = sig
+  type lits
+  type t = lits Abstract.t
+
+  val pp: t Fmt.t
+  val equal: t -> t -> bool
+  val compare: t -> t -> int
+
+  val derivative: lits -> t -> t
+
+  val first': (t -> bool) -> t -> lits Seq.t
+  val first: t -> lits Seq.t
+  val simplify: t -> t
+end
+
+module Concrete(Lits: LITS):
+  CONCRETE with type lits = Lits.t = struct
+  open Abstract
+  type lits = Lits.t
+  type t = Lits.t Abstract.t
+  [@@deriving eq, ord, show]
+
+  let first' n = 
+    let rec go = function
+      | Nothing -> Seq.empty
+      | Null -> Seq.empty
+      | Any -> Seq.empty
+      | Lits ls -> Seq.return ls
+      | Concat (_, _, x, y) when n x -> Seq.append (go x) (go y)
+      | Concat (_, _, x, _) -> go x
+      | Union (_, _, x, y) -> Seq.append (go x) (go y)
+      | Repeat (_, _, x, _) -> go x
+      | Star x -> go x
+      | Comp (_, _, x) -> go x
+    in go
+
+  let first = 
+    first' is_nullable
+
+  let rec simplify = function
+    | Union (_, _, x, Union (_, _, y, z)) -> simplify (union (simplify (union x y)) (simplify z))
+    | Union (m, h, x, y) ->
+      (match simplify x, simplify y with
+       | Nothing, x -> x
+       | x, Nothing -> x
+       | Comp (_, _, Nothing), _ -> comp_nothing
+       | _, Comp (_, _, Nothing) -> comp_nothing
+       | x, y when equal x y -> x
+       | x, y when compare x y > 0 -> Union (m, h, y, x)
+       | x, y -> Union (m, h, x, y))
+
+    | Concat (_, _, x, Concat (_, _, y, z)) -> simplify (concat (simplify (concat x y)) (simplify z))
+    | Concat (m, h, x, y) -> 
+      (match simplify x, simplify y with
+       | Nothing, _ -> nothing
+       | _, Nothing -> nothing
+       | Null, x -> x
+       | x, Null -> x
+       | Comp (_, _, Nothing), Comp (_, _, Nothing) -> comp_nothing
+       | Comp (_, _, Null), Comp (_, _, Null) -> comp_null
+       | x, y -> Concat (m, h, x, y))
+
+    | Repeat (_, _, _, 0) -> null
+    | Repeat (m, h, x, i) -> 
+      (match simplify x with
+       | Nothing -> nothing
+       | Null -> nothing
+       | Comp (_, _, Nothing) -> comp_nothing
+       | Comp (_, _, Null) -> comp_null
+       | x -> Repeat (m, h, x, i))
+
+    | Star x ->
+      (match simplify x with
+       | Null -> null
+       | Nothing -> null
+       | Comp (_, _, Nothing) -> comp_nothing
+       | Comp (_, _, Null) -> comp_nothing
+       | Star x -> x
+       | x -> Star x)
+
+    | Comp (m, h, x) -> 
+      (match simplify x with
+       | Comp (_, _, x) -> x
+       | x -> Comp (m, h, x))
+
+    | x -> x
+
+  let rec derivative s = function
+    | Nothing -> nothing
+    | Null -> nothing
+    | Any -> null
+    | Lits ls -> 
+      if Lits.subset s ls
+      then null
+      else nothing
+    | Concat (_, _, x, y) when is_nullable x -> union (concat (derivative s x) y) (derivative s y)
+    | Concat (_, _, x, y) -> concat (derivative s x) y
+    | Union (_, _, x, y) -> union (derivative s x) (derivative s y)
+    | Repeat (_, _, x, i) -> 
+      (match i with
+       | 0 -> nothing
+       | i -> concat (derivative s x) (repeat x (pred i)))
+    | Star x ->
+      concat (derivative s x) (star x)
+    | Comp (_, _, x) ->
+      comp (derivative s x)
+end
+
 module Kleene(Lits: LITS)(G: Graph.S) = struct
-  open Porcelan
+  open Abstract
   open Concrete(Lits)
 
   let labels s p g =
     try G.edge_label s p g with Not_found -> nothing
 
-  (*let initial =
-      G.labeled_edges_map (fun _ _ ls -> lits ls) g
-      |>
-    in*)
-
-  (*let initial = Seq.fold_left (fun g p ->
-      G.connect p p (union (labels p p g) null) g)
+  let solve' f g =
+    let vertices = Seq.memoize @@ G.vertices g in
+    Seq.fold_left (fun g p ->
+        let loop = labels p p g in
+        Seq.fold_left (fun g (s, q) ->
+            let l = simplify (f s p q loop g + labels s q g) in
+            if is_nothing l then g else G.connect s q l g)
+          g (Seq.product vertices vertices))
       g vertices
-    in*)
-
-  (*Seq.product (T.States.to_seq @@ start_multiple m) (T.States.to_seq @@ final m)
-    |> Seq.fold_left (fun e (s, q) -> 
-      R.union (lits' s q g) e)
-    R.nothing*)
 
   let solve g =
-    let vertices = Seq.memoize @@ G.vertices g in
-    Seq.fold_left (fun g p ->
-        let loop = labels p p g in
-        Seq.fold_left (fun g (s, q) ->
-            let l = simplify (labels s p g * star loop * labels p q g + labels s q g) in
-            if is_nothing l then g else G.connect s q l g)
-          g (Seq.product vertices vertices))
-      g vertices
+    solve' (fun s p q loop g ->
+        labels s p g * star loop * labels p q g) g
 
   let rev_solve g =
-    let vertices = Seq.memoize @@ G.vertices g in
-    Seq.fold_left (fun g p ->
-        let loop = labels p p g in
-        Seq.fold_left (fun g (s, q) ->
-            let l = simplify (labels p q g * star loop * labels s p g + labels s q g) in
-            if is_nothing l then g else G.connect s q l g)
-          g (Seq.product vertices vertices))
-      g vertices
+    solve' (fun s p q loop g ->
+        labels p q g * star loop * labels s p g) g
 end
