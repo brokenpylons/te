@@ -5,7 +5,11 @@ module Abstract: sig
 
   val equal: ('ls -> 'ls -> bool) -> 'ls t -> 'ls t -> bool
   val compare: ('ls -> 'ls -> int) -> 'ls t -> 'ls t -> int
-  val to_seq: cmp:('b -> 'b -> int) -> ('a -> 'b Seq.t) -> 'a t -> 'b Seq.t Seq.t
+
+  exception Undefined
+  val to_seq: cmp:('b -> 'b -> int) -> ?any:'b Seq.t -> ('a -> 'b Seq.t) -> 'a t -> 'b Seq.t Seq.t
+
+  val map: ('a -> 'b) -> 'a t -> 'b t
 
   val is_nullable: _ t -> bool
   val is_nothing: _ t -> bool

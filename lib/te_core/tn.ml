@@ -40,6 +40,7 @@ module Lits: sig
   val codes: T.Codes.t -> t
   val to_vars: t -> T.Vars.t
   val of_vars: T.Vars.t -> t
+  val of_symbols: T.Symbols.t -> t
 end = struct
   type vars = T.Vars.t
   type t =
@@ -57,12 +58,12 @@ end = struct
   let pp ppf x =
     Fmt.pf ppf "@[%a%a%a%a%a%a%a@]"
       (pp_if x.eof Fmt.string) "$"
-      (pp_if (not @@ T.Vars.is_empty x.scan) (fun ppf -> Fmt.pf ppf "S %a" T.Vars.pp)) x.scan
-      (pp_if (not @@ T.Vars.is_empty x.call) (fun ppf -> Fmt.pf ppf "C %a" T.Vars.pp)) x.call
+      (pp_if (not @@ T.Vars.is_empty x.scan) (fun ppf -> Fmt.pf ppf "_S %a" T.Vars.pp)) x.scan
+      (pp_if (not @@ T.Vars.is_empty x.call) (fun ppf -> Fmt.pf ppf "_C %a" T.Vars.pp)) x.call
       (pp_if x.null Fmt.string) "ε"
       (pp_if (not @@ T.Vars.is_empty x.vars) T.Vars.pp) x.vars
       (pp_if (not @@ T.Codes.is_empty x.codes) T.Codes.pp) x.codes
-      (pp_if (not @@ T.Vars.is_empty x.return) (fun ppf -> Fmt.pf ppf "R %a" T.Vars.pp)) x.return
+      (pp_if (not @@ T.Vars.is_empty x.return) (fun ppf -> Fmt.pf ppf "_R %a" T.Vars.pp)) x.return
 
   let subset x y =
     Bool.imp x.eof y.eof &&
@@ -117,6 +118,17 @@ end = struct
 
   let of_vars = vars
   let to_vars x = x.vars
+
+  let of_symbols (x: T.Symbols.t) =
+    {
+      eof = x.eof;
+      null = x.null;
+      scan = T.Vars.empty;
+      call = T.Vars.empty;
+      return = T.Vars.empty;
+      codes = x.codes;
+      vars = x.vars;
+    }
 
   let comp x =
     {
@@ -1519,9 +1531,9 @@ module Builder = struct
     Dot.string_of_graph @@
     M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Lits.pp x) m;
 
-    let m' = subset ~supply:T.State.supply m in
+    let m' = subset ~supply:(T.State.fresh_supply ()) m in
 
-    Fmt.pr "%s@." @@
+    Fmt.pr "SUBSET %s@." @@
     Dot.string_of_graph @@
     M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Lits.pp x) m';
 

@@ -74,4 +74,56 @@ module Seq = struct
         (acc, p)
     in
     go seed Seq.empty s
+
+  let shortlex cmp xs ys =
+    let c = Int.compare (Seq.length xs) (Seq.length ys) in
+    if c <> 0 then c else
+      Seq.compare cmp xs ys
+
+  let compare_heads cmp xs ys =
+    match Seq.uncons xs, Seq.uncons ys with
+    | None, None -> 0
+    | Some _, None -> 1
+    | None, Some _ -> -1
+    | Some (x, _), Some (y, _) -> cmp x y
+
+  let rec insert cmp r1 t =
+    match Seq.uncons t with
+    | None -> Seq.return r1
+    | Some (r2, t) ->
+      let c = compare_heads cmp r1 r2 in
+      if c <= 0
+      then Seq.cons r1 (Seq.cons r2 t)
+      else Seq.cons r2 (insert cmp r1 t)
+
+  let rec fair_flatten cmp t =
+    match Seq.uncons t with
+    | None -> Seq.empty
+    | Some (r, t) ->
+      match Seq.uncons r with
+      | None -> fair_flatten cmp t
+      | Some (corner, r) ->
+        let t = insert cmp r t in
+        fun () -> Seq.Cons (corner, fair_flatten cmp t)
+
+  let rec diff cmp d r =
+    match Seq.uncons d with
+    | None -> r
+    | Some (head, d) ->
+      let rec go r () =
+        match Seq.uncons r with
+        | None -> Seq.Nil
+        | Some (x, r) ->
+          let c = cmp head x in
+          if c > 0 then
+            Seq.Cons (x, go r)
+          else
+            diff cmp d r ()
+      in go r
+
+  let rec deduplicate cmp r () =
+    match Seq.uncons r with
+    | None -> Seq.Nil
+    | Some (head, r) ->
+      Seq.Cons (head, deduplicate cmp (Seq.drop_while (fun x -> cmp head x = 0) r))
 end

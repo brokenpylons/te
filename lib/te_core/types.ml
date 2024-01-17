@@ -1,6 +1,9 @@
 open Te_bot
 open! Prelude
 
+let pp_eof = "💰"
+let pp_null = "ε"
+
 module Code = struct
   include Int 
   let to_id x = Dot.(Int x)
@@ -233,21 +236,6 @@ module Labeled_var_to = struct
   let pp pp_p = pp Labeled_var.pp pp_p
 end
 
-module Node = struct
-  type t = Var.t * int * int
-  [@@deriving eq, ord]
-
-  let make state start stop = (state, start, stop)
-  let var (v, _, _) = v
-
-  let pp ppf (v, start, stop) =
-    Fmt.pf ppf "%a:%i:%i" Var.pp v start stop
-
-  let to_id x = Dot.(String (Fmt.str "%a" pp x))
-end
-module Node_to = Balanced_binary_tree.Map.Size(Node)
-module Node_packed_forest = Packed_forest.Make(Node)(Vars)(Node_to)
-
 module Reduction = struct
   module Strategy = struct
     type t = Null | Fixed of int | Scan of State_pair.t
@@ -268,8 +256,8 @@ module Symbol = struct
   [@@deriving eq, ord]
 
   let pp ppf = function
-    | Eof -> Fmt.string ppf "$"
-    | Null -> Fmt.string ppf "NULL"
+    | Eof -> Fmt.string ppf pp_eof
+    | Null -> Fmt.string ppf pp_null
     | Code x -> Code.pp ppf x
     | Var x -> Var.pp ppf x
 end
@@ -278,3 +266,104 @@ module Symbol_to = struct
   include Balanced_binary_tree.Map.Size(Symbol)
   let pp pp_p = pp Symbol.pp pp_p
 end
+
+module Symbols = struct
+  type t =
+    {
+      eof: bool;
+      null: bool;
+      vars: Vars.t;
+      codes: Codes.t
+    }
+  type elt = Symbol.t
+
+  let empty =
+    {
+      eof = false;
+      null = false;
+      vars = Vars.empty;
+      codes = Codes.empty;
+    }
+
+  let add_eof t =
+    {t with eof = true}
+
+  let add_null t =
+    {t with null = true}
+
+  let add_vars x t =
+    {t with vars = x}
+
+  let add_codes x t =
+    {t with codes = x}
+
+  let to_vars x = x.vars
+  let to_codes x = x.codes
+
+  let eof = add_eof empty
+  let null = add_null empty
+  let of_vars x = add_vars x empty
+  let of_codes x = add_codes x empty
+
+  let add x t =
+    match x with
+    | Symbol.Null -> add_null t
+    | Symbol.Eof -> add_eof t
+    | Symbol.Var x -> add_vars (Vars.singleton x) t
+    | Symbol.Code x -> add_codes (Codes.singleton x) t
+
+  let pp_if b pp ppf  =
+    if b then Fmt.pf ppf "%a@ " pp else Fmt.nop ppf
+
+  let pp ppf x =
+    Fmt.pf ppf "@[%a%a%a%a@]"
+      (pp_if x.eof Fmt.string) pp_eof
+      (pp_if x.null Fmt.string) pp_null
+      (pp_if (not @@ Vars.is_empty x.vars) Vars.pp) x.vars
+      (pp_if (not @@ Codes.is_empty x.codes) Codes.pp) x.codes
+
+  (*let subset x y =
+    Bool.imp x.eof y.eof &&
+    Bool.imp x.null y.null &&
+    Vars.subset x.vars y.vars &&
+    Codes.subset x.codes y.codes
+
+  let union x y =
+    {
+      eof = x.eof || y.eof;
+      null = x.null || y.null;
+      vars = Vars.union x.vars y.vars;
+      codes = Codes.union x.codes y.codes;
+    }
+
+  let inter x y =
+    {
+      eof = x.eof && y.eof;
+      null = x.null && y.null;
+      vars = Vars.inter x.vars y.vars;
+      codes = Codes.inter x.codes y.codes;
+    }
+
+  let diff x y =
+    {
+      eof = not (Bool.imp x.eof y.eof);
+      null = not (Bool.imp x.null y.null);
+      vars = Vars.diff x.vars y.vars;
+      codes = Codes.diff x.codes y.codes;
+    }*)
+end
+
+module Node = struct
+  type t = Symbol.t * int * int
+  [@@deriving eq, ord]
+
+  let make state start stop = (state, start, stop)
+  let symbol (v, _, _) = v
+
+  let pp ppf (v, start, stop) =
+    Fmt.pf ppf "%a:%i:%i" Symbol.pp v start stop
+
+  let to_id x = Dot.(String (Fmt.str "%a" pp x))
+end
+module Node_to = Balanced_binary_tree.Map.Size(Node)
+module Node_packed_forest = Packed_forest.Make(Node)(Vars)(Node_to)

@@ -265,18 +265,6 @@ module Labeled_var_to: sig
   val to_seq: 'a t -> (elt * 'a) Seq.t
 end
 
-module Node: sig
-  type t
-  val make: Var.t -> int -> int -> t
-  val var: t -> Var.t
-
-  val compare: t -> t -> int
-  val equal: t -> t -> bool
-  val to_id: t -> Dot.id
-  val pp: t Fmt.t
-end
-module Node_packed_forest: Packed_forest.S with type node = Node.t and type labels = Vars.t
-
 module Reduction: sig
   module Strategy: sig
     type t = Null | Fixed of int | Scan of State_pair.t
@@ -318,3 +306,40 @@ module Symbol_to: sig
   val diff: 'a t -> 'a t -> 'a t
   val filter: (elt -> 'a -> bool) -> 'a t -> 'a t
 end
+
+module Symbols: sig
+  type t =
+    {
+      eof: bool;
+      null: bool;
+      vars: Vars.t;
+      codes: Codes.t
+    }
+
+  val pp: t Fmt.t
+
+  type elt = Symbol.t
+  val of_vars: Vars.t -> t
+  val of_codes: Codes.t -> t
+
+  val to_vars: t -> Vars.t
+  val to_codes: t -> Codes.t
+
+  val eof: t
+  val null: t
+  val add: Symbol.t -> t -> t
+  val empty: t
+end
+
+
+module Node: sig
+  type t
+  val make: Symbol.t -> int -> int -> t
+  val symbol: t -> Symbol.t
+
+  val compare: t -> t -> int
+  val equal: t -> t -> bool
+  val to_id: t -> Dot.id
+  val pp: t Fmt.t
+end
+module Node_packed_forest: Packed_forest.S with type node = Node.t and type labels = Vars.t

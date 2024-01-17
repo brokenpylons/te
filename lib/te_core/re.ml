@@ -27,35 +27,52 @@ module Abstract = struct
       | Comp (_, _, x) -> Fmt.pf ppf "@[¬(@[%a@])@]" go x
     in go
 
-  let is_nullable_concat x y =
-    x && y
+  let map f =
+    let rec go = function
+      | Nothing -> Nothing
+      | Null -> Null
+      | Any -> Any
+      | Lits ls -> Lits (f ls)
+      | Concat (m, h, x, y) -> Concat (m, h, go x, go y)
+      | Union (m, h, x, y) -> Union (m, h, go x, go y)
+      | Repeat (m, h, x, i) -> Repeat (m, h, go x, i)
+      | Star x -> Star (go x)
+      | Comp (m, h, x) -> Comp (m, h, go x)
+    in go
 
-  let is_nullable_union x y =
-    x || y
+  module Is_nullable = struct
+    let concat x y =
+      x && y
 
-  let is_nullable_repeat x i = 
-    match i with
-    | 0 -> true
-    | i when i > 0 -> x
-    | _ -> assert false
+    let union x y =
+      x || y
 
-  let is_nullable_comp x =
-    not x
+    let repeat x i = 
+      match i with
+      | 0 -> true
+      | i when i > 0 -> x
+      | _ -> assert false
 
-  let is_nothing_concat x y =
-    x || y
+    let comp x =
+      not x
+  end
 
-  let is_nothing_union x y =
-    x && y
+  module Is_nothing = struct
+    let concat x y =
+      x || y
 
-  let is_nothing_repeat x i = 
-    match i with
-    | 0 -> false
-    | i when i > 0 -> x
-    | _ -> assert false
+    let union x y =
+      x && y
 
-  let is_nothing_comp x =
-    not x
+    let repeat x i = 
+      match i with
+      | 0 -> false
+      | i when i > 0 -> x
+      | _ -> assert false
+
+    let comp x =
+      not x
+  end
 
   let is_nullable = function
     | Nothing -> false
@@ -74,11 +91,11 @@ module Abstract = struct
       | Null -> true
       | Any -> false
       | Lits ls -> n ls
-      | Concat (_, _, x, y) -> is_nullable_concat (go x) (go y)
-      | Union (_, _, x, y) -> is_nullable_union (go x) (go y)
-      | Repeat (_, _, x, i) -> is_nullable_repeat (go x) i
+      | Concat (_, _, x, y) -> Is_nullable.concat (go x) (go y)
+      | Union (_, _, x, y) -> Is_nullable.union (go x) (go y)
+      | Repeat (_, _, x, i) -> Is_nullable.repeat (go x) i
       | Star _ -> true
-      | Comp (_, _, x) -> is_nullable_comp (go x)
+      | Comp (_, _, x) -> Is_nullable.comp (go x)
     in go
 
   let is_nothing = function
@@ -96,10 +113,9 @@ module Abstract = struct
     let rec go = function
       | Nothing -> true
       | Null -> false
-      | Any -> false
+      | Any -> true
       | Lits _ -> false
-      | Concat (_, _, x, y) when is_nullable x -> go x || go y
-      | Concat (_, _, x, _) -> go x
+      | Concat (_, _, x, y) -> go x || go y
       | Union (_, _, x, y) -> go x || go y
       | Repeat (_, _, x, _) -> go x
       | Star _ -> true
@@ -123,23 +139,23 @@ module Abstract = struct
   let any =
     Any
 
-  let lits s = 
+  let lits s =
     Lits s
 
   let concat x y =
-    Concat (is_nullable_concat (is_nullable x) (is_nullable y), is_nothing_concat (is_nothing x) (is_nothing y), x, y)
+    Concat (Is_nullable.concat (is_nullable x) (is_nullable y), Is_nothing.concat (is_nothing x) (is_nothing y), x, y)
 
   let union x y =
-    Union (is_nullable_union (is_nullable x) (is_nullable y), is_nothing_union (is_nothing x) (is_nothing y), x, y)
+    Union (Is_nullable.union (is_nullable x) (is_nullable y), Is_nothing.union (is_nothing x) (is_nothing y), x, y)
 
   let repeat x i =
-    Repeat (is_nullable_repeat (is_nullable x) i, is_nothing_repeat (is_nullable x) i, x, i)
+    Repeat (Is_nullable.repeat (is_nullable x) i, Is_nothing.repeat (is_nullable x) i, x, i)
 
   let star x =
     Star x
 
   let comp x =
-    Comp (is_nullable_comp (is_nullable x), is_nothing_comp (is_nothing x), x)
+    Comp (Is_nullable.comp (is_nullable x), Is_nothing.comp (is_nothing x), x)
 
   let comp_nothing =
     Comp (true, false, Nothing)
@@ -150,109 +166,62 @@ module Abstract = struct
   let comp_any =
     Comp (true, false, Any)
 
+  module To_seq = struct
+    let nothing =
+      Seq.empty
+
+    let null =
+      Seq.return Seq.empty
+
+    let lits ls =
+      Seq.map Seq.return ls
+
+    let union cmp r1 r2 =
+      let c = Seq.compare_heads cmp r1 r2 in
+      Seq.fair_flatten cmp @@
+      if c <= 0
+      then Seq.cons r1 (Seq.cons r2 Seq.empty)
+      else Seq.cons r2 (Seq.cons r1 Seq.empty)
+
+    let concat cmp r1 r2 =
+      Seq.fair_flatten cmp @@
+      Seq.map (fun x ->
+          Seq.map (fun y -> Seq.append x y) r2)
+        r1
+
+    let repeat cmp r i =
+      Seq.fair_flatten cmp @@
+      Seq.take i @@ Seq.repeat r
+
+    let star cmp r =
+      Seq.fair_flatten cmp @@
+      Seq.unfold (fun acc -> Some (acc, concat cmp r acc)) null
+
+    let comp cmp any r =
+      Seq.diff cmp r (star cmp (lits any))
+  end
+
   exception Undefined
 
-  (*let rec merge cons' xs ys =
-    match xs (), ys () with
-    | Seq.Cons (x, xs), Seq.Cons (y, ys) ->
-      cons' x y (merge cons' xs ys)
-    | Seq.Cons (x, xs), Seq.Nil
-    | Seq.Nil, Seq.Cons (x, xs) -> Seq.cons x xs
-    | Seq.Nil, Seq.Nil -> Seq.empty*)
-
-  (*let rec product cons' ~cmp xs ys =
-    match xs (), ys () with
-    | Seq.Cons (x, xs), Seq.Cons (y, ys) ->
-
-
-
-      cons' x y (merge cons' xs ys)
-    | Seq.Cons (x, xs), Seq.Nil
-    | Seq.Nil, Seq.Cons (x, xs) -> Seq.cons x xs
-    | Seq.Nil, Seq.Nil -> Seq.empty*)
-
-
-  let rec insert cmp r1 t =
-    (match Seq.uncons r1 with
-     | None -> t
-     | Some (x, r1) ->
-       (match Seq.uncons t with
-        | None -> Seq.return (Seq.cons x r1)
-        | Some (r2, t) ->
-          (match Seq.uncons r2 with
-           | None -> t
-           | Some (y, r2) ->
-             let c = Int.compare (Seq.length x) (Seq.length y) in
-               (if c <= 0 then
-                  Seq.cons (Seq.cons x r1) (Seq.cons (Seq.cons y r2) t)
-               else
-                 Seq.cons (Seq.cons y r2) (insert cmp (Seq.cons x r1) t)))))
-
-
-  let rec fair_concat cmp t =
-    match Seq.uncons t with
-    | None -> Seq.empty
-    | Some (r1, t) ->
-      (match Seq.uncons r1 with
-       | None -> fair_concat cmp t
-       | Some (x11, r1) ->
-         (match Seq.uncons r1 with
-          | None -> fun () -> Seq.Cons (x11, fair_concat cmp t)
-          | Some (x12, r1) ->
-            (match Seq.uncons t with
-             | None -> Seq.cons x11 (Seq.cons x12 r1)
-             | Some (r2, t) ->
-               (match Seq.uncons r2 with
-                | None -> fair_concat cmp (Seq.cons (Seq.cons x11 (Seq.cons x12 r1)) t)
-                | Some (x21, r2) ->
-                  let t = insert cmp (Seq.cons x12 r1) (Seq.cons (Seq.cons x21 r2) t) in
-                  fun () -> Seq.Cons (x11, fair_concat cmp t)))))
-
-
-  let merge cmp xs ys =
-    match Seq.uncons xs, Seq.uncons ys with
-    | Some (x, _), Some (y, _) ->
-      let c = Int.compare (Seq.length x) (Seq.length y) in
-      if c <= 0 then
-        fair_concat cmp
-          (Seq.cons xs (Seq.cons ys Seq.empty))
-      else
-        fair_concat cmp
-          (Seq.cons ys (Seq.cons xs Seq.empty))
-    | Some (_, _), None -> xs
-    | None, Some (_, _) -> ys
-    | None, None -> Seq.empty
-
-  let to_seq ~cmp (f: 'a -> 'b Seq.t) =
-    let rec go: 'a t -> 'b Seq.t Seq.t = function
-      | Nothing -> Seq.empty
-      | Null -> Seq.return Seq.empty
-      | Any -> raise Undefined
-      | Lits ls -> Seq.map Seq.return (f ls)
-      | Concat (_, _, x, y) ->
-        let xs = go x in
-        let ys = go y in
-        fair_concat cmp
-        (Seq.map (fun x ->
-            Seq.map (fun y -> Seq.append x y) ys)
-          xs)
-      | Union (_, _, x, y) ->
-        merge cmp (go x) (go y)
-      | Repeat (_, _, _x, _i) ->
-        raise Undefined
-      (*Seq.map (uncurry (@))
-        @@ Seq.take i
-        @@ Seq.repeat (to_seq f x)*)
-      | Star x ->
-        let xs = go x in
-        fair_concat cmp
-        (Seq.unfold (fun acc ->
-            Some (acc, fair_concat cmp
-              (Seq.map (fun x ->
-                   Seq.map (fun y -> Seq.append x y) acc)
-                  xs)))
-          (Seq.return Seq.empty))
-      | Comp _ -> raise Undefined
+  let to_seq ~cmp ?any (f: 'a -> 'b Seq.t) =
+    let try_any () =
+      match any with
+      | Some any -> any
+      | None -> raise Undefined
+    in
+    let cmp = Seq.shortlex cmp in
+    let rec go x =
+      Seq.deduplicate cmp @@
+      match x with
+      | Nothing -> To_seq.nothing
+      | Null -> To_seq.null
+      | Any -> To_seq.lits (try_any ())
+      | Lits ls -> To_seq.lits (f ls)
+      | Concat (_, _, x, y) -> To_seq.concat cmp (go x) (go y)
+      | Union (_, _, x, y) -> To_seq.union cmp (go x) (go y)
+      | Repeat (_, _, x, i) -> To_seq.repeat cmp (go x) i
+      | Star x -> To_seq.star cmp (go x)
+      | Comp (_, _, x) ->  To_seq.comp cmp (try_any ()) (go x)
     in go
 
   let comp_lits x =
@@ -371,7 +340,7 @@ module Concrete(Lits: LITS):
        | x, y -> Union (m, h, x, y))
 
     | Concat (_, _, x, Concat (_, _, y, z)) -> simplify (concat (simplify (concat x y)) (simplify z))
-    | Concat (m, h, x, y) -> 
+    | Concat (m, h, x, y) ->
       (match simplify x, simplify y with
        | Nothing, _ -> nothing
        | _, Nothing -> nothing
@@ -382,7 +351,7 @@ module Concrete(Lits: LITS):
        | x, y -> Concat (m, h, x, y))
 
     | Repeat (_, _, _, 0) -> null
-    | Repeat (m, h, x, i) -> 
+    | Repeat (m, h, x, i) ->
       (match simplify x with
        | Nothing -> nothing
        | Null -> nothing
@@ -399,7 +368,7 @@ module Concrete(Lits: LITS):
        | Star x -> x
        | x -> Star x)
 
-    | Comp (m, h, x) -> 
+    | Comp (m, h, x) ->
       (match simplify x with
        | Comp (_, _, x) -> x
        | x -> Comp (m, h, x))
@@ -410,14 +379,14 @@ module Concrete(Lits: LITS):
     | Nothing -> nothing
     | Null -> nothing
     | Any -> null
-    | Lits ls -> 
+    | Lits ls ->
       if Lits.subset s ls
       then null
       else nothing
     | Concat (_, _, x, y) when is_nullable x -> union (concat (derivative s x) y) (derivative s y)
     | Concat (_, _, x, y) -> concat (derivative s x) y
     | Union (_, _, x, y) -> union (derivative s x) (derivative s y)
-    | Repeat (_, _, x, i) -> 
+    | Repeat (_, _, x, i) ->
       (match i with
        | 0 -> nothing
        | i -> concat (derivative s x) (repeat x (pred i)))
