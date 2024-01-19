@@ -1,0 +1,3 @@
+(test
+ (name te_parser_test)
+ (libraries te_bot te_core alcotest))
