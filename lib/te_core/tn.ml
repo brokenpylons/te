@@ -58,12 +58,12 @@ end = struct
   let pp ppf x =
     Fmt.pf ppf "@[%a%a%a%a%a%a%a@]"
       (pp_if x.eof Fmt.string) "$"
-      (pp_if (not @@ T.Vars.is_empty x.scan) (fun ppf -> Fmt.pf ppf "_S %a" T.Vars.pp)) x.scan
-      (pp_if (not @@ T.Vars.is_empty x.call) (fun ppf -> Fmt.pf ppf "_C %a" T.Vars.pp)) x.call
+      (pp_if (not @@ T.Vars.is_empty x.scan) (fun ppf -> Fmt.pf ppf "𝓢 %a" T.Vars.pp)) x.scan
+      (pp_if (not @@ T.Vars.is_empty x.call) (fun ppf -> Fmt.pf ppf "𝓒 %a" T.Vars.pp)) x.call
       (pp_if x.null Fmt.string) "ε"
       (pp_if (not @@ T.Vars.is_empty x.vars) T.Vars.pp) x.vars
       (pp_if (not @@ T.Codes.is_empty x.codes) T.Codes.pp) x.codes
-      (pp_if (not @@ T.Vars.is_empty x.return) (fun ppf -> Fmt.pf ppf "_R %a" T.Vars.pp)) x.return
+      (pp_if (not @@ T.Vars.is_empty x.return) (fun ppf -> Fmt.pf ppf "𝓡 %a" T.Vars.pp)) x.return
 
   let subset x y =
     Bool.imp x.eof y.eof &&
