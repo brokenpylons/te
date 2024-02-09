@@ -1,7 +1,7 @@
-open! Prelude 
+open! Prelude
 
 module type SEQUENTIAL = sig
-  type elt 
+  type elt
   type 'a t
 
   val (&): elt * 'a -> 'a t -> 'a t

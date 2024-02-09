@@ -122,7 +122,7 @@ end = struct
   let of_symbols (x: T.Symbols.t) =
     {
       eof = x.eof;
-      null = x.null;
+      null = x.delegate;
       scan = T.Vars.empty;
       call = T.Vars.empty;
       return = T.Vars.empty;
@@ -681,8 +681,7 @@ let construct_all tokens s' ps =
             |> M.link ~merge:Lits.union (T.States.singleton from) (Acc.find_multiple x starts) (Lits.call @@ T.Vars.singleton x)
             with Not_found -> t
             (*|> M.link ~merge:Lits.union (Acc.find_multiple x finals) (T.States.singleton to_) (Lits.return (T.Vars.singleton x))*))
-          t (T.Vars.diff ls.Lits.vars tokens)
-      )
+          t (T.Vars.diff ls.Lits.vars tokens))
         t (M.transitions t))
   }
 
@@ -803,13 +802,14 @@ module Analysis(L: LITS)(Lhs: LHS with type vars = L.vars)(A: Fa.S0)(Multimap: f
   end
 
   module Nullable = struct
-    include Abstract(struct
-        type t = bool
-        [@@deriving eq, ord]
+    module Alg = struct
+      type t = bool
+      [@@deriving eq, ord]
 
-        let union = (||)
-        let empty = false
-      end)
+      let union = (||)
+      let empty = false
+    end
+    include Abstract(Alg)
 
     let get = make (module struct
         let start a q _ =
@@ -1408,7 +1408,7 @@ let labels_multiple' qs m =
 let collapse' t =
   let module R = Refine.Map(Lits)(T.Statess) in
 
-  M''.unfold  (fun _ from ->
+  M''.unfold  ~merge:Lits.union (fun _ from ->
       let next =
         M''.adjacent_multiple from t
         |> Seq.map (fun (s, ls) -> (ls, T.Statess.singleton s))
@@ -1421,7 +1421,7 @@ let collapse' t =
 
 module Builder = struct
   module Item_rhs' = struct
-    type t = {base: Item_rhs.t; right_nulled: bool; shift_lookahead: Lits.t; reduce_lookahead: Lits.t; first: Lits.t T.Var_to.t; shift_code: bool; distance: Size.t; next: Lits.t; next_null: (T.Labeled_var.t * Lits.t) list; state_pair: T.State_pair.t; reminder: T.Var.t list list}
+    type t = {base: Item_rhs.t; right_nulled: bool; shift_lookahead: Lits.t; reduce_lookahead: Lits.t; first: Lits.t T.Var_to.t; shift_code: Lits.t; distance: Size.t; next: Lits.t; next_null: (T.Labeled_var.t * Lits.t) list; state_pair: T.State_pair.t; reminder: T.Var.t list list}
     [@@deriving eq, ord]
   end
 
@@ -1452,7 +1452,7 @@ module Builder = struct
     let reminder (_, rhs) = rhs.Item_rhs'.reminder
   end
 
-  let make ~tokens start ps ds =
+  let [@warning "-21"] make ~tokens start ps ds =
     (*let supply1, supply2 = Supply.split2 T.State.supply in
     let ps' = convert_multiple ~supply:supply1 ps in
     let ds' = convert_multiple ~supply:supply2 ds in
@@ -1465,7 +1465,7 @@ module Builder = struct
     Dot.string_of_graph @@
     M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Lits.pp x) m;
 
-    let m' = subset ~supply:T.State.supply m in
+    let m' = subset ~supply:(T.State.fresh_supply ()) m in
 
     Fmt.pr "%s@." @@
     Dot.string_of_graph @@
@@ -1485,6 +1485,7 @@ module Builder = struct
     let lb = lookback eps in
     let la = lookahead' lb analysis in
     let _nl = nullable analysis in
+    let fr = first' analysis in
 
     Fmt.pr "DIST@.";
     let dist = distance_multiple Seq.(ps' @ ds') in
@@ -1553,10 +1554,11 @@ module Builder = struct
     let _nl = nullable analysis in
     let fr = first' analysis in
 
-    let m' = add_backlinks (fun lhs s q -> (la lhs s q).right_nulled) lb m' in
+    (*let m' = add_backlinks (fun lhs s q -> (la lhs s q).right_nulled) lb m' in*)
 
     Fmt.pr "DIST@.";
     let dist = distance_multiple Seq.(ps' @ ds') in
+
 
     Seq.iter (fun (lhs, rhs) ->
         Fmt.pr "-- %a@." T.Labeled_var.pp lhs;
@@ -1580,7 +1582,7 @@ module Builder = struct
     Fmt.pr "NC@.";
     let nc = M''.homomorphism (fun lits -> if Lits.is_scan lits then {lits with null = true; scan = T.Vars.empty} else lits) nc in
 
-    (*let nc = collapse' nc in*)
+    let nc = collapse' nc in
 
     Fmt.pr "%s@." @@
     Dot.string_of_graph @@
@@ -1601,7 +1603,7 @@ module Builder = struct
     Dot.string_of_graph @@
     M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Lits.pp x) m;
 
-    let m' = subset ~supply:T.State.supply m in
+    let m' = subset ~supply:(T.State.fresh_supply ()) m in
 
     let m' = extend m' ~tokens ds' in 
     let m' = M.homomorphism (fun lits -> if Lits.is_call lits && T.Vars.subset lits.call tokens then Lits.scan (lits.call) else lits) m' in
@@ -1624,6 +1626,7 @@ module Builder = struct
     let lb = lookback eps in
     let la = lookahead' lb analysis in
     let _nl = nullable analysis in
+    let fr = first' analysis in
 
     Fmt.pr "DIST@.";
     let dist = distance_multiple Seq.(ps' @ ds') in
@@ -1662,7 +1665,12 @@ module Builder = struct
     let b = back ~is_token:(fun v -> T.Vars.mem v tokens) eps in
     Fmt.pr "%s@." @@
     Dot.string_of_graph @@
-    M'.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Enhanced_lits.pp x) b;*)
+    M'.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Enhanced_lits.pp x) b; *)
+
+    let module ELM = Enhanced_lits_multimap(Enhanced_analysis.Nullable.Alg) in
+    let module LM = Lits_multimap(Enhanced_analysis.Nullable.Alg) in
+    let (lazy n) = analysis.nullable_per_lits in
+    let nx = ELM.strip n in
 
     let t = M''.map_states_labels (fun r nc_items ->
         T.State_to.fold (fun s items acc ->
@@ -1674,7 +1682,7 @@ module Builder = struct
                     base = rhs;
                     next = Seq.fold_left Lits.union Lits.empty
                       @@ Seq.map snd
-                      @@ M.adjacent rhs.Item_rhs.state 
+                      @@ M.adjacent rhs.Item_rhs.state
                       @@ T.Labeled_var_to.find lhs ps_to;
                     next_null = List.of_seq @@
                       Seq.flat_map (fun (s, ls) ->
@@ -1689,8 +1697,18 @@ module Builder = struct
                         (M''.adjacent r nc);
                     reminder =
                       if not @@ T.Vars.mem (T.Labeled_var.var lhs) tokens && (la lhs s rhs.Item_rhs.state).right_nulled && not (R.is_nullable rhs.Item_rhs.tail) then begin
-                        Fmt.pr "%a" Rhs.pp rhs.Item_rhs.tail;
-                        rhs.Item_rhs.tail
+                        let r = rhs.Item_rhs.tail in
+                        let r' = Rhs.simplify @@ R.flat_map (fun ls ->
+                            let vs =
+                              T.Vars.to_seq ls.Lits.vars
+                              |> Seq.filter (fun x -> LM.find_multiple_or_empty (Lits.var x) nx)
+                              |> T.Vars.of_seq
+                            in
+                            if T.Vars.is_empty vs then R.null else R.lits (Lits.of_vars vs))
+                            r
+                        in
+                        Fmt.pr "%a@." Rhs.pp r';
+                        r'
                         |> R.to_seq ~cmp:T.Var.compare (fun ls -> T.Vars.to_seq ls.Lits.vars)
                         |> Seq.map List.of_seq
                         |> List.of_seq end
@@ -1705,13 +1723,21 @@ module Builder = struct
                       @@ M.adjacent rhs.Item_rhs.state
                       @@ T.Labeled_var_to.find lhs ps_to;
                     shift_code =
-                      not @@ T.Vars.mem (T.Labeled_var.var lhs) tokens &&
-                      (la lhs s rhs.Item_rhs.state).shift_lookahead
-                      |> Enhanced_lits.to_seq
-                      |> Seq.exists (fun (q, ls) ->
-                          (not (T.Codes.is_empty ls.Lits.codes) || ls.Lits.eof) &&
-                          let is = M.labels q m' in
-                          Seq.exists (fun (lhs, _) -> not @@ T.Vars.mem (T.Labeled_var.var lhs) tokens) (Items.to_seq is));
+                      if T.Vars.mem (T.Labeled_var.var lhs) tokens
+                      then Lits.empty
+                      else
+                        (la lhs s rhs.Item_rhs.state).shift_lookahead
+                        |> Enhanced_lits.to_seq
+                        |> Seq.map (fun (q, ls) ->
+                            if (not (T.Codes.is_empty ls.Lits.codes)) || ls.Lits.eof
+                            then
+                              let is = M.labels q m' in
+                              (if Seq.exists (fun (lhs, _) -> not @@ T.Vars.mem (T.Labeled_var.var lhs) tokens) (Items.to_seq is) then
+                                Lits.union (Lits.codes ls.Lits.codes) (if ls.Lits.eof then Lits.eof else Lits.empty)
+                              else 
+                                Lits.empty)
+                            else Lits.empty)
+                        |> (Seq.fold_left Lits.union Lits.empty);
                     shift_lookahead = Enhanced_lits.strip @@ (la lhs s rhs.Item_rhs.state).shift_lookahead;
                     reduce_lookahead = Enhanced_lits.strip @@ (la lhs s rhs.Item_rhs.state).reduce_lookahead;
                     distance = (T.Labeled_var_to.find lhs dist) rhs.Item_rhs.state;

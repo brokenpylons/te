@@ -21,6 +21,8 @@ module type SET2 = sig
   val add: elt -> t -> t
   val fold: (elt -> 'acc -> 'acc) -> 'acc -> t -> 'acc
   val inter: t -> t -> t
+  val diff: t -> t -> t
+  val is_empty: t -> bool
 
   include Set.SEQUENTIAL with type t := t and type elt := elt
 end
@@ -29,15 +31,14 @@ module type SET3 = sig
   include SET2
 
   val remove: elt -> t -> t
-  val is_empty: t -> bool
 end
 
 module type MAP = sig
   include Map.CORE
   val update: elt -> ('a option -> 'a option) -> 'a t -> 'a t
   val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
-  val inter: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
-  val diff: 'a t -> 'a t -> 'a t
+  val inter: (elt -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
+  val diff:  (elt -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
   val filter: (elt -> 'a -> bool) -> 'a t -> 'a t
 end
 
@@ -62,8 +63,6 @@ module type S0 = sig
   val find_multiple_or: default:values -> key -> t -> values
 
   val filter_multiple: (key -> values -> bool) -> t -> t
-
-  val diff: t -> t -> t
 end
 
 module Make0(M: MAP)(S: SET0) = struct
@@ -92,8 +91,6 @@ module Make0(M: MAP)(S: SET0) = struct
   let find_multiple_or ~default x t =
     try find_multiple x t
     with Not_found -> default
-
-  let diff t1 t2 = M.diff t1 t2
 end
 
 module type S1 = sig
@@ -114,9 +111,8 @@ module Make1(M: MAP)(S: SET1) = struct
   let add_seq_multiple s t =
     Seq.fold_left (fun t (k, v) -> add_multiple k v t) t s
 
-  let of_seq_multiple s = 
+  let of_seq_multiple s =
     add_seq_multiple s empty
-
 
   let union t1 t2 =
     M.union (fun _ -> S.union) t1 t2
@@ -137,6 +133,7 @@ module type S2 = sig
   val the: t -> key * value
 
   val inter: t -> t -> t
+  val diff: t -> t -> t
 
   include Set.SEQUENTIAL with type t := t and type elt := elt
   module Set: SET2 with type t = t and type elt = elt
@@ -159,8 +156,14 @@ module Make2(M: MAP)(S: SET2) = struct
     let (x, xp) = M.the t in
     (x, S.the xp)
 
+  let if_empty xp =
+    if S.is_empty xp then None else Some xp
+
   let inter t1 t2 =
-    M.inter (fun _ -> S.inter) t1 t2
+    M.inter (fun _ -> if_empty %% S.inter) t1 t2
+
+  let diff t1 t2 =
+    M.diff (fun _ -> if_empty %% S.diff) t1 t2
 
   module X = struct
     type nonrec t = t
@@ -172,6 +175,8 @@ module Make2(M: MAP)(S: SET2) = struct
     let empty = empty
     let fold f = fold (fun x xp -> f (x, xp))
     let inter = inter
+    let diff = diff
+    let is_empty = is_empty
     let singleton (k, v) = singleton k v
     let the = the
   end

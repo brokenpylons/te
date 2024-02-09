@@ -94,7 +94,7 @@ module Set = struct
               | Node (_, z, lrl, lrr) -> node z (node y ll lrl) (node x lrr r)
               | Empty -> assert false)
         | Empty -> assert false
-      else 
+      else
         node x l r
 
     let balance_right x l r =
@@ -309,7 +309,7 @@ module Set = struct
       | Empty -> singleton x
       | Node (tag, y, l, r) as t ->
         let c = Elt.compare x y in
-        if c = 0 then 
+        if c = 0 then
           if x == y
           then t
           else Node (tag, f x y, l, r)
@@ -324,12 +324,12 @@ module Set = struct
       | Empty -> (false, Empty, Empty)
       | Node (_, y, l, r) ->
         let c = Elt.compare x y in
-        if c = 0 then 
-          (true, l, r) 
+        if c = 0 then
+          (true, l, r)
         else if c < 0 then
           let (b, ll, lr) = split x l in
           (b, ll, join y lr r)
-        else 
+        else
           let (b, rl, rr) = split x r in
           (b, join y l rl, rr)
 
@@ -392,7 +392,7 @@ module Set = struct
       | _, Empty -> t1
       | t1, Node (_, x, l2, r2) ->
         let (_, l1, r1) = split x t1 in
-        let l = diff l1 l2 
+        let l = diff l1 l2
         and r = diff r1 r2 in
         concat l r
 
@@ -529,8 +529,8 @@ module Map = struct
 
     val merge: (elt -> 'a option -> 'a option -> 'a option) -> 'a t -> 'a t -> 'a t
     val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
-    val inter: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
-    val diff: 'a t -> 'a t -> 'a t
+    val inter: (elt -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
+    val diff: (elt -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
     val subset: ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 
     val the: 'a t -> elt * 'a
@@ -594,7 +594,7 @@ module Map = struct
               | Node (_, z, zp, lrl, lrr) -> node z zp (node y yp ll lrl) (node x xp lrr r)
               | Empty -> assert false)
         | Empty -> assert false
-      else 
+      else
         node x xp l r
 
     let balance_right x xp l r =
@@ -681,7 +681,7 @@ module Map = struct
               | Node (_, z, zp, lrl, lrr) -> node z zp (node y yp ll lrl) (node x xp lrr r)
               | Empty -> assert false)
         | Empty -> assert false
-      else 
+      else
         node x xp l r
 
     let balance_right x xp l r =
@@ -828,12 +828,12 @@ module Map = struct
       | Empty -> (None, Empty, Empty)
       | Node (_, y, yp, l, r) ->
         let c = Elt.compare x y in
-        if c = 0 then 
-          (Some yp, l, r) 
+        if c = 0 then
+          (Some yp, l, r)
         else if c < 0 then
           let (b, ll, lr) = split x l in
           (b, ll, join y yp lr r)
-        else 
+        else
           let (b, rl, rr) = split x r in
           (b, join y yp l rl, rr)
 
@@ -913,7 +913,7 @@ module Map = struct
         | None -> Empty)
       | t1, Node (_, x, xp, l2, r2) ->
         let (s, l1, r1) = split x t1 in
-        let l = merge f l1 l2 
+        let l = merge f l1 l2
         and r = merge f r1 r2 in
         (match f x s (Some xp) with
         | Some xp -> join x xp l r
@@ -926,7 +926,7 @@ module Map = struct
       | _, Empty -> t1
       | t1, Node (_, x, xp, l2, r2) ->
         let (s, l1, r1) = split x t1 in
-        let l = union f l1 l2 
+        let l = union f l1 l2
         and r = union f r1 r2 in
         match s with
         | Some xp' -> join x (f x xp' xp) l r
@@ -939,22 +939,30 @@ module Map = struct
       | _, Empty -> Empty
       | t1, Node (_, x, xp, l2, r2) ->
         let (s, l1, r1) = split x t1 in
-        let l = inter f l1 l2 
+        let l = inter f l1 l2
         and r = inter f r1 r2 in
         match s with
-        | Some xp' -> join x (f x xp' xp) l r
+        | Some xp' ->
+          (match f x xp' xp with
+          | Some xp'' -> join x xp'' l r
+          | None -> concat l r)
         | None -> concat l r
 
-    let rec diff t1 t2 =
+    let rec diff f t1 t2 =
       match t1, t2 with
       | Empty, Empty -> Empty
       | Empty, _ -> Empty
       | _, Empty -> t1
-      | t1, Node (_, x, _, l2, r2) ->
-        let (_, l1, r1) = split x t1 in
-        let l = diff l1 l2 
-        and r = diff r1 r2 in
-        concat l r
+      | t1, Node (_, x, xp, l2, r2) ->
+        let (s, l1, r1) = split x t1 in
+        let l = diff f l1 l2
+        and r = diff f r1 r2 in
+        match s with
+        | Some xp' ->
+          (match f x xp' xp with
+           | Some xp'' -> join x xp'' l r
+           | None -> concat l r)
+        | None -> concat l r
 
     let rec subset' eq_p e1 e2 =
       match e1, e2 with
@@ -998,7 +1006,7 @@ module Map = struct
     let add_seq s t =
       Seq.fold_left (fun t (x, xp) -> add x xp t) t s
 
-    let of_seq s = 
+    let of_seq s =
       add_seq s empty
 
     let rec to_seq' t tl =
@@ -1019,8 +1027,8 @@ module Map = struct
         then find x l
         else find x r
 
-    let find_opt x t = 
-      try Some (find x t) 
+    let find_opt x t =
+      try Some (find x t)
       with Not_found -> None
 
     let to_fun t x =

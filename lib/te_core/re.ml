@@ -20,7 +20,7 @@ module Abstract = struct
       | Null -> Fmt.string ppf "ε"
       | Any -> Fmt.string ppf "."
       | Lits ls -> pp_lits ppf ls
-      | Concat (_, _, x, y) -> Fmt.pf ppf "@[(@[%a@]@ . @[%a@])@]" go x go y
+      | Concat (_, _, x, y) -> Fmt.pf ppf "@[(@[%a@]@,·@,@[%a@])@]" go x go y
       | Union (_, _, x, y) -> Fmt.pf ppf "@[(@[%a@]@,|@,@[%a@])@]" go x go y
       | Repeat (_, _, x, i) -> Fmt.pf ppf "@[%a@,@[{%i}@]@]" go x i
       | Star x -> Fmt.pf ppf "@[(@[%a@]){*}@]" go x
@@ -33,6 +33,19 @@ module Abstract = struct
       | Null -> Null
       | Any -> Any
       | Lits ls -> Lits (f ls)
+      | Concat (m, h, x, y) -> Concat (m, h, go x, go y)
+      | Union (m, h, x, y) -> Union (m, h, go x, go y)
+      | Repeat (m, h, x, i) -> Repeat (m, h, go x, i)
+      | Star x -> Star (go x)
+      | Comp (m, h, x) -> Comp (m, h, go x)
+    in go
+
+  let flat_map f =
+    let rec go = function
+      | Nothing -> Nothing
+      | Null -> Null
+      | Any -> Any
+      | Lits ls -> f ls
       | Concat (m, h, x, y) -> Concat (m, h, go x, go y)
       | Union (m, h, x, y) -> Union (m, h, go x, go y)
       | Repeat (m, h, x, i) -> Repeat (m, h, go x, i)

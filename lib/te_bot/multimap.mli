@@ -19,6 +19,8 @@ module type SET2 = sig
   val add: elt -> t -> t
   val fold: (elt -> 'acc -> 'acc) -> 'acc -> t -> 'acc
   val inter: t -> t -> t
+  val diff: t -> t -> t
+  val is_empty: t -> bool
 
   include Set.SEQUENTIAL with type t := t and type elt := elt
 end
@@ -27,15 +29,14 @@ module type SET3 = sig
   include SET2
 
   val remove: elt -> t -> t
-  val is_empty: t -> bool
 end
 
 module type MAP = sig
-  include Map.CORE 
+  include Map.CORE
   val update: elt -> ('a option -> 'a option) -> 'a t -> 'a t
   val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
-  val inter: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
-  val diff: 'a t -> 'a t -> 'a t
+  val inter: (elt -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
+  val diff: (elt -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
   val filter: (elt -> 'a -> bool) -> 'a t -> 'a t
 end
 
@@ -61,7 +62,6 @@ module type S0 = sig
 
   val filter_multiple: (key -> values -> bool) -> t -> t
 
-  val diff: t -> t -> t
 end
 
 module Make0(M: MAP)(S: SET0): S0 with type t = S.t M.t and type key = M.elt and type values = S.t
@@ -90,6 +90,7 @@ module type S2 = sig
   val the: t -> key * value
 
   val inter: t -> t -> t
+  val diff: t -> t -> t
 
   include Set.SEQUENTIAL with type t := t and type elt := elt
   module Set: SET2 with type t = t and type elt = elt

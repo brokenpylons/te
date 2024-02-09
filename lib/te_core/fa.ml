@@ -63,6 +63,7 @@ module type S0 = sig
   val rev: (_, 'labels, 'lits) t -> (Start.multiple, 'labels, 'lits) t
 
   val unfold:
+    ?merge: ('lits -> 'lits -> 'lits) ->
     (state -> 'seed -> bool * 'labels * ('lits * state * 'seed) Seq.t) -> state -> 'seed -> (Start.single, 'labels, 'lits) t
 
   val digraph: (state -> 'labels -> 'seed) ->
@@ -205,9 +206,9 @@ module Make0(State: STATE)(States: STATES with type elt = State.t)(G: Graph.S wi
     if is_final then final := States.add q !final;
     (vl, y)
 
-  let unfold f q start =
+  let unfold ?merge f q start =
     let final = ref States.empty in
-    let graph = G.unfold (unfold_step ~final f) q start in
+    let graph = G.unfold ?merge (unfold_step ~final f) q start in
     {
       start = Single q;
       final = !final;

@@ -33,7 +33,7 @@ module Abstract(P: PARTITION)(Fun: sig
   type partition = P.t
   type t = {partitions: P.t Fun.t list; considered: P.t}
   [@@deriving eq, ord]
-  type parts = Novel of P.t | Disjoint of P.t | Equal of P.t | Split of P.t * P.t
+  type parts = New of P.t | Disjoint of P.t | Equal of P.t | Split of P.t * P.t
 
   module Split = struct
     type t = {partitions: parts Fun.t list; considered: P.t}
@@ -41,8 +41,8 @@ module Abstract(P: PARTITION)(Fun: sig
 
   let split_partition splitter p =
     let i = P.inter splitter p in
-    if P.is_empty i then 
-      Disjoint p 
+    if P.is_empty i then
+      Disjoint p
     else
       let d = P.diff p i in
       if P.is_empty d
@@ -62,12 +62,12 @@ module Abstract(P: PARTITION)(Fun: sig
     List.to_seq t.partitions
 
   let split splitter t =
-    let novel = P.diff splitter t.considered in
+    let new_ = P.diff splitter t.considered in
     Split.{
-      partitions = 
-        if P.is_empty novel
+      partitions =
+        if P.is_empty new_
         then List.map (Fun.map (split_partition splitter)) t.partitions
-        else Fun.return (Novel novel) :: List.map (Fun.map (split_partition splitter)) t.partitions;
+        else Fun.return (New new_) :: List.map (Fun.map (split_partition splitter)) t.partitions;
       considered = P.union splitter t.considered;
     }
 end
@@ -89,7 +89,7 @@ end = struct
 
   let process = 
     List.concat_map (function
-        | Novel p -> [p]
+        | New p -> [p]
         | Disjoint p -> [p]
         | Equal p -> [p]
         | Split (i, d) -> [i; d])
@@ -130,7 +130,7 @@ end = struct
   let processes modify =
     List.concat_map (fun (p, vs) ->
         match p with
-        | Novel p -> [(p, modify vs)]
+        | New p -> [(p, modify vs)]
         | Disjoint p -> [(p, vs)]
         | Equal p -> [(p, modify vs)]
         | Split (i, d) -> [(i, modify vs); (d, vs)])
@@ -167,14 +167,14 @@ module Hopcroft(P: sig include PARTITION val cardinal: t -> int end) = struct
 
   let process aps ips =
     let aps = List.concat_map (function
-        | Set.Novel _ -> []
+        | Set.New _ -> []
         | Set.Disjoint p -> [p]
         | Set.Equal p -> [p]
         | Set.Split (i, d) -> [i; d])
         aps
     in
     List.bin_map (function
-        | Set.Novel p -> (None, Some p)
+        | Set.New p -> (None, Some p)
         | Set.Disjoint p -> (None, Some p)
         | Set.Equal p -> (None, Some p)
         | Set.Split (i, d) ->
@@ -194,7 +194,7 @@ module Hopcroft(P: sig include PARTITION val cardinal: t -> int end) = struct
       inactive = {partitions = ips; considered = i.considered};
     }
 
-  let pivot {active = a; inactive = i} = 
+  let pivot {active = a; inactive = i} =
     match a.partitions with
     | p :: ps ->
       Some (p, {

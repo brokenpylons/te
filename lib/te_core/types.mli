@@ -48,8 +48,8 @@ module State_to: sig
   val subset: ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
   val update: elt -> ('a option -> 'a option) -> 'a t -> 'a t
   val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
-  val inter: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
-  val diff: 'a t -> 'a t -> 'a t
+  val inter: (elt -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
+  val diff: (elt -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
   val filter: (elt -> 'a -> bool) -> 'a t -> 'a t
   val of_seq: (elt * 'a) Seq.t -> 'a t
   val to_seq: 'a t -> (elt * 'a) Seq.t
@@ -75,13 +75,12 @@ module States_to: sig
   val subset: ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
   val update: elt -> ('a option -> 'a option) -> 'a t -> 'a t
   val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
-  val inter: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
-  val diff: 'a t -> 'a t -> 'a t
+  val inter: (elt -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
+  val diff: (elt -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
   val filter: (elt -> 'a -> bool) -> 'a t -> 'a t
   val of_seq: (elt * 'a) Seq.t -> 'a t
 end
 module States_graph: Graph.S with type vertex = States.t
-
 
 module State_pair: sig
   type t = State.t * State.t
@@ -172,8 +171,8 @@ module Vertex_to: sig
   val pp: 'a Fmt.t -> 'a t Fmt.t
   val update: elt -> ('a option -> 'a option) -> 'a t -> 'a t
   val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
-  val inter: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
-  val diff: 'a t -> 'a t -> 'a t
+  val inter: (elt -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
+  val diff: (elt -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
   val filter: (elt -> 'a -> bool) -> 'a t -> 'a t
 end
 module Vertex_graph: Graph.S with type vertex = Vertex.t
@@ -225,8 +224,8 @@ module Var_to: sig
   val pp: 'a Fmt.t -> 'a t Fmt.t
   val update: elt -> ('a option -> 'a option) -> 'a t -> 'a t
   val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
-  val inter: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
-  val diff: 'a t -> 'a t -> 'a t
+  val inter: (elt -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
+  val diff: (elt -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
   val filter: (elt -> 'a -> bool) -> 'a t -> 'a t
   val of_seq: (elt * 'a) Seq.t -> 'a t
 end
@@ -258,8 +257,8 @@ module Labeled_var_to: sig
   val map: (elt -> 'a -> 'b) -> 'a t -> 'b t
   val update: elt -> ('a option -> 'a option) -> 'a t -> 'a t
   val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
-  val inter: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
-  val diff: 'a t -> 'a t -> 'a t
+  val inter: (elt -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
+  val diff: (elt -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
   val filter: (elt -> 'a -> bool) -> 'a t -> 'a t
   val of_seq: (elt * 'a) Seq.t -> 'a t
   val to_seq: 'a t -> (elt * 'a) Seq.t
@@ -271,9 +270,13 @@ module Reduction: sig
     val compare: t -> t -> int
     val equal: t -> t -> bool
   end
-
-  type t = private {output: Labeled_var.t; strategy: Strategy.t; reminder: Var.t list list}
-  val make: Labeled_var.t -> Strategy.t -> Var.t list list -> t
+  module Reminder: sig
+    type t = Complete | Lists of Var.t list list | Gen of State_pair.t
+    val compare: t -> t -> int
+    val equal: t -> t -> bool
+  end
+  type t = private {output: Labeled_var.t; strategy: Strategy.t; reminder: Reminder.t}
+  val make: Labeled_var.t -> Strategy.t -> Reminder.t -> t
 
   val compare: t -> t -> int
   val equal: t -> t -> bool
@@ -291,7 +294,7 @@ module Reductions: sig
 end
 
 module Symbol: sig
-  type t = Null | Eof | Code of Code.t | Var of Var.t
+  type t = Delegate | Eof | Code of Code.t | Var of Var.t
   val compare: t -> t -> int
   val equal: t -> t -> bool
   val pp: t Fmt.t
@@ -302,8 +305,8 @@ module Symbol_to: sig
   val pp: 'a Fmt.t -> 'a t Fmt.t
   val update: elt -> ('a option -> 'a option) -> 'a t -> 'a t
   val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
-  val inter: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
-  val diff: 'a t -> 'a t -> 'a t
+  val inter: (elt -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
+  val diff: (elt -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
   val filter: (elt -> 'a -> bool) -> 'a t -> 'a t
 end
 
@@ -311,7 +314,7 @@ module Symbols: sig
   type t =
     {
       eof: bool;
-      null: bool;
+      delegate: bool;
       vars: Vars.t;
       codes: Codes.t
     }
@@ -326,11 +329,44 @@ module Symbols: sig
   val to_codes: t -> Codes.t
 
   val eof: t
-  val null: t
+  val delegate: t
   val add: Symbol.t -> t -> t
+  val singleton: Symbol.t -> t
   val empty: t
+
+  val subset: t -> t -> bool
+  val union: t -> t -> t
+  val inter: t -> t -> t
+  val diff: t -> t -> t
 end
 
+module type SYMBOL_MULTIMAP_VALUES = sig
+  type t
+  val compare: t -> t -> int
+  val equal: t -> t -> bool
+
+  val empty: t
+  val union: t -> t -> t
+end
+
+module Symbols_multimap(Values: SYMBOL_MULTIMAP_VALUES): sig
+  type key = Symbols.t
+  type values = Values.t
+  type t
+
+  val equal: t -> t -> bool
+  val compare: t -> t -> int
+  val pp: values Fmt.t -> t Fmt.t
+
+  val empty: t
+  val add_multiple: key -> values -> t -> t
+  val singleton_multiple: key -> values -> t
+  val union: t -> t -> t
+  val (<|>): t -> t -> t
+  val find_multiple: key -> t -> values
+  val find_multiple_or_empty: key -> t -> values
+  val of_seq_multiple: (key * values) Seq.t -> t
+end
 
 module Node: sig
   type t
@@ -342,4 +378,46 @@ module Node: sig
   val to_id: t -> Dot.id
   val pp: t Fmt.t
 end
+module Nodes: sig
+  type t
+  type elt = Node.t
+  include Set.CORE with type elt := elt and type t := t
+  include Set.BINARY with type elt := elt and type t := t
+  include Set.SEQUENTIAL with type elt := elt and type t := t
+  val pp: t Fmt.t
+  val disjoint: t -> t -> bool
+  val subset: t -> t -> bool
+  val exists: (elt -> bool) -> t -> bool
+  val choose: t -> elt option
+  val iter: (elt -> unit) -> t -> unit
+end
 module Node_packed_forest: Packed_forest.S with type node = Node.t and type labels = Vars.t
+
+module Actions: sig
+  type t = private
+    {
+      accept: bool;
+      shift: bool;
+      load: bool;
+      orders: Vars.t;
+      matches: Labeled_vars.t;
+      predictions: Vars.t;
+      null: Reductions.t;
+      reduce: Reductions.t;
+    }
+  val compare: t -> t -> int
+  val equal: t -> t -> bool
+  val pp: t Fmt.t
+
+  val union: t -> t -> t
+  val empty: t
+  val is_empty: t -> bool
+  val accept: t
+  val shift: t
+  val load: t
+  val orders: Vars.t -> t
+  val matches: Labeled_vars.t -> t
+  val predictions: Vars.t -> t
+  val null: Reductions.t -> t
+  val reduce: Reductions.t -> t
+end

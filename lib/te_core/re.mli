@@ -10,6 +10,7 @@ module Abstract: sig
   val to_seq: cmp:('b -> 'b -> int) -> ?any:'b Seq.t -> ('a -> 'b Seq.t) -> 'a t -> 'b Seq.t Seq.t
 
   val map: ('a -> 'b) -> 'a t -> 'b t
+  val flat_map: ('a -> 'b t) -> 'a t -> 'b t
 
   val is_nullable: _ t -> bool
   val is_nothing: _ t -> bool

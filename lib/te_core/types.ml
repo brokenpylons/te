@@ -2,7 +2,7 @@ open Te_bot
 open! Prelude
 
 let pp_eof = "💰"
-let pp_null = "ε"
+let pp_delegate = "☞"
 
 module Code = struct
   include Int 
@@ -241,7 +241,11 @@ module Reduction = struct
     type t = Null | Fixed of int | Scan of State_pair.t
     [@@deriving eq, ord, show]
   end
-  type t = {output: Labeled_var.t; strategy: Strategy.t; reminder: Var.t list list}
+  module Reminder = struct
+    type t = Complete | Lists of Var.t list list | Gen of State_pair.t
+    [@@deriving eq, ord, show]
+  end
+  type t = {output: Labeled_var.t; strategy: Strategy.t; reminder: Reminder.t}
   [@@deriving eq, ord, show]
 
   let make output strategy reminder = {output; strategy; reminder}
@@ -252,12 +256,12 @@ module Reductions = struct
 end
 
 module Symbol = struct
-  type t = Null | Eof | Code of Code.t | Var of Var.t
+  type t = Delegate | Eof | Code of Code.t | Var of Var.t
   [@@deriving eq, ord]
 
   let pp ppf = function
     | Eof -> Fmt.string ppf pp_eof
-    | Null -> Fmt.string ppf pp_null
+    | Delegate -> Fmt.string ppf pp_delegate
     | Code x -> Code.pp ppf x
     | Var x -> Var.pp ppf x
 end
@@ -271,7 +275,7 @@ module Symbols = struct
   type t =
     {
       eof: bool;
-      null: bool;
+      delegate: bool;
       vars: Vars.t;
       codes: Codes.t
     }
@@ -280,7 +284,7 @@ module Symbols = struct
   let empty =
     {
       eof = false;
-      null = false;
+      delegate = false;
       vars = Vars.empty;
       codes = Codes.empty;
     }
@@ -288,8 +292,8 @@ module Symbols = struct
   let add_eof t =
     {t with eof = true}
 
-  let add_null t =
-    {t with null = true}
+  let add_delegate t =
+    {t with delegate = true}
 
   let add_vars x t =
     {t with vars = x}
@@ -301,16 +305,19 @@ module Symbols = struct
   let to_codes x = x.codes
 
   let eof = add_eof empty
-  let null = add_null empty
+  let delegate = add_delegate empty
   let of_vars x = add_vars x empty
   let of_codes x = add_codes x empty
 
   let add x t =
     match x with
-    | Symbol.Null -> add_null t
+    | Symbol.Delegate -> add_delegate t
     | Symbol.Eof -> add_eof t
     | Symbol.Var x -> add_vars (Vars.singleton x) t
     | Symbol.Code x -> add_codes (Codes.singleton x) t
+
+  let singleton x = 
+    add x empty
 
   let pp_if b pp ppf  =
     if b then Fmt.pf ppf "%a@ " pp else Fmt.nop ppf
@@ -318,20 +325,20 @@ module Symbols = struct
   let pp ppf x =
     Fmt.pf ppf "@[%a%a%a%a@]"
       (pp_if x.eof Fmt.string) pp_eof
-      (pp_if x.null Fmt.string) pp_null
+      (pp_if x.delegate Fmt.string) pp_delegate
       (pp_if (not @@ Vars.is_empty x.vars) Vars.pp) x.vars
       (pp_if (not @@ Codes.is_empty x.codes) Codes.pp) x.codes
 
-  (*let subset x y =
+  let subset x y =
     Bool.imp x.eof y.eof &&
-    Bool.imp x.null y.null &&
+    Bool.imp x.delegate y.delegate &&
     Vars.subset x.vars y.vars &&
     Codes.subset x.codes y.codes
 
   let union x y =
     {
       eof = x.eof || y.eof;
-      null = x.null || y.null;
+      delegate = x.delegate || y.delegate;
       vars = Vars.union x.vars y.vars;
       codes = Codes.union x.codes y.codes;
     }
@@ -339,7 +346,7 @@ module Symbols = struct
   let inter x y =
     {
       eof = x.eof && y.eof;
-      null = x.null && y.null;
+      delegate = x.delegate && y.delegate;
       vars = Vars.inter x.vars y.vars;
       codes = Codes.inter x.codes y.codes;
     }
@@ -347,10 +354,81 @@ module Symbols = struct
   let diff x y =
     {
       eof = not (Bool.imp x.eof y.eof);
-      null = not (Bool.imp x.null y.null);
+      delegate = not (Bool.imp x.delegate y.delegate);
       vars = Vars.diff x.vars y.vars;
       codes = Codes.diff x.codes y.codes;
-    }*)
+    }
+end
+
+module type SYMBOL_MULTIMAP_VALUES = sig
+  type t
+  val compare: t -> t -> int
+  val equal: t -> t -> bool
+
+  val empty: t
+  val union: t -> t -> t
+end
+
+module Symbols_multimap(Values: SYMBOL_MULTIMAP_VALUES) = struct
+  module Vars_multimap = Relation.Make(Var_to)(Vars)(Values)
+  module Codes_multimap = Refine.Map(Codes)(Values)
+
+  type key = Symbols.t
+  type values = Values.t
+  type t = {eof: Values.t; delegate: Values.t; vars: Vars_multimap.t; codes: Codes_multimap.t}
+  [@@deriving eq, ord]
+
+  let pp pp_values ppf x =
+    Fmt.pf ppf "@[@[%a@]@,@[%a@]@,@[%a@]@,@[%a@]@]"
+      pp_values x.eof
+      pp_values x.delegate
+      (Var_to.pp pp_values) x.vars
+      (Fmt.seq (Fmt.pair Codes.pp pp_values)) (Codes_multimap.partitions x.codes)
+
+  let empty =
+    {
+      eof = Values.empty;
+      delegate = Values.empty;
+      vars = Vars_multimap.empty;
+      codes = Codes_multimap.empty;
+    }
+
+  let add_multiple k vs t =
+    {
+      eof = if k.Symbols.eof then Values.union vs t.eof else t.eof;
+      delegate = if k.Symbols.delegate then Values.union vs t.delegate else t.delegate;
+      vars = Vars_multimap.add k.vars vs t.vars;
+      codes = Codes_multimap.add k.codes vs t.codes;
+    }
+
+  let singleton_multiple k vs = add_multiple k vs empty
+
+  let find_multiple k t =
+    let (<|>) = Values.union in
+    ((if k.Symbols.eof then t.eof else Values.empty)
+     <|> (if k.Symbols.delegate then t.delegate else Values.empty)
+     <|> Vars_multimap.find k.vars t.vars
+     <|> Codes_multimap.find k.codes t.codes)
+
+  let find_multiple_or_empty k t =
+      try find_multiple k t
+      with Not_found -> Values.empty
+
+  let union x y =
+    {
+      eof = Values.union x.eof y.eof;
+      delegate = Values.union x.delegate y.delegate;
+      vars = Vars_multimap.union x.vars y.vars;
+      codes = Codes_multimap.union x.codes y.codes;
+    }
+
+  let (<|>) = union
+
+  let add_seq_multiple s t =
+    Seq.fold_left (fun t (k, v) -> add_multiple k v t) t s
+
+  let of_seq_multiple s =
+    add_seq_multiple s empty
 end
 
 module Node = struct
@@ -365,5 +443,81 @@ module Node = struct
 
   let to_id x = Dot.(String (Fmt.str "%a" pp x))
 end
+module Nodes = struct
+  include Balanced_binary_tree.Set.Size(Node)
+  let pp = pp Node.pp
+end
 module Node_to = Balanced_binary_tree.Map.Size(Node)
 module Node_packed_forest = Packed_forest.Make(Node)(Vars)(Node_to)
+
+module Actions = struct
+  type t =
+    {
+      accept: bool;
+      shift: bool;
+      load: bool;
+      orders: Vars.t;
+      matches: Labeled_vars.t;
+      predictions: Vars.t;
+      null: Reductions.t;
+      reduce: Reductions.t;
+    }
+  [@@deriving eq, ord, show]
+
+  let union x y =
+    {
+      accept = x.accept || y.accept;
+      shift = x.shift || y.shift;
+      load = x.load || y.load;
+      orders = Vars.union x.orders y.orders;
+      matches = Labeled_vars.union x.matches y.matches;
+      predictions = Vars.union x.predictions y.predictions;
+      null = Reductions.union x.null y.null;
+      reduce = Reductions.union x.reduce y.reduce;
+    }
+
+  let empty =
+    {
+      accept = false;
+      shift = false;
+      load = false;
+      orders = Vars.empty;
+      matches = Labeled_vars.empty;
+      predictions = Vars.empty;
+      null = Reductions.empty;
+      reduce = Reductions.empty;
+    }
+
+  let is_empty x =
+    not x.accept &&
+    not x.shift &&
+    Vars.is_empty x.orders &&
+    Labeled_vars.is_empty x.matches &&
+    Vars.is_empty x.predictions &&
+    Reductions.is_empty x.null &&
+    Reductions.is_empty x.reduce
+
+  let accept =
+    {empty with accept = true}
+
+  let shift =
+    {empty with shift = true}
+
+  let load =
+    {empty with load = true}
+
+  let orders x =
+    {empty with orders = x}
+
+  let matches x =
+    {empty with matches = x}
+
+  let predictions x =
+    {empty with predictions = x}
+
+  let null x =
+    {empty with null = x}
+
+  let reduce x =
+    {empty with reduce = x}
+end
