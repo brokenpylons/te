@@ -44,16 +44,6 @@ module type EDGE_MAP = sig
   val union: (elt -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
 end
 
-module type KLEENE = sig
-  type t
-
-  val nothing: t 
-  val null: t
-  val union: t -> t -> t
-  val concat: t -> t -> t
-  val start: t
-end
-
 module type S = sig
   type vertex
   type 'vl labeled_vertex = (vertex * 'vl)
@@ -164,7 +154,7 @@ end
 
 module Make
     (Vertex: VERTEX)
-    (Vertex_map: VERTEX_MAP with type elt = Vertex.t) 
+    (Vertex_map: VERTEX_MAP with type elt = Vertex.t)
     (Edge_map: EDGE_MAP with type elt = Vertex.t): S with type vertex = Vertex.t = struct
   type vertex = Vertex.t
   type 'vl labeled_vertex = (vertex * 'vl)
@@ -173,12 +163,12 @@ module Make
   type ('vl, 'el) ctx = 'vl * 'el Edge_map.t
   type ('vl, 'el) t = (('vl, 'el) ctx) Vertex_map.t
 
-  let equal vl_eq el_eq x y = 
+  let equal vl_eq el_eq x y =
     Vertex_map.equal (fun (vl, adj1) (ul, adj2) ->
         vl_eq vl ul && Edge_map.equal el_eq adj1 adj2)
       x y
 
-  let compare cmp_vl cmp_el x y = 
+  let compare cmp_vl cmp_el x y =
     Vertex_map.compare (fun (vl, adj1) (ul, adj2) ->
         let c = cmp_vl vl ul in
         if c <> 0 then c
@@ -207,11 +197,11 @@ module Make
     Vertex_map.union (fun _ (vl1, adj1) (vl2, adj2) -> (merge_vertex_label vl1 vl2, Edge_map.union (fun _ -> merge_edge_label) adj1 adj2)) g1 g2
 
   let remove v g =
-    g 
+    g
     |> Vertex_map.remove v
     |> Vertex_map.map (fun _ (vl, adj) -> (vl, Edge_map.remove v adj))
 
-  let remove_edge v u g = 
+  let remove_edge v u g =
     Vertex_map.modify v (fun (vl, adj) -> (vl, Edge_map.remove u adj)) g
 
   let connect v u el g =
@@ -231,7 +221,7 @@ module Make
   let skeleton g =
     Vertex_map.map (fun _ (_, adj) -> ((), Edge_map.map (fun _ _ -> ()) adj)) g
 
-  let of_edges es = 
+  let of_edges es =
     empty
     |> (Fun.flip @@ Seq.fold_left (fun g v -> add v () g)) (Seq.append (Seq.map fst es) (Seq.map snd es))
     |> (Fun.flip @@ Seq.fold_left (fun g (v, u) -> connect v u () g)) es
@@ -323,13 +313,13 @@ module Make
         Dot.(node (Vertex.to_id v) ~attrs:[
             "xlabel" => String (Fmt.to_to_string Vertex.pp v);
             "label" => String (string_of_vertex_label l)
-          ])) 
-        lvs 
+          ]))
+        lvs
     in
     let edges = Seq.map (fun (v, u, l) ->
         Dot.(edge Directed (Vertex.to_id v) (Vertex.to_id u) ~attrs:[
             "label" => String (string_of_edge_label l)
-          ])) 
+          ]))
         les
     in
     Dot.((Digraph, "g", List.of_seq (Seq.append nodes edges)))
@@ -399,10 +389,10 @@ module Make
   let unfold ?(merge = Fun.const) f v start =
     let graph = ref empty in
 
-    let rec cycle v x = 
+    let rec cycle v x =
       if Vertex_map.mem v !graph
       then v
-      else 
+      else
         let (vl, adj) = f v x in
         graph := add v vl !graph;
         let adj = Seq.map (fun (el, v, x) -> (el, cycle v x)) adj in
@@ -411,20 +401,6 @@ module Make
     in
     let _ = cycle v start in
     !graph
-
-    (*let graph = ref empty in
-
-    let rec cycle v x = 
-      if Vertex_map.mem v !graph
-      then ()
-      else 
-        let (vl, adj) = f !graph v x in
-        graph := add v vl !graph;
-        Seq.iter (fun (el, u, _) -> graph := connect v u el !graph) adj;
-        Seq.iter (fun (_, u, x) -> cycle u x) adj;
-    in
-    cycle v start;
-    !graph*)
 
   let rec tie f g =
     let m = lazy begin
@@ -452,7 +428,7 @@ module Make
       let graph = ref empty in
       let index = ref (Index.make supply) in
 
-      let rec cycle x = 
+      let rec cycle x =
         match Index.update x !index with
         | `Old v -> v
         | `New (v, x, index') ->

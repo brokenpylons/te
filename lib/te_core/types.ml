@@ -301,6 +301,8 @@ module Symbols = struct
   let add_codes x t =
     {t with codes = x}
 
+  let is_eof x= x.eof
+  let is_delegate x= x.delegate
   let to_vars x = x.vars
   let to_codes x = x.codes
 

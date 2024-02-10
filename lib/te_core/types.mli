@@ -311,13 +311,7 @@ module Symbol_to: sig
 end
 
 module Symbols: sig
-  type t =
-    {
-      eof: bool;
-      delegate: bool;
-      vars: Vars.t;
-      codes: Codes.t
-    }
+  type t
 
   val pp: t Fmt.t
 
@@ -327,6 +321,9 @@ module Symbols: sig
 
   val to_vars: t -> Vars.t
   val to_codes: t -> Codes.t
+
+  val is_eof: t -> bool
+  val is_delegate: t -> bool
 
   val eof: t
   val delegate: t

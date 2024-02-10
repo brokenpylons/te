@@ -3,8 +3,12 @@ open! Prelude
 module T = Types
 module G = T.State_graph
 
+
+(* <LITS> *)
+
 let pp_if b pp ppf  =
   if b then Fmt.pf ppf "%a@ " pp else Fmt.nop ppf
+
 
 module Lits: sig
   type vars = T.Vars.t
@@ -121,13 +125,13 @@ end = struct
 
   let of_symbols (x: T.Symbols.t) =
     {
-      eof = x.eof;
-      null = x.delegate;
+      eof = T.Symbols.is_eof x;
+      null = T.Symbols.is_delegate x;
       scan = T.Vars.empty;
       call = T.Vars.empty;
       return = T.Vars.empty;
-      codes = x.codes;
-      vars = x.vars;
+      codes = T.Symbols.to_codes x;
+      vars = T.Symbols.to_vars x;
     }
 
   let comp x =
@@ -445,6 +449,8 @@ end = struct
     add_seq_multiple s empty
 end
 
+(* <LITS/> *)
+
 let refine xs =
   let module R' = Refine.Set(Lits) in
   let f = R'.refine xs in
@@ -488,41 +494,44 @@ end
 
 module Subset = M.Gen(T.State_index(Rhs_to))
 
-let is_nullable ps =
-  let ns' = T.Vars.of_seq @@ Seq.filter_map (fun p ->
-      if R.is_nullable (Production.rhs p)
-      then Some (T.Labeled_var.var @@ Production.lhs p)
-      else None)
-      ps
-  in
-  T.Vars.of_seq @@ Seq.filter_map (fun p ->
-      if R.is_nullable' (Lits.is_nullable (fun v -> T.Vars.mem v ns')) (Production.rhs p)
-      then Some (T.Labeled_var.var @@ Production.lhs p)
-      else None)
-    ps
-
 module Var_to_lits = Multimap.Make1(T.Var_to)(Lits)
 
-let update fs lss =
-  Seq.fold_left (fun acc ls ->
-      T.Vars.fold (fun v -> Lits.union (Var_to_lits.find_multiple_or ~default:Lits.empty v fs)) acc (Lits.to_vars ls))
-    Lits.empty lss
+module Not_needed1 = struct
+  let is_nullable ps =
+    let ns' = T.Vars.of_seq @@ Seq.filter_map (fun p ->
+        if R.is_nullable (Production.rhs p)
+        then Some (T.Labeled_var.var @@ Production.lhs p)
+        else None)
+        ps
+    in
+    T.Vars.of_seq @@ Seq.filter_map (fun p ->
+        if R.is_nullable' (Lits.is_nullable (fun v -> T.Vars.mem v ns')) (Production.rhs p)
+        then Some (T.Labeled_var.var @@ Production.lhs p)
+        else None)
+      ps
 
-let first n ps =
-  let init = Seq.fold_left (fun fs p ->
-      Var_to_lits.add_multiple (T.Labeled_var.var @@ Production.lhs p) (Seq.fold_left Lits.union Lits.empty @@ Rhs.first' n @@ Production.rhs p) fs)
-      Var_to_lits.empty ps
-  in
-  Fixedpoint.run ~eq:Var_to_lits.equal (fun fs ->
-      Seq.fold_left (fun fs p ->
-          Var_to_lits.add_multiple (T.Labeled_var.var @@ Production.lhs p) (update fs (Rhs.first' n @@ Production.rhs p)) fs)
-        fs ps)
-    init
 
-let productions ps =
-  let p = T.Var_to.of_seq @@ Seq.map (fun p -> (T.Labeled_var.var @@ Production.lhs p, Production.rhs p)) ps in
-  fun vs ->
-    T.Vars.fold (fun v -> R.union (T.Var_to.find v p)) R.nothing vs
+  let update fs lss =
+    Seq.fold_left (fun acc ls ->
+        T.Vars.fold (fun v -> Lits.union (Var_to_lits.find_multiple_or ~default:Lits.empty v fs)) acc (Lits.to_vars ls))
+      Lits.empty lss
+
+  let first n ps =
+    let init = Seq.fold_left (fun fs p ->
+        Var_to_lits.add_multiple (T.Labeled_var.var @@ Production.lhs p) (Seq.fold_left Lits.union Lits.empty @@ Rhs.first' n @@ Production.rhs p) fs)
+        Var_to_lits.empty ps
+    in
+    Fixedpoint.run ~eq:Var_to_lits.equal (fun fs ->
+        Seq.fold_left (fun fs p ->
+            Var_to_lits.add_multiple (T.Labeled_var.var @@ Production.lhs p) (update fs (Rhs.first' n @@ Production.rhs p)) fs)
+          fs ps)
+      init
+
+  let productions ps =
+    let p = T.Var_to.of_seq @@ Seq.map (fun p -> (T.Labeled_var.var @@ Production.lhs p, Production.rhs p)) ps in
+    fun vs ->
+      T.Vars.fold (fun v -> R.union (T.Var_to.find v p)) R.nothing vs
+end
 
 let label rhs is_start is_final is_dead lhs q =
   Items.singleton lhs Item_rhs.{state = q; tail = rhs; kernel = not is_start; dead = is_dead; reduce = is_final}
