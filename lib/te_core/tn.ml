@@ -9,7 +9,6 @@ module G = T.State_graph
 let pp_if b pp ppf  =
   if b then Fmt.pf ppf "%a@ " pp else Fmt.nop ppf
 
-
 module Lits: sig
   type vars = T.Vars.t
   type t =
@@ -38,6 +37,7 @@ module Lits: sig
   val call: T.Vars.t -> t
   val return: T.Vars.t -> t
   val scan: T.Vars.t -> t
+
   val var: T.Var.t -> t
   val vars: T.Vars.t -> t
   val code: T.Code.t -> t
@@ -261,8 +261,8 @@ module Lits_multimap(S: SET): MULTIMAP with type key = Lits.t and type values = 
   let find_multiple k t =
     let (<|>) = S.union in
     ((if k.Lits.eof then t.eof else S.empty)
-     <|> VS.find k.call t.call 
-     <|> VS.find k.return t.return 
+     <|> VS.find k.call t.call
+     <|> VS.find k.return t.return
      <|> (if k.null then t.null else S.empty)
      <|> VS.find k.vars t.vars
      <|> C.find k.codes t.codes)
@@ -1228,7 +1228,7 @@ module Items_nc = Multimap.Make1(T.State_to)(Items)
       (M.is_final_multiple from t, labels, next))
     (M.start_multiple t)*)
 
-let noncannonical token_lookahead t =
+(*let noncannonical token_lookahead t =
   M''.unfold (fun _ from ->
       let module R' = Refine.Map(Lits)(T.States) in
       let nc =
@@ -1264,7 +1264,7 @@ let noncannonical token_lookahead t =
       in
       let labels = T.States.fold (fun s -> Items_nc.add_multiple s (M.labels s t)) Items_nc.empty from in
       (M.is_final_multiple from t, labels, next))
-    (M.start_multiple t) (M.start_multiple t)
+    (M.start_multiple t) (M.start_multiple t)*)
 
 let add_backlinks right_nulled lookback t =
   M.{
