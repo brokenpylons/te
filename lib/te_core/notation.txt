@@ -1,0 +1,8 @@
+sym - Symbol
+s, p, q - State
+var - Variable
+v, u, w - Vertex
+its - Items
+lts - Lits
+prod - Production
+

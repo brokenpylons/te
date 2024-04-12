@@ -1,11 +1,11 @@
 open Te_bot
 open! Prelude
 
-let pp_eof = "💰"
-let pp_delegate = "☞"
+let eof_string = "💰"
+let delegate_string = "☞"
 
 module Code = struct
-  include Int 
+  include Int
   let to_id x = Dot.(Int x)
   let of_int = Fun.id
 
@@ -260,8 +260,8 @@ module Symbol = struct
   [@@deriving eq, ord]
 
   let pp ppf = function
-    | Eof -> Fmt.string ppf pp_eof
-    | Delegate -> Fmt.string ppf pp_delegate
+    | Eof -> Fmt.string ppf eof_string
+    | Delegate -> Fmt.string ppf delegate_string
     | Code x -> Code.pp ppf x
     | Var x -> Var.pp ppf x
 end
@@ -326,8 +326,8 @@ module Symbols = struct
 
   let pp ppf x =
     Fmt.pf ppf "@[%a%a%a%a@]"
-      (pp_if x.eof Fmt.string) pp_eof
-      (pp_if x.delegate Fmt.string) pp_delegate
+      (pp_if x.eof Fmt.string) eof_string
+      (pp_if x.delegate Fmt.string) delegate_string
       (pp_if (not @@ Vars.is_empty x.vars) Vars.pp) x.vars
       (pp_if (not @@ Codes.is_empty x.codes) Codes.pp) x.codes
 

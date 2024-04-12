@@ -24,6 +24,9 @@ let swap (x, y) = (y, x)
 
 let undefined = Obj.magic 0
 
+let pp_if b pp ppf  =
+  if b then Fmt.pf ppf "%a@ " pp else Fmt.nop ppf
+
 let rec until f x =
   match f x with 
   | Some y -> until f y

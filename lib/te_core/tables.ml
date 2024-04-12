@@ -26,7 +26,6 @@ module type ITEMS = sig
   (*val pp: t Fmt.t*)
   val to_seq: t -> item Seq.t
 
-  val is_dead: item -> bool
   val is_kernel: item -> bool
   val is_reduce: item -> bool
   val is_right_nulled: item -> bool
@@ -95,7 +94,7 @@ module Make(A: Fa.S0 with type state = T.States.t)(B: Fa.S0 with type state = T.
       else Actions_multimap.empty
     in
     let predictions =
-      if T.Vars.mem (T.Labeled_var.var @@ Items.output x) tokens && not (Items.is_dead x) && Items.is_kernel x then
+      if T.Vars.mem (T.Labeled_var.var @@ Items.output x) tokens && (*not (Items.is_dead x) &&*) Items.is_kernel x then
         Actions_multimap.singleton_multiple (Items.shift_lookahead x)
           (T.Actions.predictions (T.Vars.singleton (T.Labeled_var.var (Items.output x))))
       else Actions_multimap.empty

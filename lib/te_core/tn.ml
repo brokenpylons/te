@@ -4,7 +4,13 @@ module T = Types
 module G = T.State_graph
 
 
-(* <LITS> *)
+(* For the automaton in reverse, the nodes with distance != infty can be removed *)
+
+(* construct the enhanced productions as an intersection between the RTN and the powerset RTN for each nonterminal symbol, then the productions (N, extracted) are fed into the analysis, the nonterminal is obtained form the C_N transition *)
+
+(* TODO right nulled part is not added ATM *)
+(* OBSERVATION the tests don't conver that, the resulting SPPF also needs to be checked *)
+
 
 let pp_if b pp ppf  =
   if b then Fmt.pf ppf "%a@ " pp else Fmt.nop ppf
@@ -17,7 +23,7 @@ module Lits: sig
       call: T.Vars.t;
       return: T.Vars.t;
       scan: T.Vars.t;
-      null: bool; 
+      null: bool;
       vars: T.Vars.t;
       codes: T.Codes.t
     }
@@ -295,15 +301,13 @@ module Rhs = Re.Concrete(Lits)
 module Rhs_to = Balanced_binary_tree.Map.Size(Rhs)
 
 module Item_rhs = struct
-  type t = {state: T.State.t; tail: Rhs.t; kernel: bool; dead: bool; reduce: bool}
+  type t = {state: T.State.t; kernel: bool; reduce: bool}
   [@@deriving eq, ord]
 
   let pp ppf x =
-    Fmt.pf ppf "(@[%a %a %a %a %a@])"
+    Fmt.pf ppf "(@[%a %a %a])"
       T.State.pp x.state
-      Rhs.pp x.tail
       (pp_if x.kernel Fmt.string) "K"
-      (pp_if x.dead Fmt.string) "D"
       (pp_if x.reduce Fmt.string) "R"
 end
 module Item_rhss = Balanced_binary_tree.Set.Size(Item_rhs)
@@ -329,36 +333,6 @@ end
 type items = Items.t
 
 module Labels = Items
-
-(*struct
-  type t = Items.t
-
-  let pp ppf x =
-    Fmt.pf ppf "@[%a%a%a%a%a@]"
-      (pp_if (not @@ R.is_nothing x.tail) (fun ppf -> Fmt.pf ppf "%a" Rhs.pp)) x.tail
-      (pp_if (not @@ Items.is_empty x.items) (fun ppf -> Fmt.pf ppf "%a" Items.pp)) x.items
-      (pp_if (not @@ T.Labeled_vars.is_empty x.started) (fun ppf -> Fmt.pf ppf "S: %a" T.Labeled_vars.pp)) x.started
-      (pp_if (not @@ T.Labeled_vars.is_empty x.predictions) (fun ppf -> Fmt.pf ppf "P: %a" T.Labeled_vars.pp)) x.predictions
-      (pp_if (not @@ T.Labeled_vars.is_empty x.matches) (fun ppf -> Fmt.pf ppf "M: %a" T.Labeled_vars.pp)) x.matches
-
-  let empty =
-    {
-      items = Items.empty;
-      tail = R.nothing;
-      started = T.Labeled_vars.empty;
-      predictions = T.Labeled_vars.empty;
-      matches = T.Labeled_vars.empty;
-    }
-
-  let union x y =
-    {
-      items = Items.union x.items y.items;
-      tail = R.union x.tail y.tail;
-      started = T.Labeled_vars.union x.started y.started;
-      predictions = T.Labeled_vars.union x.predictions y.predictions;
-      matches = T.Labeled_vars.union x.matches y.matches;
-    }
-end*)
 
 module Enhanced_vars = Multimap.Make2(T.State_to)(T.Vars)
 
@@ -510,7 +484,6 @@ module Not_needed1 = struct
         else None)
       ps
 
-
   let update fs lss =
     Seq.fold_left (fun acc ls ->
         T.Vars.fold (fun v -> Lits.union (Var_to_lits.find_multiple_or ~default:Lits.empty v fs)) acc (Lits.to_vars ls))
@@ -533,8 +506,8 @@ module Not_needed1 = struct
       T.Vars.fold (fun v -> R.union (T.Var_to.find v p)) R.nothing vs
 end
 
-let label rhs is_start is_final is_dead lhs q =
-  Items.singleton lhs Item_rhs.{state = q; tail = rhs; kernel = not is_start; dead = is_dead; reduce = is_final}
+let label is_start is_final lhs q =
+  Items.singleton lhs Item_rhs.{state = q; kernel = not is_start; reduce = is_final}
 
 module Dist_rhs = struct
   type t = Size.t * Rhs.t
@@ -546,8 +519,7 @@ let convert ~supply (lhs, rhs') =
   let module Gen = M.Gen(T.State_index(Dist_rhs_to)) in
   (lhs, Gen.unfold ~supply ~merge:Lits.union (fun q (dist, rhs) ->
        let is_start = rhs == rhs'
-       and is_final = R.is_nullable rhs
-       and is_dead = R.is_nothing rhs in
+       and is_final = R.is_nullable rhs in
        let next = Seq.filter_map (fun ls ->
            let d = Rhs.simplify @@ Rhs.derivative ls rhs in
            if R.is_nothing d
@@ -555,7 +527,7 @@ let convert ~supply (lhs, rhs') =
            else Some (ls, ((if R.is_infinite d then Size.top else Size.succ dist), d)))
            (refine @@ Rhs.first rhs)
        in
-       (is_final, label rhs is_start is_final is_dead lhs q, next))
+       (is_final, label is_start is_final lhs q, next))
       (Size.zero, rhs'))
 
 let convert_multiple ~supply ps =
@@ -1054,7 +1026,8 @@ let strip ~supply t =
 
 module PG = T.State_pair_graph
 
-let inter m1 m2 =
+(* TODO Recover the tail in some other way *)
+(*let inter m1 m2 =
   let start = (M.start m1, M.start m2) in
   (start,
    PG.unfold (fun _ (from1, from2) ->
@@ -1071,7 +1044,7 @@ let inter m1 m2 =
        in
        let (_, rhs) = Items.the (M.labels from2 m2) in
        (rhs.Item_rhs.tail, Seq.(adj @ adj')))
-     start start)
+     start start)*)
 
 let backlog g =
   PG.labeled_edges_map (fun s _ ls ->
@@ -1444,7 +1417,6 @@ module Builder = struct
 
     type item = T.Labeled_var.t * Item_rhs'.t
     let output (lhs, _) = lhs
-    let is_dead (_, rhs) = rhs.Item_rhs'.base.dead
     let is_kernel (_, rhs) = rhs.Item_rhs'.base.kernel
     let is_reduce (_, rhs) = rhs.Item_rhs'.base.reduce
     let is_right_nulled (_, rhs) = rhs.Item_rhs'.right_nulled
@@ -1460,6 +1432,161 @@ module Builder = struct
     let state_pair (_, rhs) = rhs.Item_rhs'.state_pair
     let reminder (_, rhs) = rhs.Item_rhs'.reminder
   end
+
+  let [@warning "-21"] make' ~tokens start ps ds =
+    let supply1, supply2 = Supply.split2 T.State.supply in
+    let ps' = convert_multiple ~supply:supply1 ps in
+    let ds' = convert_multiple ~supply:supply2 ds in
+    let ps_to = T.Labeled_var_to.of_seq Seq.(ps' @ ds') in
+    let m = construct start Seq.(ps' @ ds') in
+    (*let m = extend m ~tokens ds' in *)
+    let m = M.homomorphism (fun lits -> if Lits.is_call lits && T.Vars.subset lits.call tokens then Lits.scan (lits.call) else lits) m in
+
+    Fmt.pr "%s@." @@
+    Dot.string_of_graph @@
+    M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Lits.pp x) m;
+
+    let m' = subset ~supply:(T.State.fresh_supply ()) m in
+
+    Fmt.pr "SUBSET %s@." @@
+    Dot.string_of_graph @@
+    M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Lits.pp x) m';
+
+    let to_start = to_start m' in
+    let eps = extract_multiple Seq.(ps' @ ds') to_start m' in
+
+    Seq.iter (fun ((q, lv), x) ->
+        Fmt.pr "(%a %a) %s@." T.State.pp q T.Labeled_var.pp lv @@
+        Dot.string_of_graph @@
+        M'.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Enhanced_lits.pp x) x)
+      eps;
+
+    Fmt.pr "LA@.";
+    let analysis = run_analysis eps in
+    let lb = lookback eps in
+    let la = lookahead' lb analysis in
+    let _nl = nullable analysis in
+    let fr = first' analysis in
+
+    (*let m' = add_backlinks (fun lhs s q -> (la lhs s q).right_nulled) lb m' in*)
+
+    Fmt.pr "DIST@.";
+    let dist = distance_multiple Seq.(ps' @ ds') in
+
+
+    Seq.iter (fun (lhs, rhs) ->
+        Fmt.pr "-- %a@." T.Labeled_var.pp lhs;
+        let d = T.Labeled_var_to.find lhs dist in
+        Fmt.pr "%s@." @@
+        Dot.string_of_graph @@
+        M.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Size.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Lits.pp x) (M.map_states_labels (fun s _ -> d s) rhs))
+      ps';
+
+    Fmt.pr "TOKEN LA@.";
+    let token_la = lookahead_tokens tokens la in
+
+    Fmt.pr "NC@.";
+    let nc = noncannonical2 token_la m' in
+    let nc = upgrade nc in
+
+    Fmt.pr "%s@." @@
+    Dot.string_of_graph @@
+    M''.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string (T.State_to.pp Items.pp) x) ~string_of_lits:(fun x -> Fmt.to_to_string Lits.pp x) nc;
+
+    Fmt.pr "NC@.";
+    let nc = M''.homomorphism (fun lits -> if Lits.is_scan lits then {lits with null = true; scan = T.Vars.empty} else lits) nc in
+
+    let nc = collapse' nc in
+
+    Fmt.pr "%s@." @@
+    Dot.string_of_graph @@
+    M''.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string (T.State_to.pp Items.pp) x) ~string_of_lits:(fun x -> Fmt.to_to_string Lits.pp x) nc;
+
+    let b = back ~is_token:(fun v -> T.Vars.mem v tokens) eps in
+    Fmt.pr "%s@." @@
+    Dot.string_of_graph @@
+    M'.to_dot ~string_of_labels:(fun x -> Fmt.to_to_string Labels.pp x) ~string_of_lits:(fun x -> Fmt.to_to_string Enhanced_lits.pp x) b;
+
+    let module ELM = Enhanced_lits_multimap(Enhanced_analysis.Nullable.Alg) in
+    let module LM = Lits_multimap(Enhanced_analysis.Nullable.Alg) in
+    let (lazy n) = analysis.nullable_per_lits in
+    let _nx = ELM.strip n in
+
+    let t = M''.map_states_labels (fun r nc_items ->
+        T.State_to.fold (fun s items acc ->
+            List.append acc @@
+            List.of_seq @@
+            (Items.to_seq items |> Seq.map (fun (lhs, rhs) ->
+                 (lhs,
+                  Item_rhs'.{
+                    base = rhs;
+                    next = Seq.fold_left Lits.union Lits.empty
+                      @@ Seq.map snd
+                      @@ M.adjacent rhs.Item_rhs.state
+                      @@ T.Labeled_var_to.find lhs ps_to;
+                    next_null = List.of_seq @@
+                      Seq.flat_map (fun (s, ls) ->
+                          if Lits.is_null ls then
+                            let nc_items = M''.labels s nc in
+                            T.State_to.to_seq nc_items |> Seq.flat_map (fun (s, items) ->
+                                Items.to_seq items |> Seq.filter_map (fun (lhs, rhs) ->
+                                    if not rhs.Item_rhs.kernel && rhs.Item_rhs.reduce then
+                                      Some (lhs, Enhanced_lits.strip @@ (la lhs s rhs.Item_rhs.state).reduce_lookahead)
+                                    else None))
+                          else Seq.empty)
+                        (M''.adjacent r nc);
+                    reminder =
+                      (*if not @@ T.Vars.mem (T.Labeled_var.var lhs) tokens && (la lhs s rhs.Item_rhs.state).right_nulled && not (R.is_nullable rhs.Item_rhs.tail) then begin
+                        let r = rhs.Item_rhs.tail in
+                        let r' = Rhs.simplify @@ R.flat_map (fun ls ->
+                            let vs =
+                              T.Vars.to_seq ls.Lits.vars
+                              |> Seq.filter (fun x -> LM.find_multiple_or_empty (Lits.var x) nx)
+                              |> T.Vars.of_seq
+                            in
+                            if T.Vars.is_empty vs then R.null else R.lits (Lits.of_vars vs))
+                            r
+                        in
+                        Fmt.pr "%a@." Rhs.pp r';
+                        r'
+                        |> R.to_seq ~cmp:T.Var.compare (fun ls -> T.Vars.to_seq ls.Lits.vars)
+                        |> Seq.map List.of_seq
+                        |> List.of_seq end
+                      else*)
+                        [[]];
+                    right_nulled = (la lhs s rhs.Item_rhs.state).right_nulled;
+                    first =
+                      Var_to_lits.of_seq_multiple
+                      @@ Seq.flat_map (fun (_, el) ->
+                          T.Vars.to_seq el.Lits.vars
+                          |> Seq.map (fun v -> (v, Enhanced_lits.strip @@ fr s (Lits.var v))))
+                      @@ M.adjacent rhs.Item_rhs.state
+                      @@ T.Labeled_var_to.find lhs ps_to;
+                    shift_code =
+                      if T.Vars.mem (T.Labeled_var.var lhs) tokens
+                      then Lits.empty
+                      else
+                        (la lhs s rhs.Item_rhs.state).shift_lookahead
+                        |> Enhanced_lits.to_seq
+                        |> Seq.map (fun (q, ls) ->
+                            if (not (T.Codes.is_empty ls.Lits.codes)) || ls.Lits.eof
+                            then
+                              let is = M.labels q m' in
+                              (if Seq.exists (fun (lhs, _) -> not @@ T.Vars.mem (T.Labeled_var.var lhs) tokens) (Items.to_seq is) then
+                                Lits.union (Lits.codes ls.Lits.codes) (if ls.Lits.eof then Lits.eof else Lits.empty)
+                              else 
+                                Lits.empty)
+                            else Lits.empty)
+                        |> (Seq.fold_left Lits.union Lits.empty);
+                    shift_lookahead = Enhanced_lits.strip @@ (la lhs s rhs.Item_rhs.state).shift_lookahead;
+                    reduce_lookahead = Enhanced_lits.strip @@ (la lhs s rhs.Item_rhs.state).reduce_lookahead;
+                    distance = (T.Labeled_var_to.find lhs dist) rhs.Item_rhs.state;
+                    state_pair = (s, rhs.Item_rhs.state)
+                  }))))
+          [] nc_items)
+        nc
+    in
+    (b, t)
 
   let [@warning "-21"] make ~tokens start ps ds =
     (*let supply1, supply2 = Supply.split2 T.State.supply in
@@ -1679,7 +1806,7 @@ module Builder = struct
     let module ELM = Enhanced_lits_multimap(Enhanced_analysis.Nullable.Alg) in
     let module LM = Lits_multimap(Enhanced_analysis.Nullable.Alg) in
     let (lazy n) = analysis.nullable_per_lits in
-    let nx = ELM.strip n in
+    let _nx = ELM.strip n in
 
     let t = M''.map_states_labels (fun r nc_items ->
         T.State_to.fold (fun s items acc ->
@@ -1705,7 +1832,7 @@ module Builder = struct
                           else Seq.empty)
                         (M''.adjacent r nc);
                     reminder =
-                      if not @@ T.Vars.mem (T.Labeled_var.var lhs) tokens && (la lhs s rhs.Item_rhs.state).right_nulled && not (R.is_nullable rhs.Item_rhs.tail) then begin
+                      (*if not @@ T.Vars.mem (T.Labeled_var.var lhs) tokens && (la lhs s rhs.Item_rhs.state).right_nulled && not (R.is_nullable rhs.Item_rhs.tail) then begin
                         let r = rhs.Item_rhs.tail in
                         let r' = Rhs.simplify @@ R.flat_map (fun ls ->
                             let vs =
@@ -1721,7 +1848,7 @@ module Builder = struct
                         |> R.to_seq ~cmp:T.Var.compare (fun ls -> T.Vars.to_seq ls.Lits.vars)
                         |> Seq.map List.of_seq
                         |> List.of_seq end
-                      else
+                      else*)
                         [[]];
                     right_nulled = (la lhs s rhs.Item_rhs.state).right_nulled;
                     first =

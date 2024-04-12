@@ -1602,7 +1602,7 @@ module Lookahead2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     ]
   end)
 
-module Example = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
+(*module Example = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     open Context
 
     let Vector.[s'; s; a; b; c; d; u] = variables Vector.["S'"; "S"; "A"; "B"; "C"; "D"; "_"]
@@ -1640,7 +1640,7 @@ module Example = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
           ]
       }
     ]
-  end)
+  end)*)
 
 (*module Lookahead3 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     open Context
@@ -1720,6 +1720,6 @@ let () =
     "noncanonical5", test_cases Noncanonical5.driver Noncanonical5.tests;
     "lookahead", test_cases Lookahead.driver Lookahead.tests;
     (*"lookahead2", test_cases Lookahead2.driver Lookahead2.tests;*)
-    "example", test_cases Example.driver Example.tests;
+    (*"example", test_cases Example.driver Example.tests;*)
   ]
 

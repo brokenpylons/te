@@ -1,5 +1,8 @@
 open Te_bot
 
+val eof_string: string
+val delegate_string: string
+
 module Code: sig
   type t
   val compare: t -> t -> int

@@ -77,7 +77,6 @@ module type CONCRETE = sig
   val first': (t -> bool) -> t -> lits Seq.t
   val first: t -> lits Seq.t
   val simplify: t -> t
-
 end
 
 module Concrete(Lits: LITS): CONCRETE with type lits = Lits.t
