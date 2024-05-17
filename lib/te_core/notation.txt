@@ -6,3 +6,5 @@ its - Items
 lts - Lits
 prod - Production
 
+M - map
+A - automaton

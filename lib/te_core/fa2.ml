@@ -38,6 +38,7 @@ module type S = sig
   val start: (Start.single, _, _) t -> state
   val start_multiple: _ t -> states
   val labels: state -> ('a, 'labels, 'lits) t -> 'labels
+  val transitions: (_, _, 'lits) t -> (state * state * 'lits) Seq.t
   val adjacent: state -> (_, _, 'lits) t -> (state * 'lits) Seq.t
   val adjacent_multiple: states -> (_, _, 'lits) t -> (state * 'lits) Seq.t
   val goto: state -> ('lits -> bool) -> ('a, 'labels, 'lits) t -> states
@@ -45,6 +46,19 @@ module type S = sig
   val unfold:
     ?merge: ('lits -> 'lits -> 'lits) ->
     (state -> 'seed -> 'labels * ('lits * state * 'seed) Seq.t) -> state -> 'seed -> (Start.single, 'labels, 'lits) t
+
+  val digraph: (state -> 'labels -> 'seed) ->
+    ('seed -> 'labels -> ('lits * (unit -> 'seed)) Seq.t -> 'seed) ->
+    (Start.single, 'labels, 'lits) t ->
+    (state -> 'seed)
+
+  val dijkstra: (state -> 'labels -> 'seed) ->
+    ('seed -> 'labels -> ('lits * (unit -> 'seed)) Seq.t -> 'seed) ->
+    (Start.single, 'labels, 'lits) t ->
+    (state -> 'seed)
+
+
+  val tail: state -> (Start.single, 'labels, 'lits) t -> (Start.single, 'labels, 'lits) t
 
   module type INDEX = sig
     type t
@@ -58,7 +72,7 @@ module type S = sig
     val unfold: supply:(state Supply.t) -> ?merge:('lits -> 'lits -> 'lits) -> (state -> Index.elt ->  'labels * ('lits * Index.elt) Seq.t) -> Index.elt -> (Start.single, 'labels, 'lits) t
   end
 
-  val to_dot: string_of_labels:('labels -> string) -> string_of_alphabet:('lits -> string) -> (_, 'labels, 'lits) t -> Dot.graph
+  val to_dot: string_of_labels:('labels -> string) -> string_of_lits:('lits -> string) -> (_, 'labels, 'lits) t -> Dot.graph
 end
 
 module Make(State: STATE)(States: STATES with type elt = State.t)(G: Graph.S with type vertex = State.t): S with type state = State.t and type states = States.t = struct
@@ -105,19 +119,22 @@ module Make(State: STATE)(States: STATES with type elt = State.t)(G: Graph.S wit
     | Single start -> States.singleton start
     | Multiple start -> start
 
+  let transitions a =
+    G.labeled_edges a.graph
+
   let adjacent q a =
     G.adjacent q a.graph
 
-  let labels q m =
-    G.vertex_label q m.graph
+  let labels q a =
+    G.vertex_label q a.graph
 
-  let goto from f m =
-    adjacent from m
+  let goto from f a =
+    adjacent from a
     |> Seq.filter_map (fun (to_, ls) -> if f ls then Some to_ else None)
     |> States.of_seq
 
-  let adjacent_multiple qs m =
-    Seq.flat_map (Fun.flip adjacent m) @@ States.to_seq qs
+  let adjacent_multiple qs a =
+    Seq.flat_map (Fun.flip adjacent a) @@ States.to_seq qs
 
   let unfold ?merge f q start =
     let graph = G.unfold ?merge f q start in
@@ -125,6 +142,15 @@ module Make(State: STATE)(States: STATES with type elt = State.t)(G: Graph.S wit
       start = Single q;
       graph
     }
+
+  let tail q a =
+    {a with start = Single q}
+
+  let digraph seed f a =
+    G.digraph seed f a.graph
+
+  let dijkstra seed f a =
+    G.dijkstra seed f a.graph
 
   module type INDEX = sig
     type t
@@ -151,7 +177,8 @@ module Make(State: STATE)(States: STATES with type elt = State.t)(G: Graph.S wit
       }
   end
 
-  let to_dot ~string_of_labels ~string_of_alphabet a =
+
+  let to_dot ~string_of_labels ~string_of_lits a =
     let node q lbls = Dot.(node (State.to_id q) ~attrs:[
         "label" => String (Fmt.to_to_string State.pp q);
         "xlabel" => String lbls
@@ -174,7 +201,7 @@ module Make(State: STATE)(States: STATES with type elt = State.t)(G: Graph.S wit
         (G.labeled_vertices a.graph)
     in
     let edges = Seq.map (fun (s, q, syms) ->
-        edge s q (string_of_alphabet syms))
+        edge s q (string_of_lits syms))
         (G.labeled_edges a.graph)
     in
     Dot.(Digraph, "g", List.of_seq @@ Seq.(nodes @ edges @ start_node @ start_edges))

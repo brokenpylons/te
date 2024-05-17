@@ -93,7 +93,10 @@ module type S2 = sig
   val diff: t -> t -> t
 
   include Set.SEQUENTIAL with type t := t and type elt := elt
-  module Set: SET2 with type t = t and type elt = elt
+  module Set: sig
+    include SET2 with type t = t and type elt = elt
+    val empty: t
+  end
 end
 
 module Make2(M: MAP)(S: SET2): S2 with type t = S.t M.t and type key = M.elt and type value = S.elt and type values = S.t

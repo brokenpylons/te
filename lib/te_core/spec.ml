@@ -101,6 +101,36 @@ module Build(Spec: SPEC') = struct
   end
 end
 
+module Build_new(Spec: SPEC') = struct
+  module Spec' = Spec(Context)
+  module X = Gsglr.Make(Tables.V1.Unoptimized)
+
+  let convert x =
+    List.to_seq x
+    |> Seq.map (fun p -> Tn2.Production.{
+        lhs = Context.Production.lhs p;
+        rhs = Re.Abstract.map Tn2.Lits.of_symbols (Context.Production.rhs p);
+      })
+
+  let build () =
+    let tokens = T.Vars.of_list Spec'.lexical in
+
+    let c = Tn2.construct ~supply:(T.State.fresh_supply ()) Spec'.start tokens (Tn2.index_productions (Seq.append (convert Spec'.parser) (convert Spec'.scanner))) in
+    let d = Tn2.collapse ~supply:(T.State.fresh_supply ()) c in
+    let p = Tn2.subset ~supply:(T.State.fresh_supply ()) d in
+    Fmt.pr "%s"  (Dot.string_of_graph (Tn2.to_dot' p));
+    let e = Tn2.enhance p d in
+    Fmt.pr "%s"  (Dot.string_of_graph (Tn2.to_dot'' e));
+    Tn2.to_enhanced_productions e
+
+    (*Tn.Builder.make' ~tokens Spec'.start (convert Spec'.parser) (convert Spec'.scanner)*)
+
+  module Run = struct
+    let code s = T.Symbol.Code (T.Codes.the @@ T.Codes.of_string s)
+    let eof = T.Symbol.Eof
+  end
+end
+
 module Test(Spec: SPEC) = struct
   module Spec' = Spec(Context)
   module X = Gsglr.Make(Tables.V1.Unoptimized)
