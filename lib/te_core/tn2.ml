@@ -6,6 +6,15 @@ module T = Types
    NOTE: The C_A and S_A transitions correspond to productions
 *)
 
+(*
+   NOTE: There is a mapping between multiple production per nonterminal grammar and single production per nonterminal grammar.
+   We basically do the conversion before.
+*)
+
+(*
+   NOTE: Predict arises naturaly from LR automaton, the LHS of items is the predict symbol.
+*)
+
 module Lits: sig
   type vars = T.Vars.t
   type t =
@@ -278,12 +287,14 @@ end = struct
   type t = T.State.t * T.Var.t
   [@@deriving ord]
 
-  let strip (_, v) = v
+  let strip (_, var) = var
 
   let pp = Fmt.pair T.State.pp T.Var.pp
 
   (*let to_vars ((q, v): t) = Enhanced_vars.singleton q (T.Labeled_var.var v)*)
 end
+
+module Enhanced_var_to = Balanced_binary_tree.Map.Size(Enhanced_var)
 
 module Enhanced_vars = Multimap.Make2(T.State_to)(T.Vars)
 
@@ -427,6 +438,28 @@ module Production_index = Multimap.Make2(T.Var_to)(Productions)
 module Items = struct
   include Balanced_binary_tree.Set.Size(Item)
   let pp = pp Item.pp
+
+  let is_reduce its =
+    exists (fun it -> it.is_reduce) its
+end
+
+module Var_state = struct
+  type t = T.Var.t * T.State.t
+  [@@deriving eq, ord]
+end
+module Var_state_to = Balanced_binary_tree.Map.Size(Var_state)
+
+(* Group by state *)
+module CollapsedItem = struct
+  module Part = struct
+    type t = {label: T.Var.t; state: T.State.t; is_kernel: bool; is_reduce: bool; distance: Size.t}
+    [@@deriving eq, ord]
+  end
+  module Parts = Balanced_binary_tree.Set.Size(Part)
+  include Multimap.Make2(Var_state_to)(Parts)
+
+  let is_reduce its =
+    fold (fun _ part acc -> acc || part.is_reduce) false its
 end
 
 module A = struct
@@ -438,7 +471,7 @@ module PA = struct
 end
 
 module Enhanced_production = struct
-  type 'a t = {lhs: Enhanced_var.t; rhs: (PA.Start.single, 'a, Enhanced_lits.t) PA.t}
+  type t = {lhs: Enhanced_var.t; rhs: (PA.Start.single, CollapsedItem.t * CollapsedItem.t, Enhanced_lits.t) PA.t}
 end
 
 let to_dot a = A.to_dot ~string_of_labels:(Fmt.to_to_string Item.pp) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
@@ -501,36 +534,56 @@ let construct ~supply start lexical prods =
          })
         (Productions.to_seq @@ Production_index.find_multiple start prods))
 
-let collapse ~supply t =
+let collapse_items qs a =
+  Seq.fold_left (fun acc q ->
+      let it = A.labels q a in
+      let (label, var) = it.Item.lhs in
+      CollapsedItem.add (var, q)
+        CollapsedItem.Part.{
+          label;
+          state = it.rhs;
+          is_kernel = it.is_kernel;
+          is_reduce = it.is_reduce;
+          distance = it.distance;
+        }
+        acc)
+    CollapsedItem.empty (T.States.to_seq qs)
+
+let subset_items qs a =
+  T.States.to_seq qs
+  |> Seq.map (fun q -> A.labels q a)
+  |> Seq.fold_left CollapsedItem.union CollapsedItem.empty
+
+let collapse ~supply a =
   let module Gen = A.Gen(T.State_index(T.States_to)) in
   Gen.unfold ~supply ~merge:Lits.union (fun _ from ->
       let module R = Refine.Map(Lits)(T.States) in
       let next =
-        A.adjacent_multiple from t
+        A.adjacent_multiple from a
         |> Seq.map (fun (s, lts) -> (lts, T.States.singleton s))
         |> R.refine
         |> R.partitions
       in
-      (from, next))
-    (A.start_multiple t)
+      (collapse_items from a, next))
+    (A.start_multiple a)
 
-let closure t qs =
+let closure a qs =
   let module C = Closure.Make(T.States) in
-  C.closure (fun q -> A.goto q Lits.is_call t) qs
+  C.closure (fun q -> A.goto q Lits.is_call a) qs
 
-let subset ~supply t =
+let subset ~supply a =
   let module Gen = A.Gen(T.State_index(T.States_to)) in
   Gen.unfold ~supply ~merge:Lits.union (fun _ from ->
       let module R = Refine.Map(Lits)(T.States) in
-      let from = closure t from in
+      let from = closure a from in
       let next =
-        A.adjacent_multiple from t
+        A.adjacent_multiple from a
         |> Seq.filter_map (fun (s, lts) -> if Lits.is_call lts then None else Some (lts, T.States.singleton s))
         |> R.refine
         |> R.partitions
       in
-      (from, next))
-    (closure t @@ A.start_multiple t)
+      (subset_items from a, next))
+    (closure a @@ A.start_multiple a)
 
 let enhance sa ca =
   let start = (A.start sa, A.start ca) in
@@ -577,7 +630,6 @@ let extract a =
       ((), next))
     (PA.start a) (PA.start a)
 
-
 module Bool_set = struct
   type t = bool
   [@@deriving eq, ord]
@@ -587,78 +639,228 @@ module Bool_set = struct
 end
 
 module Analysis = struct
-
-  module Abstract(M: MULTIMAP with type key = Enhanced_lits.t)(X: sig
-      val start: _ -> _ -> M.values
-      val next: M.t -> M.values -> _ -> (Enhanced_lits.t * (unit -> M.values)) Seq.t -> M.values
-    end) = struct
-
-    let compute_single_source _ rhs self =
-      A.dijkstra X.start (X.next self) rhs
-
-    let compute_multi_source _ rhs self =
-      A.digraph X.start (X.next self) rhs
-
-    let per_state ps self =
-      Seq.map (fun (lhs, rhs) -> (lhs,
-          (* factor out *)
-                                  compute_multi_source lhs rhs self
-
-                                 )) ps
-          (*/ factor out *)
-
-    let update ps self =
-      Seq.fold_left (fun acc (lhs, rhs) ->
-          (* factor out *)
-
-          M.add_multiple (Enhanced_lits.of_vars @@ uncurry Enhanced_vars.singleton @@ lhs) (compute_single_source lhs rhs self (A.start rhs)) acc)
-          (* / factor out *)
-        self ps
-
-    let per_lits ps self =
-      Fixedpoint.run ~eq:M.equal (update ps) self
-  end
-
   module NM = Enhanced_lits_multimap(Bool_set)
+  module EM = Enhanced_lits_multimap(Enhanced_lits)
+
   module Nullable = struct
 
+    let start _ label =
+      let (its, _) = label in
+      CollapsedItem.is_reduce its
 
+    let next self current _ adj =
+      Seq.fold_left (fun acc (lts, visit) -> NM.find_multiple_or_empty lts self && visit () || acc)
+        current adj
+
+    let compute_single_source rhs self =
+      PA.dijkstra start (next self) rhs
+
+    let compute_multi_source rhs self =
+      PA.digraph start (next self) rhs
+
+    let per_state prods self =
+      prods
+      |> Seq.map (fun Enhanced_production.{lhs; rhs} -> (lhs, compute_multi_source rhs self))
+      |> Enhanced_var_to.of_seq
+
+    let update prods self =
+      Seq.fold_left (fun acc Enhanced_production.{lhs; rhs} ->
+          NM.add_multiple (Enhanced_lits.of_vars @@ uncurry Enhanced_vars.singleton lhs)
+            (compute_single_source rhs self (PA.start rhs)) acc)
+        self prods
+
+    let per_lits prods self =
+      Fixedpoint.run ~eq:NM.equal (update prods) self
   end
 
+  module First = struct
 
-    Abstract(NM)(struct
-      let start _ _ = Bool_set.empty
+    let start _ _ =
+      Enhanced_lits.empty
 
-      let next self current _ adj =
-        Seq.fold_left (fun acc (x, visit) -> NM.find_multiple_or_empty x self && visit () || acc)
-          current adj
-    end)
+    let next nullable_per_lits self current _ adj =
+      Seq.fold_left (fun acc (lts, visit) ->
+          let (<|>) = Enhanced_lits.union in
+          EM.find_multiple_or_empty lts self <|> acc <|> if nullable_per_lits lts then visit () else Enhanced_lits.empty)
+        current adj
 
-  module FM = Enhanced_lits_multimap(Enhanced_lits)
+    let compute_single_source rhs nullable_per_lits self =
+      PA.dijkstra start (next nullable_per_lits self) rhs
 
-  module First = Abstract(FM)(struct
-        let start _ _ =
-          Enhanced_lits.empty
+    let compute_multi_source rhs nullable_per_lits self =
+      PA.digraph start (next nullable_per_lits self) rhs
 
-        let next self current _ adj =
-          Seq.fold_left (fun acc (x, visit) ->
-              let (<|>) = Enhanced_lits.union in
-              FM.find_multiple_or_empty x self <|> acc <|> if nullable x then visit () else Enhanced_lits.empty)
-            current adj
-      end)
+    let per_state prods nullable_per_lits self =
+      prods
+      |> Seq.map (fun Enhanced_production.{lhs; rhs} -> (lhs, compute_multi_source rhs nullable_per_lits self))
+      |> Enhanced_var_to.of_seq
 
+    let update prods nullable_per_lits self =
+      Seq.fold_left (fun acc Enhanced_production.{lhs; rhs} ->
+          EM.add_multiple (Enhanced_lits.of_vars @@ uncurry Enhanced_vars.singleton lhs)
+            (compute_single_source rhs nullable_per_lits self (PA.start rhs)) acc)
+        self prods
+
+    let per_lits prods nullable_per_lits self =
+      Fixedpoint.run ~eq:EM.equal (update prods nullable_per_lits) self
+  end
+
+  module Follow = struct
+
+    let compute lhs nullable_per_state first_per_state self q =
+      let (<|>) = Enhanced_lits.union in
+      first_per_state lhs q <|> if nullable_per_state lhs q then EM.find_multiple_or_empty (Enhanced_lits.of_vars @@ uncurry Enhanced_vars.singleton lhs) self else Enhanced_lits.empty
+
+    let per_state prods nullable_per_state first_per_state self =
+      prods
+      |> Seq.map (fun Enhanced_production.{lhs; _} -> (lhs, compute lhs nullable_per_state first_per_state self))
+      |> Enhanced_var_to.of_seq
+
+    let update prods nullable_per_state first_per_state self =
+      Seq.fold_left (fun acc Enhanced_production.{lhs; rhs} ->
+          Seq.fold_left (fun acc (_, q, lts) ->
+              EM.add_multiple lts (compute lhs nullable_per_state first_per_state self q) acc)
+            acc (PA.transitions rhs))
+        self prods
+
+    let per_lits prods nullable_per_state first_per_state self =
+      Fixedpoint.run ~eq:EM.equal (update prods nullable_per_state first_per_state) self
+  end
 
   type t =
     {
       nullable_per_lits: Enhanced_lits.t -> bool;
-      nullable_per_state: Enhanced_var.t -> A.state -> bool;
-      (*first_per_lits: Enhanced_lits.t -> Enhanced_lits.t;
-      first_per_state: Enhanced_var.t -> A.state -> Enhanced_lits.t;
+      nullable_per_state: Enhanced_var.t -> PA.state -> bool;
+      first_per_lits: Enhanced_lits.t -> Enhanced_lits.t;
+      first_per_state: Enhanced_var.t -> PA.state -> Enhanced_lits.t;
       follow_per_lits: Enhanced_lits.t -> Enhanced_lits.t;
-        follow_per_state: Enhanced_var.t -> A.state -> Enhanced_lits.t;*)
+      follow_per_state: Enhanced_var.t -> PA.state -> Enhanced_lits.t;
+    }
+
+  let symbols prods =
+    prods
+    |> Seq.flat_map (fun (lhs, rhs) ->
+        Seq.cons (Enhanced_lits.of_vars @@ uncurry Enhanced_vars.singleton lhs) (PA.alphabet rhs))
+    |> Seq.fold_left Enhanced_lits.union Enhanced_lits.empty
+
+  let compute (prods: Enhanced_production.t Seq.t) =
+    let nullable_per_lits = Nullable.per_lits prods NM.empty in
+    let nullable_per_state = Nullable.per_state prods nullable_per_lits in
+    let first_per_lits = First.per_lits prods
+        (fun lts -> NM.find_multiple_or_empty lts nullable_per_lits)
+        EM.empty
+    in
+    let first_per_state = First.per_state prods
+        (fun lts -> NM.find_multiple_or_empty lts nullable_per_lits)
+        first_per_lits
+    in
+    let follow_per_lits = Follow.per_lits prods
+        (fun lts -> Enhanced_var_to.find lts nullable_per_state)
+        (fun lts -> Enhanced_var_to.find lts first_per_state)
+        EM.empty
+    in
+    let follow_per_state = Follow.per_state prods
+        (fun lts -> Enhanced_var_to.find lts nullable_per_state)
+        (fun lts -> Enhanced_var_to.find lts first_per_state)
+        follow_per_lits
+    in
+    {
+      nullable_per_lits = (fun lts -> NM.find_multiple_or_empty lts nullable_per_lits);
+      nullable_per_state = (fun lts -> Enhanced_var_to.find lts nullable_per_state);
+      first_per_lits = (fun lts -> EM.find_multiple_or_empty lts first_per_lits);
+      first_per_state = (fun lts -> Enhanced_var_to.find lts first_per_state);
+      follow_per_lits = (fun lts -> EM.find_multiple_or_empty lts follow_per_lits);
+      follow_per_state = (fun lts -> Enhanced_var_to.find lts follow_per_state);
     }
 end
 
+module Lookback = struct
+  type t = Enhanced_production.t list T.Var_to.t
+
+  let of_seq prods =
+    Seq.fold_left (fun acc Enhanced_production.{lhs = (t, var); rhs} ->
+        T.Var_to.add var ((t, rhs) :: try T.Var_to.find var acc with Not_found -> []) acc)
+      T.Var_to.empty prods
+
+  let find var s q lookback =
+    T.Var_to.find var lookback
+    |> List.filter_map (fun (t, rhs) ->
+        if PA.state_mem (s, q) rhs
+        then Some (t, var)
+        else None)
+end
+
+module Lookahead = struct
+  type t =
+    {
+      right_nulled: bool;
+      shift_lookahead: Enhanced_lits.t;
+      reduce_lookahead: Enhanced_lits.t;
+      lexical_lookahead: Enhanced_lits.t;
+    }
+
+  let compute analysis lookback lexical var s q =
+    let lhss = Lookback.find var s q lookback in
+    let right_nulled =
+      List.exists (fun lhs -> analysis.Analysis.nullable_per_state lhs (s, q)) lhss
+    in
+    let shift_lookahead =
+      lhss
+      |> List.map (fun lhs -> analysis.Analysis.follow_per_state lhs (s, q))
+      |> List.fold_left Enhanced_lits.union Enhanced_lits.empty
+    in
+    let reduce_lookahead =
+      lhss
+      |> List.filter_map (fun lhs ->
+          if analysis.Analysis.nullable_per_state lhs (s, q)
+          then Some (analysis.Analysis.follow_per_lits (Enhanced_lits.of_vars @@ uncurry Enhanced_vars.singleton lhs))
+          else None)
+      |> List.fold_left Enhanced_lits.union Enhanced_lits.empty
+    in
+    let lexical_lookahead =
+      let lexical_lits = Lits.of_vars lexical in
+      Enhanced_lits.union shift_lookahead reduce_lookahead
+      |> Enhanced_lits.fold (fun s lts ->
+          Enhanced_lits.union @@ Enhanced_lits.make s (Lits.inter lts lexical_lits))
+        Enhanced_lits.empty
+    in
+    {right_nulled; shift_lookahead; reduce_lookahead; lexical_lookahead}
+end
+
+let noncannonical lookahead a =
+  let module Gen = A.Gen(T.State_index(T.States_to)) in
+  Gen.unfold (fun _ from ->
+      let module R' = Refine.Map(Lits)(T.States) in
+      let nc =
+        T.States.to_seq from
+        |> Seq.flat_map (fun s ->
+            A.labels s a
+            |> T.States.to_seq
+            |> Seq.map (fun (lhs, rhs) -> token_lookahead lhs s (rhs.Item_rhs.state)))
+        |> Seq.fold_left Enhanced_lits.union Enhanced_lits.empty
+      in
+      let nc' = Enhanced_lits.to_seq nc
+                |> Seq.flat_map (fun (s, ls) ->
+                    let ls = Lits.vars ls.Lits.vars in
+                    (Seq.flat_map (fun (_, ls') ->
+                         if Lits.subset ls' ls then
+                           (*Seq.append*) (* XXX: for infinite lookahead version *)
+                             (Seq.map (fun (q, ls'') ->
+                                   (q, Lits.scan (ls''.Lits.scan)))
+                                 (A.adjacent s a))
+                             (*(Seq.return (p, ls'))*)
+                         else Seq.empty)
+                        (A.adjacent s a)))
+      in
+      let next =
+        Seq.append (A.adjacent_multiple from a) nc'
+        |> Seq.map (fun (s, ls) -> (ls, T.States.singleton s))
+        |> R'.refine
+        |> R'.partitions
+        |> Seq.map (fun (ls, ss) -> (ls, ss, ss))
+      in
+      (labels_multiple from a, next))
+    (A.start_multiple a)
 
 let print_productions prods =
   Seq.iter (fun prod ->

@@ -37,7 +37,9 @@ module type S = sig
 
   val start: (Start.single, _, _) t -> state
   val start_multiple: _ t -> states
-  val labels: state -> ('a, 'labels, 'lits) t -> 'labels
+  val state_mem: state -> _ t -> bool
+  val labels: state -> (_, 'labels, 'lits) t -> 'labels
+  val alphabet: (_, _, 'lits) t -> 'lits Seq.t
   val transitions: (_, _, 'lits) t -> (state * state * 'lits) Seq.t
   val adjacent: state -> (_, _, 'lits) t -> (state * 'lits) Seq.t
   val adjacent_multiple: states -> (_, _, 'lits) t -> (state * 'lits) Seq.t
@@ -56,7 +58,6 @@ module type S = sig
     ('seed -> 'labels -> ('lits * (unit -> 'seed)) Seq.t -> 'seed) ->
     (Start.single, 'labels, 'lits) t ->
     (state -> 'seed)
-
 
   val tail: state -> (Start.single, 'labels, 'lits) t -> (Start.single, 'labels, 'lits) t
 
@@ -119,6 +120,9 @@ module Make(State: STATE)(States: STATES with type elt = State.t)(G: Graph.S wit
     | Single start -> States.singleton start
     | Multiple start -> start
 
+  let state_mem q a =
+    G.vertex_mem q a.graph
+
   let transitions a =
     G.labeled_edges a.graph
 
@@ -127,6 +131,9 @@ module Make(State: STATE)(States: STATES with type elt = State.t)(G: Graph.S wit
 
   let labels q a =
     G.vertex_label q a.graph
+
+  let alphabet a =
+    G.edge_labels a.graph
 
   let goto from f a =
     adjacent from a
@@ -176,7 +183,6 @@ module Make(State: STATE)(States: STATES with type elt = State.t)(G: Graph.S wit
         graph
       }
   end
-
 
   let to_dot ~string_of_labels ~string_of_lits a =
     let node q lbls = Dot.(node (State.to_id q) ~attrs:[

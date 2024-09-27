@@ -2,6 +2,11 @@ open Te_bot
 open Te_core
 module T = Types
 
+(*
+  nondeterministic NC scan connections cannot be used because the NC shifts are performed only once from a node.
+*)
+
+
 let extra_info d =
   Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);
   Fmt.pr "@[%s@]" (Dot.string_of_graph (Types.Node_packed_forest.to_dot d#forest))
@@ -1719,7 +1724,7 @@ let () =
     "noncanonical4", test_cases Noncanonical4.driver Noncanonical4.tests;
     "noncanonical5", test_cases Noncanonical5.driver Noncanonical5.tests;
     "lookahead", test_cases Lookahead.driver Lookahead.tests;
-    (*"lookahead2", test_cases Lookahead2.driver Lookahead2.tests;*)
+    "lookahead2", test_cases Lookahead2.driver Lookahead2.tests;
     (*"example", test_cases Example.driver Example.tests;*)
   ]
 

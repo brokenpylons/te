@@ -118,9 +118,9 @@ module Build_new(Spec: SPEC') = struct
     let c = Tn2.construct ~supply:(T.State.fresh_supply ()) Spec'.start tokens (Tn2.index_productions (Seq.append (convert Spec'.parser) (convert Spec'.scanner))) in
     let d = Tn2.collapse ~supply:(T.State.fresh_supply ()) c in
     let p = Tn2.subset ~supply:(T.State.fresh_supply ()) d in
-    Fmt.pr "%s"  (Dot.string_of_graph (Tn2.to_dot' p));
+    (*Fmt.pr "%s"  (Dot.string_of_graph (Tn2.to_dot' p));*)
     let e = Tn2.enhance p d in
-    Fmt.pr "%s"  (Dot.string_of_graph (Tn2.to_dot'' e));
+    Fmt.pr "%s"  (Dot.string_of_graph (Tn2.to_dot''' e));
     Tn2.to_enhanced_productions e
 
     (*Tn.Builder.make' ~tokens Spec'.start (convert Spec'.parser) (convert Spec'.scanner)*)

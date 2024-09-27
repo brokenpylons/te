@@ -92,8 +92,6 @@ The return links are needed for that (howerver just selectively, not for all sym
 Lookahead needs to be recomputed for non-cannonical states otherwise it is slightly incorrect
 *)
 
-
-
 module Make(Tables: TABLES) = struct
 
   class driver (t: Tables.t) =
