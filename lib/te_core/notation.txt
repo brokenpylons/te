@@ -5,6 +5,7 @@ v, u, w - Vertex
 its - Items
 lts - Lits
 prod - Production
+lbl - Label
 
 M - map
 A - automaton

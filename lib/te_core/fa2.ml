@@ -43,7 +43,10 @@ module type S = sig
   val transitions: (_, _, 'lits) t -> (state * state * 'lits) Seq.t
   val adjacent: state -> (_, _, 'lits) t -> (state * 'lits) Seq.t
   val adjacent_multiple: states -> (_, _, 'lits) t -> (state * 'lits) Seq.t
-  val goto: state -> ('lits -> bool) -> ('a, 'labels, 'lits) t -> states
+  val goto: state -> ('lits -> bool) -> (_, 'labels, 'lits) t -> states
+  val extend: ?merge:('lits -> 'lits -> 'lits) -> (state -> 'labels -> (state * state * 'lits) Seq.t) -> ('a, 'labels, 'lits) t -> ('a, 'labels, 'lits) t
+  val map_labels: (state -> 'labels1 -> 'labels2) -> ('a, 'labels1, 'lits) t -> ('a, 'labels2, 'lits) t
+  val map_lits: ('lits1 -> 'lits2) -> ('a, 'labels, 'lits1) t -> ('a, 'labels, 'lits2) t
 
   val unfold:
     ?merge: ('lits -> 'lits -> 'lits) ->
@@ -158,6 +161,22 @@ module Make(State: STATE)(States: STATES with type elt = State.t)(G: Graph.S wit
 
   let dijkstra seed f a =
     G.dijkstra seed f a.graph
+
+  let extend ?(merge = Fun.const) f a =
+    {
+      a with
+      graph = Seq.fold_left (fun graph (p, lbls) ->
+          Seq.fold_left (fun graph (s, q, lts) ->
+              G.connect_with merge s q lts graph)
+            graph (f p lbls))
+          a.graph (G.labeled_vertices a.graph)
+    }
+
+  let map_labels f m =
+    {m with graph = G.labeled_vertices_map f m.graph}
+
+  let map_lits f m =
+    {m with graph = G.labeled_edges_map (fun _ _ lts -> f lts) m.graph}
 
   module type INDEX = sig
     type t

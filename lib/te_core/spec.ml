@@ -117,11 +117,41 @@ module Build_new(Spec: SPEC') = struct
 
     let c = Tn2.construct ~supply:(T.State.fresh_supply ()) Spec'.start tokens (Tn2.index_productions (Seq.append (convert Spec'.parser) (convert Spec'.scanner))) in
     let d = Tn2.collapse ~supply:(T.State.fresh_supply ()) c in
+    Fmt.pr "%s@,"  (Dot.string_of_graph (Tn2.to_dot'''' d));
     let p = Tn2.subset ~supply:(T.State.fresh_supply ()) d in
+    Fmt.pr "%s@,"  (Dot.string_of_graph (Tn2.to_dot'''' p));
+
     (*Fmt.pr "%s"  (Dot.string_of_graph (Tn2.to_dot' p));*)
     let e = Tn2.enhance p d in
-    Fmt.pr "%s"  (Dot.string_of_graph (Tn2.to_dot''' e));
-    Tn2.to_enhanced_productions e
+    Fmt.pr "%s@,"  (Dot.string_of_graph (Tn2.to_dot''' e));
+
+    let ep = Tn2.to_enhanced_productions Spec'.start e in
+
+    Tn2.print_productions ep;
+
+    Fmt.pr "ANALYSIS";
+    let analysis = Tn2.Analysis.compute ep in
+
+    Fmt.pr "LOOKBACK";
+    let lookback = Tn2.Lookback.of_seq ep in
+
+    Fmt.pr "LOOKAHEAD";
+    let lookahead' = Tn2.Lookahead.compute analysis lookback tokens in
+
+    Fmt.pr "%s@,"  (Dot.string_of_graph (Tn2.to_dot''''' (Tn2.with_lookahead lookahead' p)));
+
+    Fmt.pr "NC";
+    let nc = Tn2.noncannonical tokens lookahead' p in
+    Fmt.pr "%s"  (Dot.string_of_graph (Tn2.to_dot'''' nc));
+
+    let nc' = Tn2.erase_scan nc in
+
+    let nc'' = Tn2.subset ~supply:(T.State.fresh_supply ()) nc' in
+    Fmt.pr "%s"  (Dot.string_of_graph (Tn2.to_dot'''' nc''));
+
+    Fmt.pr "%s@,"  (Dot.string_of_graph (Tn2.to_dot''''' (Tn2.with_lookahead lookahead' nc'')));
+
+    ep
 
     (*Tn.Builder.make' ~tokens Spec'.start (convert Spec'.parser) (convert Spec'.scanner)*)
 
