@@ -37,6 +37,7 @@ module type S = sig
 
   val start: (Start.single, _, _) t -> state
   val start_multiple: _ t -> states
+  val states: (_, 'labels, _) t -> (state * 'labels) Seq.t
   val state_mem: state -> _ t -> bool
   val labels: state -> (_, 'labels, 'lits) t -> 'labels
   val alphabet: (_, _, 'lits) t -> 'lits Seq.t
@@ -122,6 +123,9 @@ module Make(State: STATE)(States: STATES with type elt = State.t)(G: Graph.S wit
     match a.start with
     | Single start -> States.singleton start
     | Multiple start -> start
+
+  let states a =
+    G.labeled_vertices a.graph
 
   let state_mem q a =
     G.vertex_mem q a.graph

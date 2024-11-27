@@ -117,17 +117,20 @@ module Build_new(Spec: SPEC') = struct
 
     let c = Tn2.construct ~supply:(T.State.fresh_supply ()) Spec'.start tokens (Tn2.index_productions (Seq.append (convert Spec'.parser) (convert Spec'.scanner))) in
     let d = Tn2.collapse ~supply:(T.State.fresh_supply ()) c in
-    Fmt.pr "%s@,"  (Dot.string_of_graph (Tn2.to_dot'''' d));
+    Fmt.pr "%s@," (Dot.string_of_graph (Tn2.to_dot'''' d));
+
+    let cprod = Tn2.index_collapsed_productions (Tn2.collapsed_productions d) in
+
     let p = Tn2.subset ~supply:(T.State.fresh_supply ()) d in
-    Fmt.pr "%s@,"  (Dot.string_of_graph (Tn2.to_dot'''' p));
+    Fmt.pr "%s@," (Dot.string_of_graph (Tn2.to_dot'''' p));
 
     (*Fmt.pr "%s"  (Dot.string_of_graph (Tn2.to_dot' p));*)
-    let e = Tn2.enhance p d in
-    Fmt.pr "%s@,"  (Dot.string_of_graph (Tn2.to_dot''' e));
+    (*let e = Tn2.enhance p d in
+    Fmt.pr "%s@,"  (Dot.string_of_graph (Tn2.to_dot''' e));*)
 
-    let ep = Tn2.to_enhanced_productions Spec'.start e in
+    let ep = Tn2.enhanced_productions cprod p in
 
-    Tn2.print_productions ep;
+    (*Tn2.print_productions ep;*)
 
     Fmt.pr "ANALYSIS";
     let analysis = Tn2.Analysis.compute ep in
@@ -140,16 +143,37 @@ module Build_new(Spec: SPEC') = struct
 
     Fmt.pr "%s@,"  (Dot.string_of_graph (Tn2.to_dot''''' (Tn2.with_lookahead lookahead' p)));
 
-    Fmt.pr "NC";
+    Fmt.pr "%s@,"  (Dot.string_of_graph (Tn2.to_dot'''''' (Tn2.with_nullable lookahead' p)));
+
+
+    Fmt.pr "@,NC@,";
     let nc = Tn2.noncannonical tokens lookahead' p in
     Fmt.pr "%s"  (Dot.string_of_graph (Tn2.to_dot'''' nc));
 
     let nc' = Tn2.erase_scan nc in
 
     let nc'' = Tn2.subset ~supply:(T.State.fresh_supply ()) nc' in
+
+    Fmt.pr "@,NC@,";
     Fmt.pr "%s"  (Dot.string_of_graph (Tn2.to_dot'''' nc''));
 
+    let ep = Tn2.enhanced_productions cprod nc'' in
+
+    Fmt.pr "ANALYSIS";
+    let analysis = Tn2.Analysis.compute ep in
+
+    Fmt.pr "LOOKBACK";
+    let lookback = Tn2.Lookback.of_seq ep in
+
+    Fmt.pr "LOOKAHEAD";
+    let lookahead' = Tn2.Lookahead.compute analysis lookback tokens in
+
+    (*Tn2.print_productions ep;*)
+
     Fmt.pr "%s@,"  (Dot.string_of_graph (Tn2.to_dot''''' (Tn2.with_lookahead lookahead' nc'')));
+
+
+    Fmt.pr "%s@,"  (Dot.string_of_graph (Tn2.to_dot'''''' (Tn2.with_nullable lookahead' nc')));
 
     ep
 

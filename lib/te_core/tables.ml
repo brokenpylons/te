@@ -23,7 +23,6 @@ module type ITEMS = sig
   val compare: t -> t -> int
   val empty: t
   val union: t -> t -> t
-  (*val pp: t Fmt.t*)
   val to_seq: t -> item Seq.t
 
   val is_kernel: item -> bool
@@ -41,9 +40,6 @@ module type ITEMS = sig
   val shift_lookahead: item -> Lits.t
   val reduce_lookahead: item -> Lits.t
   val reminder: item -> T.Var.t list list
-
-  (*val filter: item -> Lits.t
-  val filter2: item -> Lits_multimap(Lits).t*)
 end
 
 (*module type EXTRA = sig

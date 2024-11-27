@@ -78,7 +78,7 @@ module Orders = Multimap.Make2(T.Var_to)(T.Vertices)
 module Orders' = Multimap.Make2(T.Vertex_to)(Orders.Set)
 
 (*
-Order of operation is inour case a mix between breadth first and depth first search.
+Order of operation is in our case a mix between breadth first and depth first search.
 The synchronization point are the characters, the orther otherwise doesn't matter.
 That way we need less explict datastructures, the data is held on the stack.
 *)

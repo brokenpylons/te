@@ -22,6 +22,8 @@ let (@@@) f x = (f x) x
 
 let swap (x, y) = (y, x)
 
+let apply2 f g (x1, y1) (x2, y2) = (f x1 x2, g y1 y2)
+
 let undefined = Obj.magic 0
 
 let pp_if b pp ppf  =
@@ -68,6 +70,9 @@ module Seq = struct
   include Seq
 
   let (@) = Seq.append
+
+  let guard p =
+    if p then Seq.return () else Seq.empty
 
   let fold_left_map f seed s =
     let rec go acc p s =
