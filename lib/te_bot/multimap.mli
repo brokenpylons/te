@@ -13,20 +13,25 @@ end
 module type SET2 = sig
   include SET1
 
+  val inter: t -> t -> t
+  val diff: t -> t -> t
+  val is_empty: t -> bool
+end
+
+module type SET3 = sig
+  include SET2
+
   type elt
   val singleton: elt -> t
   val the: t -> elt
   val add: elt -> t -> t
   val fold: (elt -> 'acc -> 'acc) -> 'acc -> t -> 'acc
-  val inter: t -> t -> t
-  val diff: t -> t -> t
-  val is_empty: t -> bool
 
   include Set.SEQUENTIAL with type t := t and type elt := elt
 end
 
-module type SET3 = sig
-  include SET2
+module type SET4 = sig
+  include SET3
 
   val remove: elt -> t -> t
 end
@@ -79,6 +84,15 @@ module Make1(M: MAP)(S: SET1): S1 with type t = S.t M.t and type key = M.elt and
 
 module type S2 = sig
   include S1
+
+  val inter: t -> t -> t
+  val diff: t -> t -> t
+end
+
+module Make2(M: MAP)(S: SET2): S2 with type t = S.t M.t and type key = M.elt and type values = S.t
+
+module type S3 = sig
+  include S2
   type value
   type elt = key * value
 
@@ -89,14 +103,11 @@ module type S2 = sig
   val add: key -> value -> t -> t
   val the: t -> key * value
 
-  val inter: t -> t -> t
-  val diff: t -> t -> t
-
   include Set.SEQUENTIAL with type t := t and type elt := elt
   module Set: sig
-    include SET2 with type t = t and type elt = elt
+    include SET3 with type t = t and type elt = elt
     val empty: t
   end
 end
 
-module Make2(M: MAP)(S: SET2): S2 with type t = S.t M.t and type key = M.elt and type value = S.elt and type values = S.t
+module Make3(M: MAP)(S: SET3): S3 with type t = S.t M.t and type key = M.elt and type value = S.elt and type values = S.t

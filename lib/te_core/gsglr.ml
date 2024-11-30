@@ -54,28 +54,27 @@ module type TABLES = sig
   type actions = T.Actions.t
   type state := T.State.t
   type states := T.States.t
-  type statess := T.Statess.t
 
   type symbol := T.Symbol.t
 
-  val start: t -> states
-  val actions: t -> states -> symbol -> actions 
-  val goto: t -> states -> symbol -> statess
+  val start: t -> state
+  val actions: t -> state -> symbol -> actions 
+  val goto: t -> state -> symbol -> states
   val back: t -> state * state -> state -> (state * state) option
 
   val shift: actions -> bool
   val load: actions -> bool
   val orders: actions -> T.Vars.t
   val matches: actions -> T.Labeled_vars.t
-  val predictions: actions -> T.Vars.t (* XXX: Labeled vars are not needed, fix in dissertation *)
+  val predictions: actions -> T.Vars.t
   val null: actions -> T.Reductions.t
   val reduce: actions -> T.Reductions.t
 end
 
-module Subclasses = Multimap.Make2(Balanced_binary_tree.Map.Size(Int))(T.Vertices)
-module Segments = Multimap.Make2(T.Vertex_to)(T.Vertices)
-module Orders = Multimap.Make2(T.Var_to)(T.Vertices)
-module Orders' = Multimap.Make2(T.Vertex_to)(Orders.Set)
+module Subclasses = Multimap.Make3(Balanced_binary_tree.Map.Size(Int))(T.Vertices)
+module Segments = Multimap.Make3(T.Vertex_to)(T.Vertices)
+module Orders = Multimap.Make3(T.Var_to)(T.Vertices)
+module Orders' = Multimap.Make3(T.Vertex_to)(Orders.Set)
 
 (*
 Order of operation is in our case a mix between breadth first and depth first search.
@@ -127,12 +126,9 @@ module Make(Tables: TABLES) = struct
       then Paths.singleton (v, ns)
       else Paths.fold (fun (v', ns') -> 
           Paths.union @@
-          T.States.fold (fun s ->
-              Paths.union @@
-              match Tables.back t p s with
-              | Some p' -> self#scan_back v' ns' (Gss.adjacent v' ns' stack) p'
-              | None -> Paths.singleton (v, ns))
-            Paths.empty (T.Vertex.states v'))
+          match Tables.back t p (T.Vertex.states v') with
+          | Some p' -> self#scan_back v' ns' (Gss.adjacent v' ns' stack) p'
+          | None -> Paths.singleton (v, ns))
           Paths.empty paths
 
     method private enumerate pos (xss: T.Reduction.Reminder.t) =
@@ -187,7 +183,7 @@ module Make(Tables: TABLES) = struct
 
     method private load v x =
       Tables.goto t (T.Vertex.states v) x |>
-      T.Statess.iter (fun s ->
+      T.States.iter (fun s ->
           let pos = succ @@ T.Vertex.position v in
           let u = T.Vertex.make s pos in
           let n = T.Node.make x (T.Vertex.position v) pos in
@@ -207,7 +203,7 @@ module Make(Tables: TABLES) = struct
     method private shift pos v w output =
       Seq.iter (fun v' ->
           Tables.goto t (T.Vertex.states v') (Var (T.Labeled_var.var output)) |>
-          T.Statess.iter (fun s ->
+          T.States.iter (fun s ->
               let u = T.Vertex.make s pos in
               let n = T.Node.make (Var (T.Labeled_var.var output)) (T.Vertex.position v') pos in
               self#log (Trace.shift output v w v' u);
@@ -241,7 +237,7 @@ module Make(Tables: TABLES) = struct
     method private reduce v l r xs =
       Seq.iter (fun (w, ns) ->
           Tables.goto t (T.Vertex.states w) (Var (T.Labeled_var.var r.output)) |>
-          T.Statess.iter (fun s ->
+          T.States.iter (fun s ->
               let pos = T.Vertex.position v in
               let u = T.Vertex.make s pos in
               let n = T.Node.make (Var (T.Labeled_var.var r.output)) (T.Vertex.position w) pos in
@@ -271,7 +267,7 @@ module Make(Tables: TABLES) = struct
 
     method private expand v =
       Tables.goto t (T.Vertex.states v) Delegate |>
-      T.Statess.iter (fun s ->
+      T.States.iter (fun s ->
           (let pos = T.Vertex.position v in
            let u = T.Vertex.make s pos in
            self#log (Trace.expand v u);
@@ -303,7 +299,7 @@ module Make(Tables: TABLES) = struct
       Seq.iter (fun (w, l) ->
           Seq.iter (fun v ->
               Tables.goto t (T.Vertex.states w) x |>
-              T.Statess.iter (fun s ->
+              T.States.iter (fun s ->
                   let pos = succ @@ T.Vertex.position w in
                   let u = T.Vertex.make s pos in
                   self#log (Trace.read x v w u );
@@ -333,7 +329,7 @@ module Make(Tables: TABLES) = struct
             |> List.map (fun v ->
                 Dot.(node (T.Vertex.to_id v) ~attrs:([
                     "xlabel" => String (Int.to_string @@ T.Vertex.position v);
-                    "label" => String (Fmt.to_to_string T.States.pp (T.Vertex.states v));
+                    "label" => String (Fmt.to_to_string T.State.pp (T.Vertex.states v));
                   ] @ if Segments.domain_mem v reduce then [
                     "shape" => String "octagon";
                   ] else [])))

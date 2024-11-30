@@ -44,6 +44,7 @@ module States: sig
   val cardinal: t -> int
   val choose: t -> elt option
   val to_id: t -> Dot.id
+  val iter: (elt -> unit) -> t -> unit
 end
 module State_to: sig
   include Map.CORE with type elt = State.t
@@ -149,10 +150,12 @@ module type INDEX_MAP = sig
 end
 module State_index(Map: INDEX_MAP): State_graph.INDEX with type elt = Map.elt
 
+module Preserve_state_index: State_graph.INDEX with type elt = States.t
+
 module Vertex: sig
   type t
-  val make: States.t -> int -> t
-  val states: t -> States.t
+  val make: State.t -> int -> t
+  val states: t -> State.t
   val position: t -> int
   val compare: t -> t -> int
   val equal: t -> t -> bool

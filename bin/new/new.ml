@@ -30,4 +30,4 @@ module New = Spec.Build_new(functor(Context: Spec.CONTEXT) -> struct
 end)
 
 let _ =
-  New.build () ()
+  New.build ()

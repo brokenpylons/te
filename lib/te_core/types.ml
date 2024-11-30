@@ -41,7 +41,7 @@ module State = struct
 end
 
 module States = struct
-  include Balanced_binary_tree.Set.Size(State)
+  include Balanced_binary_tree.Set.Height(State)
   let pp = pp State.pp 
 
   let to_id x = Dot.(String (Fmt.str "%a" pp x))
@@ -77,15 +77,32 @@ module State_index(Map: INDEX_MAP) = struct
 
   let update elt (m, s) = 
     try `Old (Map.find elt m)
-    with Not_found -> 
+    with Not_found ->
       let n, s = Supply.get s in
       `New (n, elt, (Map.add elt n m, s))
 
   let make s = (Map.empty, s)
 end
 
+module Preserve_state_index = struct
+  type elt = States.t
+  type t = State.t States_to.t * State.t Supply.t
+
+  let update elt (m, s) =
+    try `Old (States_to.find elt m)
+    with Not_found ->
+      if States.cardinal elt = 1 then
+        let n = States.the elt in
+        `New (n, elt, (States_to.add elt n m, s))
+      else
+        let n, s = Supply.get s in
+        `New (n, elt, (States_to.add elt n m, s))
+
+  let make s = (States_to.empty, s)
+end
+
 module Vertex = struct
-  type t = States.t * int
+  type t = State.t * int
   [@@deriving eq, ord]
 
   let make state position = (state, position)
@@ -95,7 +112,7 @@ module Vertex = struct
   let position = snd
 
   let pp ppf (state, position) =
-    Fmt.pf ppf "%a:%i" States.pp state position
+    Fmt.pf ppf "%a:%i" State.pp state position
 
   let to_id x = Dot.(String (Fmt.str "%a" pp x))
 end

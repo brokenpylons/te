@@ -74,6 +74,8 @@ module Seq = struct
   let guard p =
     if p then Seq.return () else Seq.empty
 
+  let bind x f = Seq.flat_map f x
+
   let fold_left_map f seed s =
     let rec go acc p s =
       match s () with

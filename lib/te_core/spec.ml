@@ -26,7 +26,7 @@ module type CONTEXT = sig
       }
     val code: string -> T.Symbol.t 
     val eof: T.Symbol.t
-    val vertex: T.State.t list -> int -> T.Vertex.t
+    val vertex: T.State.t -> int -> T.Vertex.t
   end
   val variables: (string, 'a) Vector.t -> (T.Var.t, 'a) Vector.t
   val var: T.Var.t -> T.Symbols.t R.t
@@ -72,8 +72,8 @@ module Context: CONTEXT = struct
       }
     let code s = T.Symbol.Code (T.Codes.the @@ T.Codes.of_string s)
     let eof = T.Symbol.Eof
-    let vertex ss pos =
-      T.Vertex.make (T.States.of_list ss) pos
+    let vertex s pos =
+      T.Vertex.make s pos
   end
   let variables vs = T.Var.make ~supply:T.Var.supply vs
   let var x = R.lits (T.Symbols.of_vars (T.Vars.singleton x))
@@ -83,101 +83,20 @@ end
 
 module Build(Spec: SPEC') = struct
   module Spec' = Spec(Context)
-  module X = Gsglr.Make(Tables.V1.Unoptimized)
+  module X = Gsglr.Make(Tables.Unoptimized)
 
   let convert x =
     List.to_seq x
-    |> Seq.map (fun p -> Context.Production.(lhs p, Re.Abstract.map Tn.Lits.of_symbols (rhs p)))
-
-  let driver () =
-    let tokens = T.Vars.of_list Spec'.lexical in
-    let (b, g) = Tn.Builder.make' ~tokens Spec'.start (convert Spec'.parser) (convert Spec'.scanner) in
-    let t = Tables.V1.Unoptimized.make ~tokens g b in
-    new X.driver t
-
-  module Run = struct
-    let code s = T.Symbol.Code (T.Codes.the @@ T.Codes.of_string s)
-    let eof = T.Symbol.Eof
-  end
-end
-
-module Build_new(Spec: SPEC') = struct
-  module Spec' = Spec(Context)
-  module X = Gsglr.Make(Tables.V1.Unoptimized)
-
-  let convert x =
-    List.to_seq x
-    |> Seq.map (fun p -> Tn2.Production.{
+    |> Seq.map (fun p -> Tn.Production.{
         lhs = Context.Production.lhs p;
-        rhs = Re.Abstract.map Tn2.Lits.of_symbols (Context.Production.rhs p);
+        rhs = Re.Abstract.map Tn.Lits.of_symbols (Context.Production.rhs p);
       })
 
-  let build () =
-    let tokens = T.Vars.of_list Spec'.lexical in
-
-    let c = Tn2.construct ~supply:(T.State.fresh_supply ()) Spec'.start tokens (Tn2.index_productions (Seq.append (convert Spec'.parser) (convert Spec'.scanner))) in
-    let d = Tn2.collapse ~supply:(T.State.fresh_supply ()) c in
-    Fmt.pr "%s@," (Dot.string_of_graph (Tn2.to_dot'''' d));
-
-    let cprod = Tn2.index_collapsed_productions (Tn2.collapsed_productions d) in
-
-    let p = Tn2.subset ~supply:(T.State.fresh_supply ()) d in
-    Fmt.pr "%s@," (Dot.string_of_graph (Tn2.to_dot'''' p));
-
-    (*Fmt.pr "%s"  (Dot.string_of_graph (Tn2.to_dot' p));*)
-    (*let e = Tn2.enhance p d in
-    Fmt.pr "%s@,"  (Dot.string_of_graph (Tn2.to_dot''' e));*)
-
-    let ep = Tn2.enhanced_productions cprod p in
-
-    (*Tn2.print_productions ep;*)
-
-    Fmt.pr "ANALYSIS";
-    let analysis = Tn2.Analysis.compute ep in
-
-    Fmt.pr "LOOKBACK";
-    let lookback = Tn2.Lookback.of_seq ep in
-
-    Fmt.pr "LOOKAHEAD";
-    let lookahead' = Tn2.Lookahead.compute analysis lookback tokens in
-
-    Fmt.pr "%s@,"  (Dot.string_of_graph (Tn2.to_dot''''' (Tn2.with_lookahead lookahead' p)));
-
-    Fmt.pr "%s@,"  (Dot.string_of_graph (Tn2.to_dot'''''' (Tn2.with_nullable lookahead' p)));
-
-
-    Fmt.pr "@,NC@,";
-    let nc = Tn2.noncannonical tokens lookahead' p in
-    Fmt.pr "%s"  (Dot.string_of_graph (Tn2.to_dot'''' nc));
-
-    let nc' = Tn2.erase_scan nc in
-
-    let nc'' = Tn2.subset ~supply:(T.State.fresh_supply ()) nc' in
-
-    Fmt.pr "@,NC@,";
-    Fmt.pr "%s"  (Dot.string_of_graph (Tn2.to_dot'''' nc''));
-
-    let ep = Tn2.enhanced_productions cprod nc'' in
-
-    Fmt.pr "ANALYSIS";
-    let analysis = Tn2.Analysis.compute ep in
-
-    Fmt.pr "LOOKBACK";
-    let lookback = Tn2.Lookback.of_seq ep in
-
-    Fmt.pr "LOOKAHEAD";
-    let lookahead' = Tn2.Lookahead.compute analysis lookback tokens in
-
-    (*Tn2.print_productions ep;*)
-
-    Fmt.pr "%s@,"  (Dot.string_of_graph (Tn2.to_dot''''' (Tn2.with_lookahead lookahead' nc'')));
-
-
-    Fmt.pr "%s@,"  (Dot.string_of_graph (Tn2.to_dot'''''' (Tn2.with_nullable lookahead' nc')));
-
-    ep
-
-    (*Tn.Builder.make' ~tokens Spec'.start (convert Spec'.parser) (convert Spec'.scanner)*)
+  let driver () =
+    let lexical = T.Vars.of_list Spec'.lexical in
+    let (first, lookahead, g, b) = Tn.build lexical Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
+    let t = Tables.Unoptimized.make lexical first lookahead g b in
+    new X.driver t
 
   module Run = struct
     let code s = T.Symbol.Code (T.Codes.the @@ T.Codes.of_string s)
@@ -187,18 +106,21 @@ end
 
 module Test(Spec: SPEC) = struct
   module Spec' = Spec(Context)
-  module X = Gsglr.Make(Tables.V1.Unoptimized)
+  module X = Gsglr.Make(Tables.Unoptimized)
 
   let tests = Spec'.tests
 
   let convert x =
     List.to_seq x
-    |> Seq.map (fun p -> Context.Production.(lhs p, Re.Abstract.map Tn.Lits.of_symbols (rhs p)))
+    |> Seq.map (fun p -> Tn.Production.{
+        lhs = Context.Production.lhs p;
+        rhs = Re.Abstract.map Tn.Lits.of_symbols (Context.Production.rhs p);
+      })
 
   let driver () =
-    let tokens = T.Vars.of_list Spec'.lexical in
-    let (b, g) = Tn.Builder.make ~tokens Spec'.start (convert Spec'.parser) (convert Spec'.scanner) in
-    let t = Tables.V1.Unoptimized.make ~tokens g b in
+    let lexical = T.Vars.of_list Spec'.lexical in
+    let (first, lookahead, g, b) = Tn.build lexical Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
+    let t = Tables.Unoptimized.make lexical first lookahead g b in
     new X.driver t
 end
 
