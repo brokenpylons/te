@@ -573,6 +573,14 @@ module Collapsed_items = struct
     Var_state_to.pp Parts.pp
 end
 
+module Noncanonical_items = struct
+  include Multimap.Make3(T.State_to)(Collapsed_items.Set)
+
+  let join nits =
+    fold_multiple (fun _ its acc -> Collapsed_items.union its acc) Collapsed_items.empty nits
+
+end
+
 module A = struct
   include Fa.Make(T.State)(T.States)(T.State_graph)
 end
@@ -686,6 +694,11 @@ let subset_items qs a =
   |> Seq.map (fun q -> A.labels q a)
   |> Seq.fold_left Collapsed_items.union Collapsed_items.empty
 
+let noncanonical_items qs a =
+  T.States.to_seq qs
+  |> Seq.map (fun q -> (q, A.labels q a))
+  |> Noncanonical_items.of_seq_multiple
+
 let collapse ~supply a =
   let module Gen = A.Gen(T.State_index(T.States_to)) in
   Gen.unfold ~supply ~merge:Lits.union (fun p from ->
@@ -740,27 +753,33 @@ let closure a qs =
   let module C = Closure.Make(T.States) in
   C.closure (fun q -> A.goto q Lits.is_call a) qs
 
-module Make_subset(Index: T.State_graph.INDEX with type elt = T.States.t) = struct
-  let subset ~supply a =
-    let module Gen = A.Gen(Index) in
-    Gen.unfold ~supply ~merge:Lits.union (fun _ from ->
-        let module R = Refine.Map(Lits)(T.States) in
-        let from = closure a from in
-        let next =
-          A.adjacent_multiple from a
-          |> Seq.filter_map (fun (s, lts) -> if Lits.is_call lts then None else Some (lts, T.States.singleton s))
-          |> R.refine
-          |> R.partitions
-        in
-        (subset_items from a, next))
-      (closure a @@ A.start_multiple a)
-end
+let subset ~supply a =
+  let module Gen = A.Gen(T.State_index(T.States_to)) in
+  Gen.unfold ~supply ~merge:Lits.union (fun _ from ->
+      let module R = Refine.Map(Lits)(T.States) in
+      let from = closure a from in
+      let next =
+        A.adjacent_multiple from a
+        |> Seq.filter_map (fun (s, lts) -> if Lits.is_call lts then None else Some (lts, T.States.singleton s))
+        |> R.refine
+        |> R.partitions
+      in
+      (subset_items from a, next))
+    (closure a @@ A.start_multiple a)
 
-module Subset = Make_subset(T.State_index(T.States_to))
-let subset = Subset.subset
-
-module Preserve_subset = Make_subset(T.Preserve_state_index)
-let subset' = Preserve_subset.subset
+let subset' ~supply a =
+  let module Gen = A.Gen(T.Preserve_state_index) in
+  Gen.unfold ~supply ~merge:Lits.union (fun _ from ->
+      let module R = Refine.Map(Lits)(T.States) in
+      let from = closure a from in
+      let next =
+        A.adjacent_multiple from a
+        |> Seq.filter_map (fun (s, lts) -> if Lits.is_call lts then None else Some (lts, T.States.singleton s))
+        |> R.refine
+        |> R.partitions
+      in
+      (noncanonical_items from a, next))
+    (closure a @@ A.start_multiple a)
 
 let enhance sa ca =
   let start = (A.start sa, A.start ca) in
@@ -775,7 +794,7 @@ let enhance sa ca =
       (A.labels ca_from ca, next))
     start start
 
-let enhanced_productions cprods sa =
+let enhanced_productions cprods (sa: (A.Start.single, _, Lits.t) A.t)  =
   Seq.map (fun (s, p, var) ->
       Enhanced_production.{
         lhs = (s, var);
@@ -1039,27 +1058,7 @@ let add_backlinks lookahead' lookback a =
 let erase_scan a =
   A.map_lits (fun lts -> if Lits.is_scan lts then Lits.scan' else lts) a
 
-let enhanced_productions' start lookahead' cprods na =
-  let (let*) = Seq.bind in
-  let* (s, p, var) = nonkernel na in
-  let* lhs' = if (not @@ T.Var.equal var start) && (T.States.is_empty @@ A.goto s (fun lts -> T.Vars.mem var @@ Lits.to_vars lts) na)
-    then begin
-      let* (lhs, rhs) = Collapsed_items.heads (A.labels s na) in
-      (lookahead' lhs s rhs).Lookahead.lexical_lookahead
-      |> Enhanced_lits.to_vars
-      |> Enhanced_vars.to_seq
-      |> Seq.filter (fun (_, var') -> T.Var.equal var var')
-    end else Seq.return (s, var)
-  in
-  (*let* lhs' = Seq.return (s, var) in*)
-  Fmt.pr "VAR @[%a %b@]" Enhanced_var.pp lhs' (T.States.is_empty @@ A.goto s (fun lts -> T.Vars.mem var @@ Lits.to_vars lts) na);
-  Seq.return 
-    Enhanced_production.{
-      lhs = lhs';
-      rhs = enhance (A.tail p na) (T.Var_to.find var cprods).Collapsed_production.rhs;
-    }
-
-let noncannonical lexical lookahead' a =
+let noncanonical lexical lookahead' a =
   let (let*) = Seq.bind in
   A.extend ~merge:Lits.union (fun s its ->
       let* (lhs, rhs) = Collapsed_items.heads its in
@@ -1083,44 +1082,49 @@ let back _lexical eprods =
     PA.empty
   |> PA.rev
 
-let shift lexical _ lookahead' s a =
+let shift lexical _ lookahead' s' a =
   let (let*) = Seq.bind in
-  let* (lhs, rhs) = Collapsed_items.heads (A.labels s a) in
+  let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
+  let* (lhs, rhs) = Collapsed_items.heads its in
   let* () = Seq.guard (not @@ T.Vars.mem lhs lexical) in
   Seq.return
     (Enhanced_lits.strip (lookahead' lhs s rhs).Lookahead.code_lookahead,
      T.Actions.load)
 
-let orders lexical first _ s a =
+let orders lexical first _ s' a =
   let (let*) = Seq.bind in
-  let* (_, lts) = A.adjacent s a in
+  let* (_, lts) = A.adjacent s' a in
   let* var = T.Vars.to_seq @@ Lits.to_vars lts in
   let* () = Seq.guard (T.Vars.mem var lexical) in
+  let* (s, _) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
   Seq.return
     ((Enhanced_lits.strip @@ first var s),
      T.Actions.orders (T.Vars.singleton var))
 
-let matches lexical _ lookahead' s a =
+let matches lexical _ lookahead' s' a =
   let (let*) = Seq.bind in
-  let* (lhs, rhs), parts = Collapsed_items.to_seq (A.labels s a) in
+  let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
+  let* (lhs, rhs), parts = Collapsed_items.to_seq its in
   let* part = parts in
   let* () = Seq.guard (T.Vars.mem lhs lexical && part.is_kernel && part.is_reduce) in
   Seq.return
     (Enhanced_lits.strip @@ (lookahead' lhs s rhs).Lookahead.reduce_lookahead,
      T.Actions.matches (T.Labeled_vars.singleton (part.label, lhs)))
 
-let predictions lexical _ lookahead' s a =
+let predictions lexical _ lookahead' s' a =
   let (let*) = Seq.bind in
-  let* (lhs, rhs), parts = Collapsed_items.to_seq (A.labels s a) in
+  let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
+  let* (lhs, rhs), parts = Collapsed_items.to_seq its in
   let* part = parts in
   let* () = Seq.guard (T.Vars.mem lhs lexical && part.is_kernel) in
   Seq.return
     (Enhanced_lits.strip @@ (lookahead' lhs s rhs).Lookahead.shift_lookahead,
      T.Actions.predictions (T.Vars.singleton lhs))
 
-let null lexical _ lookahead' s a =
+let null lexical _ lookahead' s' a =
   let (let*) = Seq.bind in
-  let* (lhs, rhs), parts = Collapsed_items.to_seq (A.labels s a) in
+  let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
+  let* (lhs, rhs), parts = Collapsed_items.to_seq its in
   let* part = parts in
   let right_nulled = (lookahead' lhs s rhs).Lookahead.right_nulled in
   let* () = Seq.guard (not @@ T.Vars.mem lhs lexical && not @@ part.is_kernel && right_nulled) in
@@ -1135,21 +1139,22 @@ let shift_null lexical first lookahead' s a =
   let* () = Seq.guard (Lits.is_scan' lts) in
   null lexical first lookahead' q a
 
-let select_strategy part s q =
+let select_strategy part s' q =
   match Size.to_int @@ part.Collapsed_items.Part.distance with
   | Some d -> T.Reduction.Strategy.Fixed d
-  | None -> T.Reduction.Strategy.Scan (s, q)
+  | None -> T.Reduction.Strategy.Scan (s', q)
 
-let reduce lexical _ lookahead' s a =
+let reduce lexical _ lookahead' s' a =
   let (let*) = Seq.bind in
-  let* (lhs, rhs), parts = Collapsed_items.to_seq (A.labels s a) in
+  let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
+  let* (lhs, rhs), parts = Collapsed_items.to_seq its in
   let* part = parts in
   let right_nulled = (lookahead' lhs s rhs).Lookahead.right_nulled in
   let* () = Seq.guard (not @@ T.Vars.mem lhs lexical && part.is_kernel && right_nulled) in
   Seq.return
     (Enhanced_lits.strip @@ (lookahead' lhs s rhs).Lookahead.reduce_lookahead,
      T.Actions.reduce (T.Reductions.singleton
-                       (T.Reduction.make (part.label, lhs) (select_strategy part s rhs) (Lists [[]]))))
+                         (T.Reduction.make (part.label, lhs) (select_strategy part s' rhs) (Lists [[]]))))
 
 let actions lexical first lookahead' s a =
   let fs = List.to_seq @@ [shift; orders; matches; predictions; null; shift_null; reduce] in
@@ -1201,21 +1206,20 @@ let build lexical start prods  =
 
   Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot''''' (with_lookahead lookahead' p)));
 
-  let nc = noncannonical lexical lookahead' p in
+  let nc = noncanonical lexical lookahead' p in
   let nc' = erase_scan nc in
   let nc'' = subset' ~supply:subset_supply2 nc' in
 
-  let eprods2 = enhanced_productions' start lookahead' icprods nc'' in
-  print_productions eprods2;
+  let eprods2 = enhanced_productions icprods (A.map_labels (fun _ -> Noncanonical_items.join) nc'') in
 
-  let pre_analysis = Analysis.Pre.compute eprods2 Analysis.Pre.empty  in
-  let analysis = Analysis.compute pre_analysis in
-
-  let ieprods2 = index_enhanced_productions eprods2 in
-  let lookahead' = Lookahead.compute analysis ieprods2 lexical in
   let first = first analysis in
+  Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot'''''''' (with_actions lexical first lookahead' nc'')));
 
-  Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot''''' (with_lookahead lookahead' nc'')));
+  (*let ieprods2 = index_enhanced_productions eprods2 in
+  let lookahead' = Lookahead.compute analysis ieprods2 lexical in
+  let first = first analysis in*)
+
+  (*Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot''''' (with_lookahead lookahead' nc'')));*)
   (*Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot'''''' (with_nullable lookahead' nc'')));
   Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot'''''''' (with_actions lexical first lookahead' nc'')));*)
 
