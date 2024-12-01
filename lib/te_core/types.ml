@@ -256,16 +256,24 @@ end
 module Reduction = struct
   module Strategy = struct
     type t = Null | Fixed of int | Scan of State_pair.t
-    [@@deriving eq, ord, show]
+    [@@deriving eq, ord]
+
+    let pp ppf = function
+      | Null -> Fmt.pf ppf "NULL"
+      | Fixed d -> Fmt.pf ppf "FIXED %i" d
+      | Scan (s, q) -> Fmt.pf ppf "SCAN (%a, %a)" State.pp s State.pp q
   end
   module Reminder = struct
     type t = Complete | Lists of Var.t list list | Gen of State_pair.t
-    [@@deriving eq, ord, show]
+    [@@deriving eq, ord]
   end
   type t = {output: Labeled_var.t; strategy: Strategy.t; reminder: Reminder.t}
-  [@@deriving eq, ord, show]
+  [@@deriving eq, ord]
 
   let make output strategy reminder = {output; strategy; reminder}
+
+  let pp ppf x =
+    Fmt.pf ppf "[%a: %a]" Labeled_var.pp x.output Strategy.pp x.strategy
 end
 module Reductions = struct
   include Balanced_binary_tree.Set.Size(Reduction)
@@ -481,7 +489,16 @@ module Actions = struct
       null: Reductions.t;
       reduce: Reductions.t;
     }
-  [@@deriving eq, ord, show]
+  [@@deriving eq, ord]
+
+  let pp ppf x =
+    Fmt.pf ppf "@[%a%a%a%a%a%a@]"
+      (pp_if x.load Fmt.string) "LOAD"
+      (pp_if (not @@ Vars.is_empty x.orders) (fun ppf -> Fmt.pf ppf "ORDER %a" Vars.pp)) x.orders
+      (pp_if (not @@ Labeled_vars.is_empty x.matches) (fun ppf -> Fmt.pf ppf "MATCH %a" Labeled_vars.pp)) x.matches
+      (pp_if (not @@ Vars.is_empty x.predictions) (fun ppf -> Fmt.pf ppf "PRED %a" Vars.pp)) x.predictions
+      (pp_if (not @@ Reductions.is_empty x.null) Reductions.pp) x.null
+      (pp_if (not @@ Reductions.is_empty x.reduce) Reductions.pp) x.reduce
 
   let union x y =
     {

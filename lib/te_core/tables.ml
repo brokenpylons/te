@@ -3,10 +3,6 @@ open! Prelude
 module T = Types
 open Tn
 
-module Actions_multimap = struct
-  include Lits_multimap(T.Actions)
-  let pp = pp T.Actions.pp
-end
 module Goto_partial_map = struct
   include Lits_multimap(T.States)
   let pp = pp T.States.pp
@@ -21,8 +17,8 @@ let actions lexical first lookahead' a =
   |> T.States.to_seq
   |> Seq.map (fun s -> 
       (s, Tn.actions lexical first lookahead' s a
-          |> Seq.map (fun (lts, x) -> Actions_multimap.singleton_multiple lts x)
-          |> Seq.fold_left Actions_multimap.union Actions_multimap.empty))
+          |> Seq.map (fun (lts, x) -> Tn.Actions_multimap.singleton_multiple lts x)
+          |> Seq.fold_left Tn.Actions_multimap.union Tn.Actions_multimap.empty))
   |> T.State_to.of_seq
 
 let goto a =

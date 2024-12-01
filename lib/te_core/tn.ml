@@ -597,6 +597,11 @@ module Enhanced_production = struct
   type t = {lhs: Enhanced_var.t; rhs: (PA.Start.single, Collapsed_items.t, Enhanced_lits.t) PA.t}
 end
 
+module Actions_multimap = struct
+  include Lits_multimap(T.Actions)
+  let pp = pp T.Actions.pp
+end
+
 let to_dot a = A.to_dot ~string_of_labels:(Fmt.to_to_string Item.pp) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
 
 let to_dot' a = A.to_dot ~string_of_labels:(Fmt.to_to_string T.States.pp) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
@@ -620,7 +625,7 @@ let pp_context ppf (lhs, q, lits) =
 let to_dot''''''' a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Fmt.seq @@ Fmt.parens pp_context)) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
 
 
-let to_dot'''''''' a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Fmt.seq @@ Fmt.parens (Fmt.pair Lits.pp T.Actions.pp))) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
+let to_dot'''''''' a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Fmt.seq (Fmt.pair Lits.pp T.Actions.pp))) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
 
 let refine xs =
   let module R = Refine.Set(Lits) in
@@ -1180,9 +1185,16 @@ let with_nullable lookahead' a =
         (Collapsed_items.heads its))
     a
 
+let actions1 lexical first lookahead' s a =
+  actions lexical first lookahead' s a
+  |> Seq.filter (fun (lts, _) -> not @@ Lits.is_empty lts)
+  (*|> Seq.map (fun (lts, x) -> Actions_multimap.singleton_multiple lts x)
+  |> Seq.fold_left Actions_multimap.union Actions_multimap.empty*)
+
+
 let with_actions lexical first lookahead' a =
   A.map_labels (fun s _ ->
-      (actions lexical first lookahead' s a))
+      actions1 lexical first lookahead' s a)
     a
 
 let build lexical start prods  =
