@@ -171,6 +171,41 @@ module Null_reduce = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     ]
   end)
 
+(* REGRESSION the shift null actions were excluded in table construction *)
+module Null_shift = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
+    open Context
+
+    let Vector.[s'; a; u] = variables Vector.["S'"; "A"; "_"]
+    let syntactic = [s']
+    let lexical = [a]
+
+    let start = s'
+
+    let parser =
+      Production.[
+        make (u, s') R.(var a * plus eof);
+      ]
+
+    let scanner =
+      Production.[
+        make (u, a) R.null;
+      ]
+
+    let tests = [
+      Test.{
+        name = "base";
+        input = [
+          eof
+        ];
+        trace = Trace.[
+            expand (vertex 0 0) (vertex 3 0);
+            reduce (u, a) (vertex 0 0) (vertex 0 0) (vertex 1 0);
+            load eof (vertex 1 0) (vertex 2 1);
+          ]
+      }
+    ]
+  end)
+
 module Load_reduce = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     open Context
 
@@ -1227,14 +1262,14 @@ module Noncanonical2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
           eof
         ];
         trace = Trace.[
-            expand (vertex 0 0) (vertex 11 0);
-            read (code "x") (vertex 0 0) (vertex 11 0) (vertex 12 1);
-            predict (vertex 12 1) (vertex 0 0) [a; b];
+            expand (vertex 0 0) (vertex 15 0);
+            read (code "x") (vertex 0 0) (vertex 15 0) (vertex 16 1);
+            predict (vertex 16 1) (vertex 0 0) [a; b];
             order (vertex 0 0) a;
             order (vertex 0 0) b;
-            shift (u, a) (vertex 12 1) (vertex 0 0) (vertex 0 0) (vertex 9 1);
+            shift (u, a) (vertex 16 1) (vertex 0 0) (vertex 0 0) (vertex 9 1);
             expand (vertex 9 1) (vertex 5 1);
-            shift (u, b) (vertex 12 1) (vertex 0 0) (vertex 0 0) (vertex 10 1);
+            shift (u, b) (vertex 16 1) (vertex 0 0) (vertex 0 0) (vertex 10 1);
             expand (vertex 10 1) (vertex 5 1);
             read (code "l") (vertex 9 1) (vertex 5 1) (vertex 6 2);
             read (code "l") (vertex 10 1) (vertex 5 1) (vertex 6 2);
@@ -1291,16 +1326,16 @@ module Noncanonical3 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
           eof
         ];
         trace = Trace.[
-            expand (vertex 0 0) (vertex 11 0);
-            read (code "x") (vertex 0 0) (vertex 11 0) (vertex 12 1);
-            predict (vertex 12 1) (vertex 0 0) [a; b];
+            expand (vertex 0 0) (vertex 16 0);
+            read (code "x") (vertex 0 0) (vertex 16 0) (vertex 17 1);
+            predict (vertex 17 1) (vertex 0 0) [a; b];
             order (vertex 0 0) a;
             order (vertex 0 0) b;
-            shift (u, a) (vertex 12 1) (vertex 0 0) (vertex 0 0) (vertex 9 1);
+            shift (u, a) (vertex 17 1) (vertex 0 0) (vertex 0 0) (vertex 9 1);
             expand (vertex 9 1) (vertex 5 1);
-            read (code "l") (vertex 0 0) (vertex 12 1) (vertex 13 2);
+            read (code "l") (vertex 0 0) (vertex 17 1) (vertex 15 2);
             read (code "l") (vertex 9 1) (vertex 5 1) (vertex 6 2);
-            shift (u, b) (vertex 13 2) (vertex 0 0) (vertex 0 0) (vertex 10 2);
+            shift (u, b) (vertex 15 2) (vertex 0 0) (vertex 0 0) (vertex 10 2);
             expand (vertex 10 2) (vertex 5 2);
             predict (vertex 6 2) (vertex 9 1) [l];
             reduce (u, n2) (vertex 9 1) (vertex 0 0) (vertex 8 1);
@@ -1309,7 +1344,7 @@ module Noncanonical3 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
             order (vertex 3 1) l;
             shift (u, l) (vertex 6 2) (vertex 9 1) (vertex 3 1) (vertex 4 2);
             expand (vertex 4 2) (vertex 5 2);
-            read (code "l") (vertex 0 0) (vertex 13 2) (vertex 13 3);
+            read (code "l") (vertex 0 0) (vertex 15 2) (vertex 15 3);
             read (code "l") (vertex 4 2) (vertex 5 2) (vertex 6 3);
             read (code "l") (vertex 10 2) (vertex 5 2) (vertex 6 3);
             predict (vertex 6 3) (vertex 4 2) [l];
@@ -1424,7 +1459,7 @@ module Noncanonical4 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     ]
   end)
 
-(*(* Two shifts performed from a single root at different "heights" *)
+(* Two shifts performed from a single root at different "heights" *)
 module Noncanonical5 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     open Context
     let Vector.[s'; s; n0; n1; n2; a; l0; l1; u] = variables Vector.["S'"; "S"; "N0"; "N1"; "N2"; "a"; "l0"; "l1"; "_"]
@@ -1464,17 +1499,17 @@ module Noncanonical5 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
             predict (vertex 15 1) (vertex 0 0) [a];
             order (vertex 0 0) a;
             shift (u, a) (vertex 15 1) (vertex 0 0) (vertex 0 0) (vertex 13 1);
-            expand (vertex 13 1) (vertex [5; 10] 1);
-            read (code "l") (vertex 13 1) (vertex [5; 10] 1) (vertex [6; 11] 2);
-            predict (vertex [6; 11] 2) (vertex 13 1) [l0; l1];
+            expand (vertex 13 1) (vertex 16 1);
+            read (code "l") (vertex 13 1) (vertex 16 1) (vertex 17 2);
+            predict (vertex 17 2) (vertex 13 1) [l0; l1];
             reduce (u, n2) (vertex 13 1) (vertex 0 0) (vertex 12 1);
             reduce (u, n1) (vertex 12 1) (vertex 0 0) (vertex 8 1);
             order (vertex 8 1) l1;
             reduce (u, n0) (vertex 8 1) (vertex 0 0) (vertex 3 1);
             order (vertex 3 1) l0;
-            shift (u, l1) (vertex [6; 11] 2) (vertex 13 1) (vertex 8 1) (vertex 9 2);
+            shift (u, l1) (vertex 17 2) (vertex 13 1) (vertex 8 1) (vertex 9 2);
             expand (vertex 9 2) (vertex 5 2);
-            read (code "l") (vertex 13 1) (vertex [6; 11] 2) (vertex 7 3);
+            read (code "l") (vertex 13 1) (vertex 17 2) (vertex 7 3);
             read (code "l") (vertex 9 2) (vertex 5 2) (vertex 6 3);
             shift (u, l0) (vertex 7 3) (vertex 13 1) (vertex 3 1) (vertex 4 3);
             reduce (u, s) (vertex 4 3) (vertex 0 0) (vertex 1 3);
@@ -1527,11 +1562,11 @@ module Lookahead = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
             predict (vertex 15 1) (vertex 0 0) [d];
             order (vertex 0 0) d;
             shift (u, d) (vertex 15 1) (vertex 0 0) (vertex 0 0) (vertex 13 1);
-            expand (vertex 13 1) (vertex [6; 10] 1);
-            read (code "x") (vertex 13 1) (vertex [6; 10] 1) (vertex [7; 11] 2);
-            read (code "x") (vertex 13 1) (vertex [7; 11] 2) (vertex [7; 11] 3);
-            read (code "x") (vertex 13 1) (vertex [7; 11] 3) (vertex [7; 11] 4);
-            read (code "a") (vertex 13 1) (vertex [7; 11] 4) (vertex 8 5);
+            expand (vertex 13 1) (vertex 16 1);
+            read (code "x") (vertex 13 1) (vertex 16 1) (vertex 17 2);
+            read (code "x") (vertex 13 1) (vertex 17 2) (vertex 17 3);
+            read (code "x") (vertex 13 1) (vertex 17 3) (vertex 17 4);
+            read (code "a") (vertex 13 1) (vertex 17 4) (vertex 8 5);
             predict (vertex 8 5) (vertex 13 1) [l0];
             reduce (u, b) (vertex 13 1) (vertex 0 0) (vertex 4 1);
             order (vertex 4 1) l0;
@@ -1584,28 +1619,30 @@ module Lookahead2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
         ];
         trace = Trace.[
             expand (vertex 0 0) (vertex 15 0);
-            (*read (code "x") (vertex 0 0) (vertex 15 0) (vertex 16 1);
+            read (code "x") (vertex 0 0) (vertex 15 0) (vertex 16 1);
             predict (vertex 16 1) (vertex 0 0) [d];
             order (vertex 0 0) d;
             shift (u, d) (vertex 16 1) (vertex 0 0) (vertex 0 0) (vertex 13 1);
-            expand (vertex 13 1) (vertex [6; 10; 15] 1);
-            read (code "x") (vertex 13 1) (vertex [6; 10; 15] 1) (vertex [7; 11; 16] 2);
-            predict (vertex [7; 11; 17] 2) (vertex 13 1) [d; l0; l1];
+            expand (vertex 13 1) (vertex 17 1);
+            read (code "x") (vertex 13 1) (vertex 17 1) (vertex 18 2);
+            predict (vertex 18 2) (vertex 13 1) [d; l0; l1];
             order (vertex 13 1) d;
             reduce (u, b) (vertex 13 1) (vertex 0 0) (vertex 4 1);
             order (vertex 4 1) l0;
             reduce (u, c) (vertex 13 1) (vertex 0 0) (vertex 9 1);
             order (vertex 9 1) l1;
-            shift (u, d) (vertex [7; 11; 16] 2) (vertex 13 1) (vertex 13 1) (vertex 14 2);
-            read (code "x") (vertex 13 1) (vertex [7; 11; 16] 2)
-
-
-
-            load eof (vertex 1 0) (vertex 2 1);*)
+            shift (u, d) (vertex 18 2) (vertex 13 1) (vertex 13 1) (vertex 14 2);
+            read (code "x") (vertex 13 1) (vertex 18 2) (vertex 19 3);
+            read (code "x") (vertex 13 1) (vertex 19 3) (vertex 19 4);
+            read (code "a") (vertex 13 1) (vertex 19 4) (vertex 8 5);
+            shift (u, l0) (vertex 8 5) (vertex 13 1) (vertex 4 1) (vertex 5 5);
+            reduce (u, a) (vertex 5 5) (vertex 0 0) (vertex 3 5);
+            reduce (u, s) (vertex 3 5) (vertex 0 0) (vertex 1 5);
+            load eof (vertex 1 5) (vertex 2 6);
           ]
       }
     ]
-  end)*)
+  end)
 
 (*module Example = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     open Context
@@ -1698,7 +1735,8 @@ let () =
   Alcotest.run "parser" [
     "noop", test_cases Noop.driver Noop.tests;
     "null", test_cases Null.driver Null.tests;
-    "null_redice", test_cases Null_reduce.driver Null_reduce.tests;
+    "null_reduce", test_cases Null_reduce.driver Null_reduce.tests;
+    "null_shift", test_cases Null_shift.driver Null_shift.tests;
     "load", test_cases Load.driver Load.tests;
     "load2", test_cases Load2.driver Load2.tests;
     "load_reduce", test_cases Load_reduce.driver Load_reduce.tests;
@@ -1722,9 +1760,9 @@ let () =
     "noncanonical2", test_cases Noncanonical2.driver Noncanonical2.tests;
     "noncanonical3", test_cases Noncanonical3.driver Noncanonical3.tests;
     "noncanonical4", test_cases Noncanonical4.driver Noncanonical4.tests;
-    (*"noncanonical5", test_cases Noncanonical5.driver Noncanonical5.tests;
+    "noncanonical5", test_cases Noncanonical5.driver Noncanonical5.tests;
     "lookahead", test_cases Lookahead.driver Lookahead.tests;
-    "lookahead2", test_cases Lookahead2.driver Lookahead2.tests;*)
+    "lookahead2", test_cases Lookahead2.driver Lookahead2.tests;
     (*"example", test_cases Example.driver Example.tests;*)
   ]
 

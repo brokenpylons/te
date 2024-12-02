@@ -154,7 +154,7 @@ module Set = struct
 
     let cardinal = function
       | Empty -> 0
-      | Node (s, _, _, _) -> (s + 1) / 2
+      | Node (s, _, _, _) -> (s - 1) / 2
 
     let singleton x =
       Node (3, x, Empty, Empty)

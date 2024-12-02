@@ -41,7 +41,7 @@ module State = struct
 end
 
 module States = struct
-  include Balanced_binary_tree.Set.Height(State)
+  include Balanced_binary_tree.Set.Size(State)
   let pp = pp State.pp 
 
   let to_id x = Dot.(String (Fmt.str "%a" pp x))

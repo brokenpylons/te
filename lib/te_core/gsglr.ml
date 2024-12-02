@@ -166,7 +166,8 @@ module Make(Tables: TABLES) = struct
       end;
       if not null then begin
         T.Reductions.iter (fun r ->
-            self#reduce v l r xs) (Tables.reduce a)
+            self#reduce v l r xs)
+          (Tables.reduce a)
       end;
       T.Reductions.iter (fun r ->
           self#reduce v T.Vertices.empty r xs)
