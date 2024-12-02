@@ -1138,11 +1138,19 @@ let null lexical _ lookahead' s' a =
      T.Actions.null (T.Reductions.singleton
                        (T.Reduction.make (part.label, lhs) Null (Lists [[]]))))
 
-let shift_null lexical first lookahead' s a =
+let shift_null lexical _ lookahead' s' a =
   let (let*) = Seq.bind in
-  let* (q, lts) = A.adjacent s a in
+  let* (q, lts) = A.adjacent s' a in
   let* () = Seq.guard (Lits.is_scan' lts) in
-  null lexical first lookahead' q a
+  let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels q a) in
+  let* (lhs, rhs), parts = Collapsed_items.to_seq its in
+  let* part = parts in
+  let right_nulled = (lookahead' lhs s rhs).Lookahead.right_nulled in
+  let* () = Seq.guard (T.Vars.mem lhs lexical && not @@ part.is_kernel && right_nulled) in
+  Seq.return
+    (Enhanced_lits.strip @@ (lookahead' lhs s rhs).Lookahead.reduce_lookahead,
+     T.Actions.null (T.Reductions.singleton
+                       (T.Reduction.make (part.label, lhs) Null (Lists [[]]))))
 
 let select_strategy part s' q =
   match Size.to_int @@ part.Collapsed_items.Part.distance with
