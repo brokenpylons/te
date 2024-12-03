@@ -219,6 +219,7 @@ module type SET = sig
   val equal: t -> t -> bool
 
   val empty: t
+  val is_empty: t -> bool
   val union: t -> t -> t
 end
 
@@ -261,11 +262,11 @@ module Lits_multimap(Values: SET): MULTIMAP with type key = Lits.t and type valu
 
   let pp pp_s ppf x =
     Fmt.pf ppf "@[@[%a@]@,@[%a@]@,@[%a@]@,@[%a@]@,@[%a@]@,@[%a@]@,@[%a@]@]"
-      pp_s x.eof
+      (pp_if (not @@ Values.is_empty x.eof) (fun ppf -> Fmt.pf ppf "%s %a" T.eof_string pp_s)) x.eof
       (T.Var_to.pp pp_s) x.call
       (T.Var_to.pp pp_s) x.return
       (T.Var_to.pp pp_s) x.scan
-      pp_s x.scan'
+      (pp_if (not @@ Values.is_empty x.scan') (fun ppf -> Fmt.pf ppf "%s %a" T.delegate_string pp_s)) x.scan'
       (T.Var_to.pp pp_s) x.vars
       (Fmt.seq (Fmt.pair T.Codes.pp pp_s)) (CM.partitions x.codes)
 
@@ -360,6 +361,7 @@ module Enhanced_lits: sig
   val restrict: (T.State.t -> Lits.t -> Lits.t) -> t -> t
 
   val empty: t
+  val is_empty: t -> bool
   val union: t -> t -> t
   val diff: t -> t -> t
   val inter: t -> t -> t
@@ -425,6 +427,7 @@ end = struct
 
   let make = M.singleton_multiple
   let empty = M.empty
+  let is_empty = M.is_empty
   let union = M.union
   let diff = M.diff
   let inter = M.inter
@@ -625,7 +628,8 @@ let pp_context ppf (lhs, q, lits) =
 let to_dot''''''' a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Fmt.seq @@ Fmt.parens pp_context)) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
 
 
-let to_dot'''''''' a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Fmt.seq (Fmt.pair Lits.pp T.Actions.pp))) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
+(*let to_dot'''''''' a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Fmt.seq (Fmt.pair Lits.pp T.Actions.pp))) ~string_of_lits:(Fmt.to_to_string Lits.pp) a*)
+let to_dot'''''''' a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Actions_multimap.pp)) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
 
 let refine xs =
   let module R = Refine.Set(Lits) in
@@ -813,6 +817,7 @@ module Bool_set = struct
 
   let union = (||)
   let empty = false
+  let is_empty = Fun.id
 end
 
 module Analysis = struct
@@ -1087,6 +1092,7 @@ let back _lexical eprods =
     PA.empty
   |> PA.rev
 
+
 let shift lexical _ lookahead' s' a =
   let (let*) = Seq.bind in
   let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
@@ -1196,8 +1202,8 @@ let with_nullable lookahead' a =
 let actions1 lexical first lookahead' s a =
   actions lexical first lookahead' s a
   |> Seq.filter (fun (lts, _) -> not @@ Lits.is_empty lts)
-  (*|> Seq.map (fun (lts, x) -> Actions_multimap.singleton_multiple lts x)
-  |> Seq.fold_left Actions_multimap.union Actions_multimap.empty*)
+  |> Seq.map (fun (lts, x) -> Actions_multimap.singleton_multiple lts x)
+  |> Seq.fold_left Actions_multimap.union Actions_multimap.empty
 
 
 let with_actions lexical first lookahead' a =

@@ -3,7 +3,7 @@ open Te_core
 module T = Types
 
 
-module New = Spec.Build_new(functor(Context: Spec.CONTEXT) -> struct
+module New = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   open Context
 
   let Vector.[s'; s; a; b; c; d; l0; l1; u] = variables Vector.["S'"; "S"; "A"; "B"; "C"; "d"; "l0"; "l1"; "_"]
@@ -30,4 +30,4 @@ module New = Spec.Build_new(functor(Context: Spec.CONTEXT) -> struct
 end)
 
 let _ =
-  New.build ()
+  New.driver ()
