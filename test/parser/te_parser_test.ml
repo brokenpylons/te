@@ -437,6 +437,46 @@ module Multilabel_shift_reduce = Spec.Test(functor(Context: Spec.CONTEXT) -> str
     ]
   end)
 
+(* DISCOVERED reduce for A was applied twice, since the edge at the begining of the path has two nodes linked to it. *)
+module Split_productions_reduce = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
+    open Context
+
+    let Vector.[s'; s; a; b; u] = variables Vector.["S'"; "S"; "A"; "B"; "_"]
+    let syntactic = [s'; s; a]
+    let lexical = []
+
+    let start = s'
+
+    let parser =
+      Production.[
+        make (u, s') R.(var s * plus eof);
+        make (u, s) (var a);
+        make (u, s) (var b);
+        make (u, a) (codes "a");
+        make (u, b) (codes "a");
+      ]
+
+    let scanner = []
+
+    let tests = [
+      Test.{
+        name = "base";
+        input = [
+          code "a";
+          eof
+        ];
+        trace = Trace.[
+            load (code "a") (vertex 0 0) (vertex 1 1);
+            reduce (u, a) (vertex 1 1) (vertex 0 0) (vertex 4 1);
+            reduce (u, s) (vertex 4 1) (vertex 0 0) (vertex 2 1);
+            load eof (vertex 2 1) (vertex 3 2);
+            reduce (u, b) (vertex 1 1) (vertex 0 0) (vertex 4 1);
+            reduce (u, s) (vertex 4 1) (vertex 0 0) (vertex 2 1);
+          ]
+      };
+    ]
+  end)
+
 module Right_nulled = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     open Context
 
@@ -1745,6 +1785,7 @@ let () =
     "shift_reduce", test_cases Shift_reduce.driver Shift_reduce.tests;
     "shift_reduce2", test_cases Shift_reduce2.driver Shift_reduce2.tests;
     "multilabel_shift_reduce", test_cases Multilabel_shift_reduce.driver Multilabel_shift_reduce.tests;
+    "split_productions_reduce", test_cases Split_productions_reduce.driver Split_productions_reduce.tests;
     "right_nulled", test_cases Right_nulled.driver Right_nulled.tests;
     "right_nulled2", test_cases Right_nulled2.driver Right_nulled2.tests;
     "repeat_load", test_cases Repeat_load.driver Repeat_load.tests;
