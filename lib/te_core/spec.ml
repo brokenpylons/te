@@ -1,5 +1,6 @@
 open Te_bot
 module T = Types
+open! Prelude
 
 type test =
   {
@@ -32,6 +33,12 @@ module type CONTEXT = sig
   val var: T.Var.t -> T.Symbols.t R.t
   val codes: string -> T.Symbols.t R.t
   val eof: T.Symbols.t R.t
+
+  (* Extended *)
+  val not_codes: string -> T.Symbols.t R.t
+  val text: string -> T.Symbols.t R.t
+  val range: string -> string -> T.Symbols.t R.t
+  val not_range: string -> string -> T.Symbols.t R.t
 end
 
 module type SPEC' = functor (Context: CONTEXT) -> sig
@@ -79,6 +86,24 @@ module Context: CONTEXT = struct
   let var x = R.lits (T.Symbols.of_vars (T.Vars.singleton x))
   let codes x = R.lits (T.Symbols.of_codes (T.Codes.of_string x))
   let eof = R.lits T.Symbols.eof
+
+  (* Extended *)
+  let not_codes x = R.lits (T.Symbols.of_codes (T.Codes.comp @@ T.Codes.of_string x))
+
+  let text s =
+    List.fold_right (fun c acc -> R.(lits (T.Symbols.of_codes @@ T.Codes.of_int c) * acc))
+      (T.explode s) R.null
+
+  let range_codes from to_ =
+    let lf = List.the @@ T.explode from
+    and lt = List.the @@ T.explode to_ in
+    T.Codes.of_int_list @@ List.range lf lt
+
+  let range from to_ =
+    R.lits (T.Symbols.of_codes (range_codes from to_))
+
+  let not_range from to_ =
+    R.lits (T.Symbols.of_codes (T.Codes.comp (range_codes from to_)))
 end
 
 module Build(Spec: SPEC') = struct
@@ -93,14 +118,25 @@ module Build(Spec: SPEC') = struct
       })
 
   let driver () =
+    let syntactic = T.Vars.of_list Spec'.syntactic in
     let lexical = T.Vars.of_list Spec'.lexical in
-    let (first, lookahead, g, b) = Tn.build lexical Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
+
+    let (first, lookahead, g, b) = Tn.build syntactic lexical Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
     let t = Tables.Unoptimized.make lexical first lookahead g b in
     new X.driver t
 
   module Run = struct
     let code s = T.Symbol.Code (T.Codes.the @@ T.Codes.of_string s)
     let eof = T.Symbol.Eof
+
+    let file f path =
+      let d = Uutf.decoder (`Channel (open_in path)) in
+      let rec loop () =
+        match Uutf.decode d with
+        | `Uchar u -> f (T.Symbol.Code (T.Code.of_int (Uchar.to_int u))); loop ()
+        | `End -> f T.Symbol.Eof
+        | _ -> assert false
+      in loop ()
   end
 end
 
@@ -119,7 +155,9 @@ module Test(Spec: SPEC) = struct
 
   let driver () =
     let lexical = T.Vars.of_list Spec'.lexical in
-    let (first, lookahead, g, b) = Tn.build lexical Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
+    let syntactic = T.Vars.of_list Spec'.syntactic in
+
+    let (first, lookahead, g, b) = Tn.build syntactic lexical Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
     let t = Tables.Unoptimized.make lexical first lookahead g b in
     new X.driver t
 end

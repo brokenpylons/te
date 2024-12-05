@@ -3,6 +3,8 @@ open Te_bot
 val eof_string: string
 val delegate_string: string
 
+val explode: string -> int list
+
 module Code: sig
   type t
   val compare: t -> t -> int
@@ -20,6 +22,8 @@ module Codes: sig
   include Comp_set.S with type elt := elt and type t := t
 
   val pp: t Fmt.t
+  val of_int: int -> t
+  val of_int_list: int list -> t
   val of_string: string -> t
 end
 

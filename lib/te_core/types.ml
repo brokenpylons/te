@@ -4,6 +4,17 @@ open! Prelude
 let eof_string = "💰"
 let delegate_string = "☞"
 
+let explode s =
+  let rec go i =
+    if i >= String.length s then
+      []
+    else
+      let d = String.get_utf_8_uchar s i in
+      if Uchar.utf_decode_is_valid d
+      then (Uchar.to_int @@ Uchar.utf_decode_uchar d) :: (go (i + Uchar.utf_decode_length d))
+      else assert false
+  in go 0
+
 module Code = struct
   include Int
   let to_id x = Dot.(Int x)
@@ -20,16 +31,13 @@ module Codes = struct
   include Comp_set.Make(Balanced_binary_tree.Set.Size(Code))
   let pp = pp Code.pp
 
+  let of_int = singleton
+
+  let of_int_list l =
+    List.fold_right add l empty 
+
   let of_string s =
-    let rec go i =
-      if i >= String.length s then
-        empty
-      else
-        let d = String.get_utf_8_uchar s i in
-        if Uchar.utf_decode_is_valid d
-        then add (Uchar.to_int @@ Uchar.utf_decode_uchar d) (go (i + Uchar.utf_decode_length d))
-        else assert false
-    in go 0
+    of_list (explode s)
 end
 
 module State = struct

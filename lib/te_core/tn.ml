@@ -605,32 +605,6 @@ module Actions_multimap = struct
   let pp = pp T.Actions.pp
 end
 
-let to_dot a = A.to_dot ~string_of_labels:(Fmt.to_to_string Item.pp) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
-
-let to_dot' a = A.to_dot ~string_of_labels:(Fmt.to_to_string T.States.pp) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
-
-let to_dot'' a = PA.to_dot ~string_of_labels:(Fmt.to_to_string (Fmt.pair T.States.pp T.States.pp)) ~string_of_lits:(Fmt.to_to_string Enhanced_lits.pp) a
-
-let to_dote a = PA.to_dot ~string_of_labels:(Fmt.to_to_string Collapsed_items.pp) ~string_of_lits:(Fmt.to_to_string Enhanced_lits.pp) a
-
-
-let to_dot''' a = PA.to_dot ~string_of_labels:(Fmt.to_to_string Fmt.nop) ~string_of_lits:(Fmt.to_to_string Enhanced_lits.pp) a
-
-let to_dot'''' a = A.to_dot ~string_of_labels:(Fmt.to_to_string Collapsed_items.pp) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
-
-let to_dot''''' a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Fmt.seq @@ Fmt.parens (Fmt.pair ~sep:(Fmt.const Fmt.string ": ") T.Var.pp Enhanced_lits.pp))) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
-
-let to_dot'''''' a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Fmt.seq @@ Fmt.parens (Fmt.pair ~sep:(Fmt.const Fmt.string ": ") T.Var.pp Fmt.bool))) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
-
-let pp_context ppf (lhs, q, lits) =
-  Fmt.pf ppf "@[(@[%a@], @[%a@], @[%a@])@]" T.Var.pp lhs T.State.pp q Lits.pp lits
-
-let to_dot''''''' a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Fmt.seq @@ Fmt.parens pp_context)) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
-
-
-(*let to_dot'''''''' a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Fmt.seq (Fmt.pair Lits.pp T.Actions.pp))) ~string_of_lits:(Fmt.to_to_string Lits.pp) a*)
-let to_dot'''''''' a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Actions_multimap.pp)) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
-
 let refine xs =
   let module R = Refine.Set(Lits) in
   let f = R.refine xs in
@@ -1180,11 +1154,6 @@ let actions lexical first lookahead' s a =
   Seq.flat_map (fun f -> f lexical first lookahead' s a) fs
 
 (* FOR DEBUGGING *)
-let print_productions prods =
-  Seq.iter (fun prod ->
-      Fmt.pr "@[@[%a@] ::= @[%s@]@]@." Enhanced_var.pp prod.Enhanced_production.lhs (Dot.string_of_graph @@ to_dot''' (prod.Enhanced_production.rhs)))
-    prods
-
 let with_lookahead lookahead' a =
   A.map_labels (fun s its ->
       Seq.map (fun (lhs, rhs) ->
@@ -1199,7 +1168,7 @@ let with_nullable lookahead' a =
         (Collapsed_items.heads its))
     a
 
-let actions1 lexical first lookahead' s a =
+let actions' lexical first lookahead' s a =
   actions lexical first lookahead' s a
   |> Seq.filter (fun (lts, _) -> not @@ Lits.is_empty lts)
   |> Seq.map (fun (lts, x) -> Actions_multimap.singleton_multiple lts x)
@@ -1208,10 +1177,12 @@ let actions1 lexical first lookahead' s a =
 
 let with_actions lexical first lookahead' a =
   A.map_labels (fun s _ ->
-      actions1 lexical first lookahead' s a)
+      actions' lexical first lookahead' s a)
     a
 
-let build lexical start prods  =
+let build syntactic lexical start prods  =
+  assert (T.Vars.disjoint syntactic lexical);
+
   let iprods = index_productions prods in
   let c = construct ~supply:(T.State.fresh_supply ()) start lexical iprods in
   let d = collapse ~supply:(T.State.fresh_supply ()) c in
@@ -1230,26 +1201,16 @@ let build lexical start prods  =
   let ieprods1 = index_enhanced_productions eprods1 in
   let lookahead' = Lookahead.compute analysis ieprods1 lexical in
 
-  Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot''''' (with_lookahead lookahead' p)));
+  let nc =
+    noncanonical lexical lookahead' p
+    |> erase_scan 
+    |> subset' ~supply:subset_supply2
+  in
 
-  let nc = noncanonical lexical lookahead' p in
-  let nc' = erase_scan nc in
-  let nc'' = subset' ~supply:subset_supply2 nc' in
-
-  let eprods2 = enhanced_productions icprods (A.map_labels (fun _ -> Noncanonical_items.join) nc'') in
+  let eprods2 = enhanced_productions icprods (A.map_labels (fun _ -> Noncanonical_items.join) nc) in
 
   let first = first analysis in
-  Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot'''''''' (with_actions lexical first lookahead' nc'')));
-
-  (*let ieprods2 = index_enhanced_productions eprods2 in
-  let lookahead' = Lookahead.compute analysis ieprods2 lexical in
-  let first = first analysis in*)
-
-  (*Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot''''' (with_lookahead lookahead' nc'')));*)
-  (*Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot'''''' (with_nullable lookahead' nc'')));
-  Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot'''''''' (with_actions lexical first lookahead' nc'')));*)
-
   let back = back lexical eprods2 in
 
-  (first, lookahead', nc'', back)
+  (first, lookahead', nc, back)
 

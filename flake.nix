@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -19,7 +19,7 @@
             duneVersion = "3";
             src = ./.;
 
-            buildInputs = with pkgs.ocamlPackages; [ppx_deriving alcotest fmt js_of_ocaml js_of_ocaml-ppx];
+            buildInputs = with pkgs.ocamlPackages; [ppx_deriving alcotest fmt uutf js_of_ocaml js_of_ocaml-ppx];
 
             #strictDeps = true;
             doCheck = true;

@@ -37,12 +37,6 @@ let back b =
           |> Back_map.of_seq_multiple))
   |> T.State_pair_to.of_seq
 
-(*module Unoptimized: sig
-  include Gsglr.TABLES
-  val make: tokens:T.Vars.t -> (A.Start.single, Items.t, Lits.t) A.t -> (PA.Start.multiple, _, _) PA.t -> t
-  val pp: t Fmt.t
-end = struct*)
-
 module Unoptimized = struct
   type actions = T.Actions.t
   type t =

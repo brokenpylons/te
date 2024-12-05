@@ -72,6 +72,7 @@ module type TABLES = sig
 end
 
 module Subclasses = Multimap.Make3(Balanced_binary_tree.Map.Size(Int))(T.Vertices)
+
 module Segments = Multimap.Make3(T.Vertex_to)(T.Vertices)
 module Orders = Multimap.Make3(T.Var_to)(T.Vertices)
 module Orders' = Multimap.Make3(T.Vertex_to)(Orders.Set)
@@ -140,13 +141,17 @@ module Make(Tables: TABLES) = struct
         | Gen _ -> failwith "Not supported"
         | Complete -> []
 
-      method private find_paths v l (strategy: T.Reduction.Strategy.t)  =
+      method private find_paths ?filter v l (strategy: T.Reduction.Strategy.t)  =
         let init =
-          T.Vertices.fold (fun v' ps ->
-              T.Nodes.fold (fun n ps ->
-                  Paths.add (v', [n]) ps)
-                ps (Gss.node v v' stack))
-            Paths.empty l
+          match filter with
+          | Some n ->
+            Paths.singleton (T.Vertices.the l, [n])
+          | None ->
+            T.Vertices.fold (fun v' ps ->
+                T.Nodes.fold (fun n ps ->
+                    Paths.add (v', [n]) ps)
+                  ps (Gss.node v v' stack))
+              Paths.empty l
         in
         Paths.to_seq @@ match strategy with
         | Fixed d -> self#successors v [] init d
@@ -154,7 +159,7 @@ module Make(Tables: TABLES) = struct
         | Null -> Paths.singleton (v, [])
 
       method private actor ~null ?filter v l xs = 
-        Fmt.pr "actor %b %a %a %a@," null T.Vertex.pp v T.Vertices.pp l (Fmt.list T.Symbol.pp) xs;
+        (*Fmt.pr "actor %b %a %a %a@," null T.Vertex.pp v T.Vertices.pp l (Fmt.list T.Symbol.pp) xs;*)
         let a = List.fold_left (fun acc x ->
             T.Actions.union (Tables.actions t (T.Vertex.states v) x) acc) T.Actions.empty xs in
         T.Vars.iter (fun x ->
@@ -170,7 +175,7 @@ module Make(Tables: TABLES) = struct
             (Tables.reduce a)
         end;
         T.Reductions.iter (fun r ->
-            self#reduce ?filter v T.Vertices.empty r xs)
+            self#reduce v T.Vertices.empty r xs)
           (Tables.null a);
         Seq.iter (fun output ->
             Seq.iter (fun w ->
@@ -237,41 +242,37 @@ module Make(Tables: TABLES) = struct
 
       method private reduce ?filter v l r xs =
         Seq.iter (fun (w, ns) ->
-            if (match filter, ns with 
-                | Some n, n' :: _  when T.Node.equal n n' -> false
-                | _ -> true)
-            then
-              Tables.goto t (T.Vertex.states w) (Var (T.Labeled_var.var r.output)) |>
-              T.States.iter (fun s ->
-                  let pos = T.Vertex.position v in
-                  let u = T.Vertex.make s pos in
-                  let n = T.Node.make (Var (T.Labeled_var.var r.output)) (T.Vertex.position w) pos in
-                  self#log (Trace.reduce r.output v w u);
-                  if not (Gss.contains u stack) then begin
-                    stack <- Gss.add u stack;
-                    subclasses <- Subclasses.add pos u subclasses;
-                    match r.strategy with
-                    | Null -> self#actor ~null:true u (T.Vertices.singleton w) xs
-                    | _ -> ()
-                  end;
-                  if not (Gss.contains_edge u w stack) then begin
-                    stack <- Gss.connect u w (T.Nodes.singleton n) stack;
-                    forest <- Forest.add n forest;
-                    match r.strategy with
-                    | Null -> ()
-                    | _ -> self#actor ~null:false u (T.Vertices.singleton w) xs
-                  end else if not (Forest.mem n forest) then begin
-                    stack <- Gss.connect u w (T.Nodes.add n @@ Gss.node u w stack) stack;
-                    forest <- Forest.add n forest;
-                    match r.strategy with
-                    | Null -> ()
-                    | _ -> self#actor ~null:false ~filter:n u (T.Vertices.singleton w) xs
-                  end;
-                  orders <- Orders'.add_multiple v (Orders'.find_multiple_or ~default:Orders.empty u orders) orders; (* XXX add orders in any case *)
-                  List.iter (fun ns' ->
-                      forest <- Forest.pack n (T.Vars.singleton @@ T.Labeled_var.label r.output) (ns @ ns') forest)
-                    (self#enumerate pos r.reminder)))
-          (self#find_paths v l r.strategy)
+            Tables.goto t (T.Vertex.states w) (Var (T.Labeled_var.var r.output)) |>
+            T.States.iter (fun s ->
+                let pos = T.Vertex.position v in
+                let u = T.Vertex.make s pos in
+                let n = T.Node.make (Var (T.Labeled_var.var r.output)) (T.Vertex.position w) pos in
+                self#log (Trace.reduce r.output v w u);
+                if not (Gss.contains u stack) then begin
+                  stack <- Gss.add u stack;
+                  subclasses <- Subclasses.add pos u subclasses;
+                  match r.strategy with
+                  | Null -> self#actor ~null:true u (T.Vertices.singleton w) xs
+                  | _ -> ()
+                end;
+                if not (Gss.contains_edge u w stack) then begin
+                  stack <- Gss.connect u w (T.Nodes.singleton n) stack;
+                  forest <- Forest.add n forest;
+                  match r.strategy with
+                  | Null -> ()
+                  | _ -> self#actor ~null:false u (T.Vertices.singleton w) xs
+                end else if not (Forest.mem n forest) then begin
+                  stack <- Gss.connect u w (T.Nodes.add n @@ Gss.node u w stack) stack;
+                  forest <- Forest.add n forest;
+                  match r.strategy with
+                  | Null -> ()
+                  | _ -> self#actor ~null:false ~filter:n u (T.Vertices.singleton w) xs
+                end;
+                orders <- Orders'.add_multiple v (Orders'.find_multiple_or ~default:Orders.empty u orders) orders; (* XXX add orders in any case *)
+                List.iter (fun ns' ->
+                    forest <- Forest.pack n (T.Vars.singleton @@ T.Labeled_var.label r.output) (ns @ ns') forest)
+                  (self#enumerate pos r.reminder)))
+          (self#find_paths ?filter v l r.strategy)
 
       method private expand v =
         Tables.goto t (T.Vertex.states v) Delegate |>

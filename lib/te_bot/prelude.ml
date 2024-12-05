@@ -51,6 +51,13 @@ module List = struct
   | [x] -> x
   | _ -> assert false
 
+  let rec range2 a b acc =
+    if b < a then acc
+    else range2 a (b - 1) (b :: acc)
+
+  let range a b =
+    range2 a b []
+
   let add_opt x xs =
     match x with
     | Some x -> x :: xs
