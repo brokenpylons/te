@@ -51,6 +51,7 @@ module Abstract: sig
   val ( * ): 'ls t -> 'ls t -> 'ls t
   val (+): 'ls t -> 'ls t -> 'ls t
   val (-): 'ls t -> 'ls t -> 'ls t
+  val (~-): 'ls t -> 'ls t
   val (&): 'ls t -> 'ls t -> 'ls t
   val (|..): 'ls t -> int -> 'ls t
   val (|...): 'ls t -> (int * int) -> 'ls t

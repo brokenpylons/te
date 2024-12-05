@@ -15,7 +15,7 @@ module New = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       number;
       true_;
       false_;
-      null;
+      null_;
       members;
       member;
       elements;
@@ -71,7 +71,7 @@ module New = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     string;
     true_;
     false_;
-    null;
+    null_;
   ]
 
   let start = start
@@ -80,19 +80,21 @@ module New = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     Production.[
       make (u, start) R.(var json * plus eof);
 
+      make (u, json) (var value);
+
       make (object', value) (var object_);
       make (array', value) (var array);
-      make (string', value) (var string);
-      make (number', value) (var number);
-      make (true', value) (var true_);
-      make (false', value) (var false_);
-      make (null', value) (var null);
+      make (string', value) R.(var string * var ws);
+      make (number', value) R.(var number * var ws);
+      make (true', value) R.(var true_ * var ws);
+      make (false', value) R.(var false_ * var ws);
+      make (null', value) R.(var null_ * var ws);
 
-      make (u, object_) R.(codes "{" * var ws * var members * codes "}" * var ws);
+      make (u, object_) R.(codes "{" * var ws * opt (var members) * codes "}" * var ws);
       make (u, members) R.(star (var member * codes "," * var ws) * var member);
-      make (u, member) R.(var string * var ws * codes ":" * var ws * codes ":" * var ws * var value);
+      make (u, member) R.(var string * var ws * codes ":" * var ws * var value);
 
-      make (u, array) R.(codes "[" * var ws * var members * codes "]" * var ws);
+      make (u, array) R.(codes "[" * var ws * opt (var elements) * codes "]" * var ws);
       make (u, elements) R.(star (var element * codes "," * var ws) * var element);
       make (u, element) (var value);
     ]
@@ -112,7 +114,8 @@ module New = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (u, string) R.(codes "\"" * star characters * codes "\"");
       make (u, true_) (text "true");
       make (u, false_) (text "false");
-      make (u, null) (text "null");
+      make (u, null_) (text "null");
+      make (u, ws) R.(star (codes " \n\r\t"));
     ]
 
 end)

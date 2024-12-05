@@ -288,6 +288,7 @@ module Abstract = struct
   let ( * ) x y = concat x y
   let (+) x y = union x y
   let (-) x y = diff x y
+  let (~-) x = comp x
   let (&) x y = inter x y
   let (|..) x i = repeat x i
   let (|...) x (i, j) = interval x i j
