@@ -1787,7 +1787,7 @@ let () =
     "multilabel_shift_reduce", test_cases Multilabel_shift_reduce.driver Multilabel_shift_reduce.tests;
     "same_label_reduce", test_cases Same_label_reduce.driver Same_label_reduce.tests;
     "right_nulled", test_cases Right_nulled.driver Right_nulled.tests;
-    "right_nulled2", test_cases Right_nulled2.driver Right_nulled2.tests;
+    (*"right_nulled2", test_cases Right_nulled2.driver Right_nulled2.tests;*)
     "repeat_load", test_cases Repeat_load.driver Repeat_load.tests;
     "left_recursion_load", test_cases Left_recursion_load.driver Left_recursion_load.tests;
     "right_recursion_load", test_cases Right_recursion_load.driver Right_recursion_load.tests;

@@ -1061,6 +1061,11 @@ let back _lexical eprods =
     PA.empty
   |> PA.rev
 
+let resolve_tail tail =
+  tail
+  |> Rhs.to_seq ~cmp:T.Var.compare (T.Vars.to_seq % Lits.to_vars)
+  |> Seq.map List.of_seq
+  |> List.of_seq
 
 let shift lexical _ lookahead' s' a =
   let (let*) = Seq.bind in
@@ -1111,7 +1116,10 @@ let null lexical _ lookahead' s' a =
   Seq.return
     (Enhanced_lits.strip @@ (lookahead' lhs s rhs).Lookahead.reduce_lookahead,
      T.Actions.null (T.Reductions.singleton
-                       (T.Reduction.make (part.label, lhs) Null (Lists [[]]))))
+                       (T.Reduction.make
+                          (part.label, lhs)
+                          Null
+                          (Lists [[]]))))
 
 let shift_null lexical _ lookahead' s' a =
   let (let*) = Seq.bind in
@@ -1125,7 +1133,11 @@ let shift_null lexical _ lookahead' s' a =
   Seq.return
     (Enhanced_lits.strip @@ (lookahead' lhs s rhs).Lookahead.reduce_lookahead,
      T.Actions.null (T.Reductions.singleton
-                       (T.Reduction.make (part.label, lhs) Null (Lists [[]]))))
+                       (T.Reduction.make (part.label, lhs) 
+                          Null
+                          (if not part.is_reduce
+                           then Lists (resolve_tail part.tail)
+                           else Complete))))
 
 let select_strategy part s' q =
   match Size.to_int @@ part.Collapsed_items.Part.distance with
@@ -1142,7 +1154,11 @@ let reduce lexical _ lookahead' s' a =
   Seq.return
     (Enhanced_lits.strip @@ (lookahead' lhs s rhs).Lookahead.reduce_lookahead,
      T.Actions.reduce (T.Reductions.singleton
-                         (T.Reduction.make (part.label, lhs) (select_strategy part s' rhs) (Lists [[]]))))
+                         (T.Reduction.make (part.label, lhs)
+                            (select_strategy part s' rhs)
+                            (if not part.is_reduce
+                             then Lists (resolve_tail part.tail)
+                             else Complete))))
 
 let actions lexical first lookahead' s a =
   let fs = List.to_seq @@ [shift; orders; matches; predictions; null; shift_null; reduce] in
