@@ -90,7 +90,7 @@ module New = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (false', value) R.(var false_ * var ws);
       make (null', value) R.(var null_ * var ws);
 
-      make (u, object_) R.(codes "{" * var ws * opt (var members) * codes "}" * var ws);
+      make (u, object_) R.(codes "(" * var ws * opt (var members) * codes ")" * var ws);
       make (u, members) R.(star (var member * codes "," * var ws) * var member);
       make (u, member) R.(var string * var ws * codes ":" * var ws * var value);
 

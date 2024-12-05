@@ -139,7 +139,7 @@ module Make(Tables: TABLES) = struct
               List.map (fun x -> T.Node.make (Var x) pos pos) xs)
             xss
         | Gen _ -> failwith "Not supported"
-        | Complete -> []
+        | Complete -> [[]]
 
       method private find_paths ?filter v l (strategy: T.Reduction.Strategy.t)  =
         let init =
