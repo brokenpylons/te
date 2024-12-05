@@ -98,10 +98,10 @@ module Make(Node: NODE)(Labels: LABELS)(Node_map: NODE_MAP with type elt = Node.
     let ctxs = Node_map.to_seq f in
 
     let nodes = Seq.map (fun (n, adjs) ->
-        let ports = List.mapi (fun i (lbls, _) -> Dot.RecordPortString (Int.to_string i, Fmt.str "%a" Labels.pp lbls)) adjs in
+        let ports = List.mapi (fun i (lbls, _) -> Dot.(RecordPortString (Int.to_string i, escape_string @@ Fmt.str "%a" Labels.pp lbls))) adjs in
         Dot.(node (Node.to_id n) ~attrs:[
             "shape" => Id "record";
-            "label" => String (string_of_record [Record [RecordString (Fmt.str "%a" Node.pp n); Record ports]])
+            "label" => String (string_of_record [Record [RecordString (escape_string @@ Fmt.str "%a" Node.pp n); Record ports]])
           ]))
         ctxs
     in
