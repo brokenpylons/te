@@ -1,0 +1,4 @@
+(executable
+ (public_name te)
+ (name te_json)
+ (libraries te_core te_bot))
