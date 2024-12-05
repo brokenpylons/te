@@ -1,4 +1,0 @@
-(executable
- (public_name te)
- (name with_tables)
- (libraries te_core te_bot))
