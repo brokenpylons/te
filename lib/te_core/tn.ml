@@ -486,23 +486,18 @@ module Rhs = struct
 end
 
 module Item = struct
-  type t = {lhs: T.Labeled_var.t; rhs: T.State.t; is_kernel: bool; is_reduce: bool; distance: Size.t}
+  type t = {lhs: T.Labeled_var.t; rhs: Rhs.t; is_kernel: bool; is_reduce: bool; distance: Size.t}
   [@@deriving eq, ord]
 
   let pp ppf {lhs; rhs; is_kernel; is_reduce; distance} =
     Fmt.pf ppf "@[%a ::= %a %a %a %a@]"
       T.Labeled_var.pp lhs
-      T.State.pp rhs
+      Rhs.pp rhs
       (pp_if is_kernel Fmt.string) "K"
       (pp_if is_reduce Fmt.string) "R"
       Size.pp distance
 end
-
-module Preitem = struct
-  type t = {lhs: T.Labeled_var.t; rhs: Rhs.t; is_kernel: bool; is_reduce: bool; distance: Size.t}
-  [@@deriving eq, ord]
-end
-module Preitem_to = Balanced_binary_tree.Map.Size(Preitem)
+module Item_to = Balanced_binary_tree.Map.Size(Item)
 
 module Production = struct
   type t = {lhs: T.Labeled_var.t; rhs: Rhs.t}
@@ -539,13 +534,13 @@ end
 (* Group by state *)
 module Collapsed_items = struct
   module Part = struct
-    type t = {label: T.Var.t; state: T.State.t; is_kernel: bool; is_reduce: bool; distance: Size.t}
+    type t = {label: T.Var.t; tail: Rhs.t; is_kernel: bool; is_reduce: bool; distance: Size.t}
     [@@deriving eq, ord]
 
-    let pp ppf {label; state; is_kernel; is_reduce; distance} =
+    let pp ppf {label; tail; is_kernel; is_reduce; distance} =
       Fmt.pf ppf "@[%a %a %a %a %a@]"
         T.Var.pp label
-        T.State.pp state
+        Rhs.pp tail
         (pp_if is_kernel Fmt.string) "K"
         (pp_if is_reduce Fmt.string) "R"
         Size.pp distance
@@ -617,14 +612,14 @@ let index_productions ps =
     ps
 
 let construct ~supply start lexical prods =
-  let module Gen = A.Gen(T.State_index(Preitem_to)) in
-  Gen.unfold_multiple ~supply ~merge:Lits.union (fun q {lhs; rhs; is_kernel; is_reduce; distance} ->
+  let module Gen = A.Gen(T.State_index(Item_to)) in
+  Gen.unfold_multiple ~supply ~merge:Lits.union (fun _ {lhs; rhs; is_kernel; is_reduce; distance} ->
       let fs = refine @@ Rhs.first rhs in
       let kernel = Seq.filter_map (fun lts ->
           let rhs' = Rhs.simplify @@ Rhs.derivative lts rhs in
           if Rhs.is_nothing rhs'
           then None
-          else Some (lts, Preitem.{
+          else Some (lts, Item.{
               lhs;
               rhs = rhs';
               distance = if Rhs.is_infinite rhs' then Size.top else Size.succ distance;
@@ -636,7 +631,7 @@ let construct ~supply start lexical prods =
       let nonkernel =
         Seq.flat_map (fun var ->
             Seq.map (fun Production.{lhs; rhs} ->
-                ((if T.Vars.mem var lexical then Lits.scan else Lits.call) (T.Vars.singleton var), Preitem.{
+                ((if T.Vars.mem var lexical then Lits.scan else Lits.call) (T.Vars.singleton var), Item.{
                      lhs;
                      rhs;
                      distance = Size.zero;
@@ -646,9 +641,9 @@ let construct ~supply start lexical prods =
               (Productions.to_seq @@ Production_index.find_multiple var prods))
           (T.Vars.to_seq @@ Lits.to_vars @@ Seq.fold_left Lits.union Lits.empty fs)
       in
-      Item.{lhs; rhs = q; is_kernel; is_reduce; distance}, Seq.(kernel @ nonkernel))
+      Item.{lhs; rhs; is_kernel; is_reduce; distance}, Seq.(kernel @ nonkernel))
     (List.of_seq @@ Seq.map (fun Production.{lhs; rhs} ->
-         Preitem.{
+         Item.{
            lhs;
            rhs;
            distance = Size.zero;
@@ -664,7 +659,7 @@ let collapse_items p qs a =
       Collapsed_items.add (var, p)
         Collapsed_items.Part.{
           label;
-          state = it.rhs;
+          tail = it.rhs;
           is_kernel = it.is_kernel;
           is_reduce = it.is_reduce;
           distance = it.distance;
