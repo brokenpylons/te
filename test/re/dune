@@ -1,3 +1,0 @@
-(test
- (name te_re_test)
- (libraries te_bot te_core alcotest))
