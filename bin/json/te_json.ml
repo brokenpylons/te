@@ -2,7 +2,7 @@ open Te_bot
 open Te_core
 module T = Types
 
-module New = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
+module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   open Context
 
   let Vector.[
@@ -121,7 +121,7 @@ module New = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
 end)
 
 let _ =
-  let d = New.driver () in
-  New.Run.file (fun c -> d#read c) "test.json";
+  let d = X.driver () in
+  X.Run.file (fun c -> d#read c) "test.json";
   Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);
   Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))

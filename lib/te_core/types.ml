@@ -500,7 +500,8 @@ module Actions = struct
   [@@deriving eq, ord]
 
   let pp ppf x =
-    Fmt.pf ppf "@[%a%a%a%a%a%a@]"
+    Fmt.pf ppf "@[%a%a%a%a%a%a%a@]"
+      (pp_if x.shift Fmt.string) "SHIFT"
       (pp_if x.load Fmt.string) "LOAD"
       (pp_if (not @@ Vars.is_empty x.orders) (fun ppf -> Fmt.pf ppf "ORDER %a" Vars.pp)) x.orders
       (pp_if (not @@ Labeled_vars.is_empty x.matches) (fun ppf -> Fmt.pf ppf "MATCH %a" Labeled_vars.pp)) x.matches

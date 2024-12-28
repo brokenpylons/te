@@ -628,6 +628,12 @@ let construct ~supply start lexical prods =
             }))
           fs
       in
+      let vars = Lits.to_vars @@ Seq.fold_left Lits.union Lits.empty fs in
+      (* OVEREXPAND *)
+      (*let vars = if not @@ T.Vars.is_empty (T.Vars.inter vars lexical)
+        then T.Vars.union vars lexical
+        else vars
+      in*)
       let nonkernel =
         Seq.flat_map (fun var ->
             Seq.map (fun Production.{lhs; rhs} ->
@@ -639,7 +645,7 @@ let construct ~supply start lexical prods =
                      is_reduce = Rhs.is_nullable rhs;
                    }))
               (Productions.to_seq @@ Production_index.find_multiple var prods))
-          (T.Vars.to_seq @@ Lits.to_vars @@ Seq.fold_left Lits.union Lits.empty fs)
+          (T.Vars.to_seq @@ vars)
       in
       Item.{lhs; rhs; is_kernel; is_reduce; distance}, Seq.(kernel @ nonkernel))
     (List.of_seq @@ Seq.map (fun Production.{lhs; rhs} ->
@@ -667,7 +673,7 @@ let collapse_items p qs a =
         acc)
     Collapsed_items.empty (T.States.to_seq qs)
 
-let subset_items qs a =
+let lr_items qs a =
   T.States.to_seq qs
   |> Seq.map (fun q -> A.labels q a)
   |> Seq.fold_left Collapsed_items.union Collapsed_items.empty
@@ -731,7 +737,7 @@ let closure a qs =
   let module C = Closure.Make(T.States) in
   C.closure (fun q -> A.goto q Lits.is_call a) qs
 
-let subset ~supply a =
+let lr ~supply a =
   let module Gen = A.Gen(T.State_index(T.States_to)) in
   Gen.unfold ~supply ~merge:Lits.union (fun _ from ->
       let module R = Refine.Map(Lits)(T.States) in
@@ -742,14 +748,13 @@ let subset ~supply a =
         |> R.refine
         |> R.partitions
       in
-      (subset_items from a, next))
+      (lr_items from a, next))
     (closure a @@ A.start_multiple a)
 
-let subset' ~supply a =
+let noncanonical_subset ~supply a =
   let module Gen = A.Gen(T.Preserve_state_index) in
   Gen.unfold ~supply ~merge:Lits.union (fun _ from ->
       let module R = Refine.Map(Lits)(T.States) in
-      let from = closure a from in
       let next =
         A.adjacent_multiple from a
         |> Seq.filter_map (fun (s, lts) -> if Lits.is_call lts then None else Some (lts, T.States.singleton s))
@@ -1073,6 +1078,15 @@ let shift lexical _ lookahead' s' a =
   let* (lhs, rhs) = Collapsed_items.heads its in
   let* () = Seq.guard (not @@ T.Vars.mem lhs lexical) in
   Seq.return
+    (Enhanced_lits.strip (lookahead' lhs s rhs).Lookahead.lexical_lookahead,
+     T.Actions.shift)
+
+let load lexical _ lookahead' s' a =
+  let (let*) = Seq.bind in
+  let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
+  let* (lhs, rhs) = Collapsed_items.heads its in
+  let* () = Seq.guard (not @@ T.Vars.mem lhs lexical) in
+  Seq.return
     (Enhanced_lits.strip (lookahead' lhs s rhs).Lookahead.code_lookahead,
      T.Actions.load)
 
@@ -1099,9 +1113,9 @@ let matches lexical _ lookahead' s' a =
 let predictions lexical _ lookahead' s' a =
   let (let*) = Seq.bind in
   let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
-  let* (lhs, rhs), parts = Collapsed_items.to_seq its in
-  let* part = parts in
-  let* () = Seq.guard (T.Vars.mem lhs lexical && part.is_kernel) in
+  let* (lhs, rhs), _parts = Collapsed_items.to_seq its in
+  (*let* part = parts in*)
+  let* () = Seq.guard (T.Vars.mem lhs lexical (* && part.is_kernel *)) in
   Seq.return
     (Enhanced_lits.strip @@ (lookahead' lhs s rhs).Lookahead.shift_lookahead,
      T.Actions.predictions (T.Vars.singleton lhs))
@@ -1161,7 +1175,7 @@ let reduce lexical _ lookahead' s' a =
                              else Complete))))
 
 let actions lexical first lookahead' s a =
-  let fs = List.to_seq @@ [shift; orders; matches; predictions; null; shift_null; reduce] in
+  let fs = List.to_seq @@ [shift; load; orders; matches; predictions; null; shift_null; reduce] in
   Seq.flat_map (fun f -> f lexical first lookahead' s a) fs
 
 (* FOR DEBUGGING *)
@@ -1191,6 +1205,8 @@ let with_actions lexical first lookahead' a =
       actions' lexical first lookahead' s a)
     a
 
+let to_dot'''''''' a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Actions_multimap.pp)) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
+
 let build syntactic lexical start prods  =
   assert (T.Vars.disjoint syntactic lexical);
 
@@ -1201,8 +1217,8 @@ let build syntactic lexical start prods  =
   let cprods = collapsed_productions d in
   let icprods = index_collapsed_productions cprods in
 
-  let subset_supply1, subset_supply2 = Supply.split2 @@ T.State.fresh_supply () in
-  let p = subset ~supply:subset_supply1 d in
+  let lr_supply1, lr_supply2 = Supply.split2 @@ T.State.fresh_supply () in
+  let p = lr ~supply:lr_supply1 d in
 
   let eprods1 = enhanced_productions icprods p in
 
@@ -1215,13 +1231,16 @@ let build syntactic lexical start prods  =
   let nc =
     noncanonical lexical lookahead' p
     |> erase_scan 
-    |> subset' ~supply:subset_supply2
+    |> noncanonical_subset ~supply:lr_supply2
   in
+
 
   let eprods2 = enhanced_productions icprods (A.map_labels (fun _ -> Noncanonical_items.join) nc) in
 
   let first = first analysis in
   let back = back lexical eprods2 in
+
+  Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot'''''''' (with_actions lexical first lookahead' nc)));
 
   (first, lookahead', nc, back)
 

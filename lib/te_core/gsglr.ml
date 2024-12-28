@@ -232,11 +232,12 @@ module Make(Tables: TABLES) = struct
            |> Orders.find_multiple_or ~default:T.Vertices.empty (T.Labeled_var.var output)
            |> T.Vertices.to_seq)
 
-      method private prediction v l xs =
+      method private prediction v l vars =
+        let xs = (List.map (fun x -> T.Symbol.Var x) vars) in
         Seq.iter (fun w ->
-            if not (Orders'.domain_mem w orders) then begin
-              self#log (Trace.predict v w xs);
-              self#actor ~null:false w (Segments.find_multiple w reduce) (List.map (fun x -> T.Symbol.Var x) xs)
+            if not (Orders'.domain_mem w orders) && List.exists (fun x -> Tables.shift @@ Tables.actions t (T.Vertex.states w) x) xs then begin
+              self#log (Trace.predict v w vars);
+              self#actor ~null:false w (Segments.find_multiple w reduce) xs
             end)
           (T.Vertices.to_seq l)
 
@@ -307,19 +308,23 @@ module Make(Tables: TABLES) = struct
         (*Fmt.pr "AFTER %a@," (T.Vertex_to.pp (Fmt.parens T.Vertices.pp)) read0;*)
         Seq.iter (fun (w, l) ->
             Seq.iter (fun v ->
-                Tables.goto t (T.Vertex.states w) x |>
-                T.States.iter (fun s ->
-                    let pos = succ @@ T.Vertex.position w in
-                    let u = T.Vertex.make s pos in
-                    self#log (Trace.read x v w u );
-                    if not (Gss.contains u stack) then begin
-                      stack <- Gss.add u stack;
-                      subclasses <- Subclasses.add pos u subclasses;
-                    end;
-                    if not (Gss.contains_edge u v stack) then begin
-                      stack <- Gss.connect u v T.Nodes.empty stack;
-                      read1 <- Segments.add u v read1
-                    end))
+                if T.Vars.exists (fun x ->
+                    Tables.shift @@ Tables.actions t (T.Vertex.states v) (T.Symbol.Var x))
+                    (Tables.predictions @@ Tables.actions t (T.Vertex.states w) x)
+                then
+                  Tables.goto t (T.Vertex.states w) x |>
+                  T.States.iter (fun s ->
+                      let pos = succ @@ T.Vertex.position w in
+                      let u = T.Vertex.make s pos in
+                      self#log (Trace.read x v w u );
+                      if not (Gss.contains u stack) then begin
+                        stack <- Gss.add u stack;
+                        subclasses <- Subclasses.add pos u subclasses;
+                      end;
+                      if not (Gss.contains_edge u v stack) then begin
+                        stack <- Gss.connect u v T.Nodes.empty stack;
+                        read1 <- Segments.add u v read1
+                      end))
               (T.Vertices.to_seq l))
           (Segments.to_seq_multiple read0);
       end
