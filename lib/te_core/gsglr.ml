@@ -161,19 +161,19 @@ module Make(Tables: TABLES) = struct
       method private actor ~null ?filter v l xs = 
         (*Fmt.pr "actor %b %a %a %a@," null T.Vertex.pp v T.Vertices.pp l (Fmt.list T.Symbol.pp) xs;*)
         let a = List.fold_left (fun acc x ->
-            T.Actions.union (Tables.actions t (T.Vertex.states v) x) acc) T.Actions.empty xs in
+            T.Actions.union (Tables.actions t (T.Vertex.states v) x) acc)
+            T.Actions.empty xs
+        in
         T.Vars.iter (fun x ->
             self#log (Trace.order v x);
             orders <- Orders'.add_multiple v (Orders.singleton x v) orders)
           (Tables.orders a);
-        if not (T.Labeled_vars.is_empty @@ Tables.matches a) then begin
+        if not (T.Labeled_vars.is_empty @@ Tables.matches a) then
           self#prediction v l (T.Vars.to_list @@ Tables.predictions a);
-        end;
-        if not null then begin
+        if not null then
           T.Reductions.iter (fun r ->
               self#reduce ?filter v l r xs)
-            (Tables.reduce a)
-        end;
+            (Tables.reduce a);
         T.Reductions.iter (fun r ->
             self#reduce v T.Vertices.empty r xs)
           (Tables.null a);
@@ -184,7 +184,12 @@ module Make(Tables: TABLES) = struct
               (T.Vertices.to_seq l))
           (T.Labeled_vars.to_seq @@ Tables.matches a);
         List.iter (fun x ->
-            if (match x with T.Symbol.Eof -> true | T.Symbol.Code _ -> true | _ -> false) && Tables.load @@ Tables.actions t (T.Vertex.states v) x then self#load v x)
+            if (match x with
+                | T.Symbol.Eof -> true
+                | T.Symbol.Code _ -> true
+                | _ -> false) &&
+               Tables.load @@ Tables.actions t (T.Vertex.states v) x
+            then self#load v x)
           xs
 
       method private load v x =
@@ -233,9 +238,11 @@ module Make(Tables: TABLES) = struct
            |> T.Vertices.to_seq)
 
       method private prediction v l vars =
-        let xs = (List.map (fun x -> T.Symbol.Var x) vars) in
+        let xs = List.map (fun x -> T.Symbol.Var x) vars in
         Seq.iter (fun w ->
-            if not (Orders'.domain_mem w orders) && List.exists (fun x -> Tables.shift @@ Tables.actions t (T.Vertex.states w) x) xs then begin
+            let xs = List.filter (fun x -> Tables.shift @@ Tables.actions t (T.Vertex.states w) x) xs
+            in
+            if not (Orders'.domain_mem w orders) && not (List.is_empty xs) then begin
               self#log (Trace.predict v w vars);
               self#actor ~null:false w (Segments.find_multiple w reduce) xs
             end)
@@ -269,7 +276,7 @@ module Make(Tables: TABLES) = struct
                   | Null -> ()
                   | _ -> self#actor ~null:false ~filter:n u (T.Vertices.singleton w) xs
                 end;
-                orders <- Orders'.add_multiple v (Orders'.find_multiple_or ~default:Orders.empty u orders) orders; (* XXX add orders in any case *)
+                orders <- Orders'.add_multiple v (Orders'.find_multiple_or ~default:Orders.empty u orders) orders; (* add orders in any case *)
                 List.iter (fun ns' ->
                     forest <- Forest.pack n (T.Vars.singleton @@ T.Labeled_var.label r.output) (ns @ ns') forest)
                   (self#enumerate pos r.reminder)))
