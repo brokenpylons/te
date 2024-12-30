@@ -1053,9 +1053,8 @@ let noncanonical lexical lookahead' a =
       in
       let* (t, lts') = A.adjacent q a in
 
-      let lts_scan = Lits.scan lts'.Lits.scan in
-      let* () = Seq.guard (not @@ Lits.is_empty lts_scan) in
-      Seq.return (s, t, lts_scan))
+      let* () = Seq.guard (Lits.is_scan' lts') in
+      Seq.return (s, t, Lits.scan'))
     a
 
 let back _lexical eprods =
@@ -1218,7 +1217,9 @@ let build syntactic lexical start prods  =
   let icprods = index_collapsed_productions cprods in
 
   let lr_supply1, lr_supply2 = Supply.split2 @@ T.State.fresh_supply () in
-  let p = lr ~supply:lr_supply1 d in
+  let p = 
+    lr ~supply:lr_supply1 (erase_scan d)
+  in
 
   let eprods1 = enhanced_productions icprods p in
 
@@ -1230,7 +1231,6 @@ let build syntactic lexical start prods  =
 
   let nc =
     noncanonical lexical lookahead' p
-    |> erase_scan 
     |> noncanonical_subset ~supply:lr_supply2
   in
 

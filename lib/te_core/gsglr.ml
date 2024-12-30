@@ -102,6 +102,7 @@ module Make(Tables: TABLES) = struct
       val mutable orders = Orders'.empty
 
       (* roots *)
+      val mutable processed = T.Vertices.empty
       val mutable reduce = Segments.singleton bottom bottom
       val mutable read0 = Segments.empty
       val mutable read1 = Segments.empty
@@ -164,10 +165,8 @@ module Make(Tables: TABLES) = struct
             T.Actions.union (Tables.actions t (T.Vertex.states v) x) acc)
             T.Actions.empty xs
         in
-        T.Vars.iter (fun x ->
-            self#log (Trace.order v x);
-            orders <- Orders'.add_multiple v (Orders.singleton x v) orders)
-          (Tables.orders a);
+        if not (Orders'.domain_mem v orders) then
+          self#order v xs;
         if not (T.Labeled_vars.is_empty @@ Tables.matches a) then
           self#prediction v l (T.Vars.to_list @@ Tables.predictions a);
         if not null then
@@ -177,12 +176,13 @@ module Make(Tables: TABLES) = struct
         T.Reductions.iter (fun r ->
             self#reduce v T.Vertices.empty r xs)
           (Tables.null a);
-        Seq.iter (fun output ->
-            Seq.iter (fun w ->
-                let pos = T.Vertex.position v in
-                self#shift pos v w output)
-              (T.Vertices.to_seq l))
-          (T.Labeled_vars.to_seq @@ Tables.matches a);
+        if not null then
+          Seq.iter (fun output ->
+              Seq.iter (fun w ->
+                  let pos = T.Vertex.position v in
+                  self#shift pos v w output)
+                (T.Vertices.to_seq l))
+            (T.Labeled_vars.to_seq @@ Tables.matches a);
         List.iter (fun x ->
             if (match x with
                 | T.Symbol.Eof -> true
@@ -191,6 +191,16 @@ module Make(Tables: TABLES) = struct
                Tables.load @@ Tables.actions t (T.Vertex.states v) x
             then self#load v x)
           xs
+
+      method private order v xs =
+        let a = List.fold_left (fun acc x ->
+            T.Actions.union (Tables.actions t (T.Vertex.states v) x) acc)
+            T.Actions.empty xs
+        in
+        T.Vars.iter (fun x ->
+            self#log (Trace.order v x);
+            orders <- Orders'.add_multiple v (Orders.singleton x v) orders)
+          (Tables.orders a)
 
       method private load v x =
         Tables.goto t (T.Vertex.states v) x |>
@@ -242,9 +252,10 @@ module Make(Tables: TABLES) = struct
         Seq.iter (fun w ->
             let xs = List.filter (fun x -> Tables.shift @@ Tables.actions t (T.Vertex.states w) x) xs
             in
-            if not (Orders'.domain_mem w orders) && not (List.is_empty xs) then begin
+            if not (T.Vertices.mem  w processed) && not (List.is_empty xs) then begin
               self#log (Trace.predict v w vars);
-              self#actor ~null:false w (Segments.find_multiple w reduce) xs
+              self#actor ~null:false w (Segments.find_multiple w reduce) xs;
+              processed <- T.Vertices.add w processed
             end)
           (T.Vertices.to_seq l)
 
@@ -276,6 +287,8 @@ module Make(Tables: TABLES) = struct
                   | Null -> ()
                   | _ -> self#actor ~null:false ~filter:n u (T.Vertices.singleton w) xs
                 end;
+                if not (Orders'.domain_mem u orders) then
+                  self#order u xs;
                 orders <- Orders'.add_multiple v (Orders'.find_multiple_or ~default:Orders.empty u orders) orders; (* add orders in any case *)
                 List.iter (fun ns' ->
                     forest <- Forest.pack n (T.Vars.singleton @@ T.Labeled_var.label r.output) (ns @ ns') forest)
