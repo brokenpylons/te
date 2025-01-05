@@ -12,11 +12,11 @@ module Back_map = struct
   let pp = T.State_to.pp T.State_pair_partial.pp
 end
 
-let actions lexical first lookahead' a =
+let actions lexical lookahead' a =
   A.states a
   |> T.States.to_seq
   |> Seq.map (fun s -> 
-      (s, Tn.actions lexical first lookahead' s a
+      (s, Tn.actions lexical lookahead' s a
           |> Seq.map (fun (lts, x) -> Tn.Actions_multimap.singleton_multiple lts x)
           |> Seq.fold_left Tn.Actions_multimap.union Tn.Actions_multimap.empty))
   |> T.State_to.of_seq
@@ -58,12 +58,12 @@ module Unoptimized = struct
     }
   [@@deriving show]
 
-  let make lexical first lookahead' g b =
+  let make lexical lookahead' g b =
     {
       start = A.start g;
       goto = goto g;
       orders = orders lexical g;
-      actions = actions lexical first lookahead' g;
+      actions = actions lexical lookahead' g;
       back = back b;
     }
 

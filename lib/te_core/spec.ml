@@ -121,8 +121,8 @@ module Build(Spec: SPEC') = struct
     let syntactic = T.Vars.of_list Spec'.syntactic in
     let lexical = T.Vars.of_list Spec'.lexical in
 
-    let (first, lookahead, g, b) = Tn.build syntactic lexical Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
-    let t = Tables.Unoptimized.make lexical first lookahead g b in
+    let (lookahead, g, b) = Tn.build syntactic lexical Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
+    let t = Tables.Unoptimized.make lexical lookahead g b in
     new X.driver t
 
   module Run = struct
@@ -157,8 +157,8 @@ module Test(Spec: SPEC) = struct
     let lexical = T.Vars.of_list Spec'.lexical in
     let syntactic = T.Vars.of_list Spec'.syntactic in
 
-    let (first, lookahead, g, b) = Tn.build syntactic lexical Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
-    let t = Tables.Unoptimized.make lexical first lookahead g b in
+    let (lookahead, g, b) = Tn.build syntactic lexical Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
+    let t = Tables.Unoptimized.make lexical lookahead g b in
     new X.driver t
 end
 

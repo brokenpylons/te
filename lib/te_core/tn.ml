@@ -1026,9 +1026,6 @@ module Lookahead = struct
     {right_nulled; shift_lookahead; reduce_lookahead; lexical_lookahead; code_lookahead}
 end
 
-let first analysis var s =
-  analysis.Analysis.first_per_lits (Enhanced_lits.of_vars @@ Enhanced_vars.singleton (s, var))
-
 let add_backlinks lookahead' lookback a =
   let (let*) = Seq.bind in
   A.extend ~merge:Lits.union (fun s its ->
@@ -1074,7 +1071,7 @@ let resolve_tail tail =
   |> Seq.map List.of_seq
   |> List.of_seq
 
-let shift lexical _ lookahead' s' a =
+let shift lexical lookahead' s' a =
   let (let*) = Seq.bind in
   let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
   let* (lhs, rhs) = Collapsed_items.heads its in
@@ -1083,7 +1080,7 @@ let shift lexical _ lookahead' s' a =
     (Enhanced_lits.strip (lookahead' lhs s rhs).Lookahead.lexical_lookahead,
      T.Actions.shift)
 
-let load lexical _ lookahead' s' a =
+let load lexical lookahead' s' a =
   let (let*) = Seq.bind in
   let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
   let* (lhs, rhs) = Collapsed_items.heads its in
@@ -1092,7 +1089,7 @@ let load lexical _ lookahead' s' a =
     (Enhanced_lits.strip (lookahead' lhs s rhs).Lookahead.code_lookahead,
      T.Actions.load)
 
-let matches lexical _ lookahead' s' a =
+let matches lexical lookahead' s' a =
   let (let*) = Seq.bind in
   let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
   let* (lhs, rhs), parts = Collapsed_items.to_seq its in
@@ -1102,7 +1099,7 @@ let matches lexical _ lookahead' s' a =
     (Enhanced_lits.strip @@ (lookahead' lhs s rhs).Lookahead.reduce_lookahead,
      T.Actions.matches (T.Labeled_vars.singleton (part.label, lhs)))
 
-let predictions lexical _ lookahead' s' a =
+let predictions lexical lookahead' s' a =
   let (let*) = Seq.bind in
   let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
   let* (lhs, rhs) = Collapsed_items.heads its in
@@ -1111,7 +1108,7 @@ let predictions lexical _ lookahead' s' a =
     (Enhanced_lits.strip @@ (lookahead' lhs s rhs).Lookahead.shift_lookahead,
      T.Actions.predictions (T.Vars.singleton lhs))
 
-let null lexical _ lookahead' s' a =
+let null lexical lookahead' s' a =
   let (let*) = Seq.bind in
   let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
   let* (lhs, rhs), parts = Collapsed_items.to_seq its in
@@ -1128,7 +1125,7 @@ let null lexical _ lookahead' s' a =
                            then Lists (resolve_tail part.tail)
                            else Complete))))
 
-let shift_null lexical _ lookahead' s' a =
+let shift_null lexical lookahead' s' a =
   let (let*) = Seq.bind in
   let* (q, lts) = A.adjacent s' a in
   let* () = Seq.guard (Lits.is_scan' lts) in
@@ -1151,7 +1148,7 @@ let select_strategy part s' q =
   | Some d -> T.Reduction.Strategy.Fixed d
   | None -> T.Reduction.Strategy.Scan (s', q)
 
-let reduce lexical _ lookahead' s' a =
+let reduce lexical lookahead' s' a =
   let (let*) = Seq.bind in
   let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
   let* (lhs, rhs), parts = Collapsed_items.to_seq its in
@@ -1167,9 +1164,9 @@ let reduce lexical _ lookahead' s' a =
                              then Lists (resolve_tail part.tail)
                              else Complete))))
 
-let actions lexical first lookahead' s a =
+let actions lexical lookahead' s a =
   let fs = List.to_seq @@ [shift; load; matches; predictions; null; shift_null; reduce] in
-  Seq.flat_map (fun f -> f lexical first lookahead' s a) fs
+  Seq.flat_map (fun f -> f lexical lookahead' s a) fs
 
 (* FOR DEBUGGING *)
 let with_lookahead lookahead' a =
@@ -1186,16 +1183,16 @@ let with_nullable lookahead' a =
         (Collapsed_items.heads its))
     a
 
-let actions' lexical first lookahead' s a =
-  actions lexical first lookahead' s a
+let actions' lexical lookahead' s a =
+  actions lexical lookahead' s a
   |> Seq.filter (fun (lts, _) -> not @@ Lits.is_empty lts)
   |> Seq.map (fun (lts, x) -> Actions_multimap.singleton_multiple lts x)
   |> Seq.fold_left Actions_multimap.union Actions_multimap.empty
 
 
-let with_actions lexical first lookahead' a =
+let with_actions lexical lookahead' a =
   A.map_labels (fun s _ ->
-      actions' lexical first lookahead' s a)
+      actions' lexical lookahead' s a)
     a
 
 let to_dot a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Actions_multimap.pp)) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
@@ -1228,10 +1225,9 @@ let build syntactic lexical start prods  =
     |> noncanonical_subset ~supply:lr_supply2
   in
 
-  let first = first analysis in
   let back = return lexical eprods1 in
 
-  Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot (with_actions lexical first lookahead' nc)));
+  Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot (with_actions lexical lookahead' nc)));
 
-  (first, lookahead', nc, back)
+  (lookahead', nc, back)
 
