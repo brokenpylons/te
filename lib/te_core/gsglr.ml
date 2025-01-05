@@ -176,13 +176,12 @@ module Make(Tables: TABLES) = struct
         T.Reductions.iter (fun r ->
             self#reduce v T.Vertices.empty r xs)
           (Tables.null a);
-        if not null then
-          Seq.iter (fun output ->
-              Seq.iter (fun w ->
-                  let pos = T.Vertex.position v in
-                  self#shift pos v w output)
-                (T.Vertices.to_seq l))
-            (T.Labeled_vars.to_seq @@ Tables.matches a);
+        Seq.iter (fun output ->
+            Seq.iter (fun w ->
+                let pos = T.Vertex.position v in
+                self#shift pos v w output)
+              (T.Vertices.to_seq l))
+          (T.Labeled_vars.to_seq @@ Tables.matches a);
         List.iter (fun x ->
             if (match x with
                 | T.Symbol.Eof -> true

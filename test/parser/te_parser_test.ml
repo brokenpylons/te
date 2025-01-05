@@ -1409,6 +1409,7 @@ module Noncanonical3 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
 (* Just something complex to see if something has falen though the cracks when testing basic operations *)
 (* This example also has complex order connections *)
 (* DISCOVERED: repeated null operations *)
+(* DISCOVERED: order loops, null actions connect two root vertices  *)
 module Noncanonical4 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     open Context
 

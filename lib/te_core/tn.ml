@@ -1112,9 +1112,8 @@ let matches lexical _ lookahead' s' a =
 let predictions lexical _ lookahead' s' a =
   let (let*) = Seq.bind in
   let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
-  let* (lhs, rhs), _parts = Collapsed_items.to_seq its in
-  (*let* part = parts in*)
-  let* () = Seq.guard (T.Vars.mem lhs lexical (* && part.is_kernel *)) in
+  let* (lhs, rhs) = Collapsed_items.heads its in
+  let* () = Seq.guard (T.Vars.mem lhs lexical) in
   Seq.return
     (Enhanced_lits.strip @@ (lookahead' lhs s rhs).Lookahead.shift_lookahead,
      T.Actions.predictions (T.Vars.singleton lhs))
@@ -1132,7 +1131,9 @@ let null lexical _ lookahead' s' a =
                        (T.Reduction.make
                           (part.label, lhs)
                           Null
-                          (Lists [[]]))))
+                          (if not part.is_reduce
+                           then Lists (resolve_tail part.tail)
+                           else Complete))))
 
 let shift_null lexical _ lookahead' s' a =
   let (let*) = Seq.bind in
@@ -1146,7 +1147,7 @@ let shift_null lexical _ lookahead' s' a =
   Seq.return
     (Enhanced_lits.strip @@ (lookahead' lhs s rhs).Lookahead.reduce_lookahead,
      T.Actions.null (T.Reductions.singleton
-                       (T.Reduction.make (part.label, lhs) 
+                       (T.Reduction.make (part.label, lhs)
                           Null
                           (if not part.is_reduce
                            then Lists (resolve_tail part.tail)
@@ -1217,7 +1218,7 @@ let build syntactic lexical start prods  =
   let icprods = index_collapsed_productions cprods in
 
   let lr_supply1, lr_supply2 = Supply.split2 @@ T.State.fresh_supply () in
-  let p = 
+  let p =
     lr ~supply:lr_supply1 (erase_scan d)
   in
 
@@ -1234,11 +1235,8 @@ let build syntactic lexical start prods  =
     |> noncanonical_subset ~supply:lr_supply2
   in
 
-
-  let eprods2 = enhanced_productions icprods (A.map_labels (fun _ -> Noncanonical_items.join) nc) in
-
   let first = first analysis in
-  let back = back lexical eprods2 in
+  let back = back lexical eprods1 in
 
   Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot'''''''' (with_actions lexical first lookahead' nc)));
 
