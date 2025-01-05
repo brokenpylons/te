@@ -1057,9 +1057,12 @@ let noncanonical lexical lookahead' a =
       Seq.return (s, t, Lits.scan'))
     a
 
-let back _lexical eprods =
+let back lexical eprods =
   eprods
-  |> Seq.map (fun Enhanced_production.{rhs; _} -> rhs)
+  |> Seq.filter_map (fun Enhanced_production.{lhs = (_, var); rhs; _} ->
+      if T.Vars.mem var lexical
+      then None
+      else Some rhs)
   |> Seq.fold_left
     (PA.merge ~merge_labels:Collapsed_items.union ~merge_lits:Enhanced_lits.union)
     PA.empty
