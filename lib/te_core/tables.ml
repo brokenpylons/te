@@ -25,8 +25,16 @@ let goto a =
   A.to_segments a
   |> Seq.map (fun ((s, _), adj) ->
       (s, adj
-          |> Seq.map (fun (p, x) -> (x, T.States.singleton p))
+          |> Seq.map (fun (p, lts) -> (lts, T.States.singleton p))
           |> Goto_partial_map.of_seq_multiple))
+  |> T.State_to.of_seq
+
+let orders lexical a =
+  A.to_segments a
+  |> Seq.map (fun ((s, _), adj) ->
+      (s, adj
+          |> Seq.map (fun (_, lts) -> T.Vars.inter lexical (Lits.to_vars lts))
+          |> Seq.fold_left T.Vars.union T.Vars.empty))
   |> T.State_to.of_seq
 
 let back b =
@@ -37,12 +45,14 @@ let back b =
           |> Back_map.of_seq_multiple))
   |> T.State_pair_to.of_seq
 
+
 module Unoptimized = struct
   type actions = T.Actions.t
   type t =
     {
       start: T.State.t;
       goto: Goto_partial_map.t T.State_to.t;
+      orders: T.Vars.t T.State_to.t;
       actions: Actions_multimap.t T.State_to.t;
       back: Back_map.t T.State_pair_to.t;
     }
@@ -52,6 +62,7 @@ module Unoptimized = struct
     {
       start = A.start g;
       goto = goto g;
+      orders = orders lexical g;
       actions = actions lexical first lookahead' g;
       back = back b;
     }
@@ -75,6 +86,10 @@ module Unoptimized = struct
     |> T.State_to.find s
     |> Goto_partial_map.find_multiple_or_empty (lits_of_symbol x)
 
+  let orders t s =
+    t.orders
+    |> T.State_to.find s
+
   let back t p s =
     t.back
     |> T.State_pair_to.find p
@@ -85,9 +100,6 @@ module Unoptimized = struct
 
   let load a =
     a.T.Actions.load
-
-  let orders a =
-    a.T.Actions.orders
 
   let reduce a =
     a.T.Actions.reduce

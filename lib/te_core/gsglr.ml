@@ -60,11 +60,11 @@ module type TABLES = sig
   val start: t -> state
   val actions: t -> state -> symbol -> actions 
   val goto: t -> state -> symbol -> states
+  val orders: t -> state -> T.Vars.t
   val back: t -> state * state -> state -> (state * state) option
 
   val shift: actions -> bool
   val load: actions -> bool
-  val orders: actions -> T.Vars.t
   val matches: actions -> T.Labeled_vars.t
   val predictions: actions -> T.Vars.t
   val null: actions -> T.Reductions.t
@@ -112,6 +112,7 @@ module Make(Tables: TABLES) = struct
       val mutable trace = []
 
       initializer
+        self#order bottom;
         self#expand bottom
 
       method private log action =
@@ -165,8 +166,6 @@ module Make(Tables: TABLES) = struct
             T.Actions.union (Tables.actions t (T.Vertex.states v) x) acc)
             T.Actions.empty xs
         in
-        if not (Orders'.domain_mem v orders) then
-          self#order v xs;
         if not (T.Labeled_vars.is_empty @@ Tables.matches a) then
           self#prediction v l (T.Vars.to_list @@ Tables.predictions a);
         if not null then
@@ -191,15 +190,12 @@ module Make(Tables: TABLES) = struct
             then self#load v x)
           xs
 
-      method private order v xs =
-        let a = List.fold_left (fun acc x ->
-            T.Actions.union (Tables.actions t (T.Vertex.states v) x) acc)
-            T.Actions.empty xs
-        in
-        T.Vars.iter (fun x ->
-            self#log (Trace.order v x);
-            orders <- Orders'.add_multiple v (Orders.singleton x v) orders)
-          (Tables.orders a)
+      method private order v =
+        if not (Orders'.domain_mem v orders) then
+          T.Vars.iter (fun x ->
+              self#log (Trace.order v x);
+              orders <- Orders'.add_multiple v (Orders.singleton x v) orders)
+            (Tables.orders t (T.Vertex.states v))
 
       method private load v x =
         Tables.goto t (T.Vertex.states v) x |>
@@ -211,6 +207,7 @@ module Make(Tables: TABLES) = struct
             if not (Gss.contains u stack) then begin
               stack <- Gss.add u stack;
               subclasses <- Subclasses.add pos u subclasses;
+              self#order u;
               self#expand u
             end;
             if not (Gss.contains_edge u v stack) then begin
@@ -230,6 +227,7 @@ module Make(Tables: TABLES) = struct
                 if not (Gss.contains u stack) then begin
                   stack <- Gss.add u stack;
                   subclasses <- Subclasses.add pos u subclasses;
+                  self#order u;
                   self#expand u
                 end;
                 if not (Gss.contains_edge u v' stack) then begin
@@ -269,6 +267,7 @@ module Make(Tables: TABLES) = struct
                 if not (Gss.contains u stack) then begin
                   stack <- Gss.add u stack;
                   subclasses <- Subclasses.add pos u subclasses;
+                  self#order u;
                   match r.strategy with
                   | Null -> self#actor ~null:true u (T.Vertices.singleton w) xs
                   | _ -> ()
@@ -286,8 +285,6 @@ module Make(Tables: TABLES) = struct
                   | Null -> ()
                   | _ -> self#actor ~null:false ~filter:n u (T.Vertices.singleton w) xs
                 end;
-                if not (Orders'.domain_mem u orders) then
-                  self#order u xs;
                 orders <- Orders'.add_multiple v (Orders'.find_multiple_or ~default:Orders.empty u orders) orders; (* add orders in any case *)
                 List.iter (fun ns' ->
                     forest <- Forest.pack n (T.Vars.singleton @@ T.Labeled_var.label r.output) (ns @ ns') forest)

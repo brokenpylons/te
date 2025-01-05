@@ -1057,7 +1057,7 @@ let noncanonical lexical lookahead' a =
       Seq.return (s, t, Lits.scan'))
     a
 
-let back lexical eprods =
+let return lexical eprods =
   eprods
   |> Seq.filter_map (fun Enhanced_production.{lhs = (_, var); rhs; _} ->
       if T.Vars.mem var lexical
@@ -1091,16 +1091,6 @@ let load lexical _ lookahead' s' a =
   Seq.return
     (Enhanced_lits.strip (lookahead' lhs s rhs).Lookahead.code_lookahead,
      T.Actions.load)
-
-let orders lexical first _ s' a =
-  let (let*) = Seq.bind in
-  let* (_, lts) = A.adjacent s' a in
-  let* var = T.Vars.to_seq @@ Lits.to_vars lts in
-  let* () = Seq.guard (T.Vars.mem var lexical) in
-  let* (s, _) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
-  Seq.return
-    ((Enhanced_lits.strip @@ first var s),
-     T.Actions.orders (T.Vars.singleton var))
 
 let matches lexical _ lookahead' s' a =
   let (let*) = Seq.bind in
@@ -1178,7 +1168,7 @@ let reduce lexical _ lookahead' s' a =
                              else Complete))))
 
 let actions lexical first lookahead' s a =
-  let fs = List.to_seq @@ [shift; load; orders; matches; predictions; null; shift_null; reduce] in
+  let fs = List.to_seq @@ [shift; load; matches; predictions; null; shift_null; reduce] in
   Seq.flat_map (fun f -> f lexical first lookahead' s a) fs
 
 (* FOR DEBUGGING *)
@@ -1208,7 +1198,7 @@ let with_actions lexical first lookahead' a =
       actions' lexical first lookahead' s a)
     a
 
-let to_dot'''''''' a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Actions_multimap.pp)) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
+let to_dot a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Actions_multimap.pp)) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
 
 let build syntactic lexical start prods  =
   assert (T.Vars.disjoint syntactic lexical);
@@ -1239,9 +1229,9 @@ let build syntactic lexical start prods  =
   in
 
   let first = first analysis in
-  let back = back lexical eprods1 in
+  let back = return lexical eprods1 in
 
-  Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot'''''''' (with_actions lexical first lookahead' nc)));
+  Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot (with_actions lexical first lookahead' nc)));
 
   (first, lookahead', nc, back)
 

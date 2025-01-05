@@ -175,7 +175,7 @@ module Null_reduce = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
 module Null_shift = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     open Context
 
-    let Vector.[s'; a; u] = variables Vector.["S'"; "A"; "_"]
+    let Vector.[s'; a; u] = variables Vector.["S'"; "a"; "_"]
     let syntactic = [s']
     let lexical = [a]
 
@@ -198,6 +198,7 @@ module Null_shift = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
           eof
         ];
         trace = Trace.[
+            order (vertex 0 0) a;
             expand (vertex 0 0) (vertex 3 0);
             reduce (u, a) (vertex 0 0) (vertex 0 0) (vertex 1 0);
             load eof (vertex 1 0) (vertex 2 1);
@@ -302,10 +303,10 @@ module Shift = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
           eof
         ];
         trace = Trace.[
+            order (vertex 0 0) a;
             expand (vertex 0 0) (vertex 3 0) ;
             read (code "a") (vertex 0 0) (vertex 3 0) (vertex 4 1);
             predict (vertex 4 1) (vertex 0 0) [a];
-            order (vertex 0 0) a;
             shift (u, a) (vertex 4 1) (vertex 0 0) (vertex 0 0) (vertex 1 1);
             load eof (vertex 1 1) (vertex 2 2);
           ]
@@ -341,10 +342,10 @@ module Shift_reduce = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
           eof
         ];
         trace = Trace.[
+            order (vertex 0 0) a;
             expand (vertex 0 0) (vertex 4 0) ;
             read (code "a") (vertex 0 0) (vertex 4 0) (vertex 5 1);
             predict (vertex 5 1) (vertex 0 0)  [a];
-            order (vertex 0 0) a;
             shift (u, a) (vertex 5 1) (vertex 0 0) (vertex 0 0) (vertex 3 1);
             reduce (u, s) (vertex 3 1) (vertex 0 0) (vertex 1 1);
             load eof (vertex 1 1) (vertex 2 2);
@@ -382,10 +383,10 @@ module Shift_reduce2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
           eof
         ];
         trace = Trace.[
+            order (vertex 0 0) a;
             expand (vertex 0 0) (vertex 5 0) ;
             read (code "a") (vertex 0 0) (vertex 5 0) (vertex 6 1);
             predict (vertex 6 1) (vertex 0 0) [a];
-            order (vertex 0 0) a;
             shift (u, a) (vertex 6 1) (vertex 0 0) (vertex 0 0) (vertex 4 1);
             reduce (u, p) (vertex 4 1) (vertex 0 0) (vertex 3 1);
             reduce (u, s) (vertex 3 1) (vertex 0 0) (vertex 1 1);
@@ -424,10 +425,10 @@ module Multilabel_shift_reduce = Spec.Test(functor(Context: Spec.CONTEXT) -> str
           eof
         ];
         trace = Trace.[
+            order (vertex 0 0) a;
             expand (vertex 0 0) (vertex 4 0) ;
             read (code "a") (vertex 0 0) (vertex 4 0) (vertex 5 1);
             predict (vertex 5 1) (vertex 0 0) [a];
-            order (vertex 0 0) a;
             shift (u, a) (vertex 5 1) (vertex 0 0) (vertex 0 0) (vertex 3 1);
             shift (p, a) (vertex 5 1) (vertex 0 0) (vertex 0 0) (vertex 3 1);
             reduce (u, s) (vertex 3 1) (vertex 0 0) (vertex 1 1);
@@ -942,6 +943,7 @@ module Left_recursion_shift = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
         trace = Trace.[
             expand (vertex 0 0) (vertex 3 0);
             reduce (u, s) (vertex 0 0) (vertex 0 0) (vertex 1 0);
+            order (vertex 1 0) a;
             load eof (vertex 1 0) (vertex 5 1);
           ]
       };
@@ -960,6 +962,7 @@ module Left_recursion_shift = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
             shift (u, a) (vertex 4 1) (vertex 0 0) (vertex 1 0) (vertex 2 1);
             expand (vertex 2 1) (vertex 3 1);
             reduce (u, s) (vertex 2 1) (vertex 0 0) (vertex 1 1);
+            order (vertex 1 1) a;
             load eof (vertex 1 1) (vertex 5 2);
           ]
       };
@@ -985,6 +988,7 @@ module Left_recursion_shift = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
             shift (u, a) (vertex 4 2) (vertex 2 1) (vertex 1 1) (vertex 2 2);
             expand (vertex 2 2) (vertex 3 2);
             reduce (u, s) (vertex 2 2) (vertex 0 0) (vertex 1 2);
+            order (vertex 1 2) a;
             load eof (vertex 1 2) (vertex 5 3);
           ]
       };
@@ -1017,6 +1021,7 @@ module Left_recursion_shift = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
             shift (u, a) (vertex 4 3) (vertex 2 2) (vertex 1 2) (vertex 2 3);
             expand (vertex 2 3) (vertex 3 3);
             reduce (u, s) (vertex 2 3) (vertex 0 0) (vertex 1 3);
+            order (vertex 1 3) a;
             load eof (vertex 1 3) (vertex 5 4);
           ]
       };
@@ -1050,6 +1055,7 @@ module Right_recursion_shift = Spec.Test(functor(Context: Spec.CONTEXT) -> struc
           eof
         ];
         trace = Trace.[
+            order (vertex 0 0) a;
             expand (vertex 0 0) (vertex 5 0);
             reduce (u, s) (vertex 0 0) (vertex 0 0) (vertex 1 0);
             load eof (vertex 1 0) (vertex 2 1);
@@ -1062,11 +1068,12 @@ module Right_recursion_shift = Spec.Test(functor(Context: Spec.CONTEXT) -> struc
           eof
         ];
         trace = Trace.[
+            order (vertex 0 0) a;
             expand (vertex 0 0) (vertex 5 0);
             read (code "a") (vertex 0 0) (vertex 5 0) (vertex 6 1);
             predict (vertex 6 1) (vertex 0 0) [a];
-            order (vertex 0 0) a;
             shift (u, a) (vertex 6 1) (vertex 0 0) (vertex 0 0) (vertex 3 1);
+            order (vertex 3 1) a;
             expand (vertex 3 1) (vertex 5 1);
             reduce (u, s) (vertex 3 1) (vertex 0 0) (vertex 1 1);
             load eof (vertex 1 1) (vertex 2 2);
@@ -1081,16 +1088,17 @@ module Right_recursion_shift = Spec.Test(functor(Context: Spec.CONTEXT) -> struc
           eof
         ];
         trace = Trace.[
+            order (vertex 0 0) a;
             expand (vertex 0 0) (vertex 5 0);
             read (code "a") (vertex 0 0) (vertex 5 0) (vertex 6 1);
             predict (vertex 6 1) (vertex 0 0) [a];
-            order (vertex 0 0) a;
             shift (u, a) (vertex 6 1) (vertex 0 0) (vertex 0 0) (vertex 3 1);
+            order (vertex 3 1) a;
             expand (vertex 3 1) (vertex 5 1);
             read (code "a") (vertex 3 1) (vertex 5 1) (vertex 6 2);
             predict (vertex 6 2) (vertex 3 1) [a];
-            order (vertex 3 1) a;
             shift (u, a) (vertex 6 2) (vertex 3 1) (vertex 3 1) (vertex 3 2);
+            order (vertex 3 2) a;
             expand (vertex 3 2) (vertex 5 2);
             reduce (u, s) (vertex 3 2) (vertex 3 1) (vertex 4 2);
             reduce (u, s) (vertex 4 2) (vertex 0 0) (vertex 1 2);
@@ -1129,6 +1137,7 @@ module Nest_shift = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
           eof
         ];
         trace = Trace.[
+            order (vertex 0 0) a;
             expand (vertex 0 0) (vertex 8 0);
             reduce (u, s) (vertex 0 0) (vertex 0 0) (vertex 1 0);
             load eof (vertex 1 0) (vertex 2 1);
@@ -1142,11 +1151,12 @@ module Nest_shift = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
           eof
         ];
         trace = Trace.[
+            order (vertex 0 0) a;
             expand (vertex 0 0) (vertex 8 0);
             read (code "a") (vertex 0 0) (vertex 8 0) (vertex 9 1);
             predict (vertex 9 1) (vertex 0 0) [a];
-            order (vertex 0 0) a;
             shift (u, a) (vertex 9 1) (vertex 0 0) (vertex 0 0) (vertex 3 1);
+            order (vertex 3 1) a;
             expand (vertex 3 1) (vertex 10 1);
             read (code "b") (vertex 3 1) (vertex 10 1) (vertex 7 2);
             predict (vertex 7 2) (vertex 3 1) [b];
@@ -1192,16 +1202,16 @@ module Predict = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
           eof
         ];
         trace = Trace.[
+            order (vertex 0 0) a;
             expand (vertex 0 0) (vertex 7 0);
             read (code "x") (vertex 0 0) (vertex 7 0) (vertex 8 1);
             predict (vertex 8 1) (vertex 0 0) [a];
-            order (vertex 0 0) a;
             shift (u, a) (vertex 8 1) (vertex 0 0) (vertex 0 0) (vertex 3 1);
+            order (vertex 3 1) b;
+            order (vertex 3 1) c;
             expand (vertex 3 1) (vertex 5 1);
             read (code "y") (vertex 3 1) (vertex 5 1) (vertex 6 2);
             predict (vertex 6 2) (vertex 3 1) [b; c];
-            order (vertex 3 1) b;
-            order (vertex 3 1) c;
             shift (u, b) (vertex 6 2) (vertex 3 1) (vertex 3 1) (vertex 4 2);
             shift (u, c) (vertex 6 2) (vertex 3 1) (vertex 3 1) (vertex 4 2);
             reduce (u, s) (vertex 4 2) (vertex 0 0) (vertex 1 2);
@@ -1246,10 +1256,10 @@ module Noncanonical = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
           eof
         ];
         trace = Trace.[
+            order (vertex 0 0) a;
             expand (vertex 0 0) (vertex 10 0);
             read (code "x") (vertex 0 0) (vertex 10 0) (vertex 11 1);
             predict (vertex 11 1) (vertex 0 0) [a];
-            order (vertex 0 0) a;
             shift (u, a) (vertex 11 1) (vertex 0 0) (vertex 0 0) (vertex 9 1);
             expand (vertex 9 1) (vertex 5 1);
             read (code "l") (vertex 9 1) (vertex 5 1) (vertex 6 2);
@@ -1302,11 +1312,11 @@ module Noncanonical2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
           eof
         ];
         trace = Trace.[
+            order (vertex 0 0) a;
+            order (vertex 0 0) b;
             expand (vertex 0 0) (vertex 11 0);
             read (code "x") (vertex 0 0) (vertex 11 0) (vertex 12 1);
             predict (vertex 12 1) (vertex 0 0) [a; b];
-            order (vertex 0 0) a;
-            order (vertex 0 0) b;
             shift (u, a) (vertex 12 1) (vertex 0 0) (vertex 0 0) (vertex 9 1);
             expand (vertex 9 1) (vertex 5 1);
             shift (u, b) (vertex 12 1) (vertex 0 0) (vertex 0 0) (vertex 10 1);
@@ -1366,11 +1376,11 @@ module Noncanonical3 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
           eof
         ];
         trace = Trace.[
+            order (vertex 0 0) a;
+            order (vertex 0 0) b;
             expand (vertex 0 0) (vertex 11 0);
             read (code "x") (vertex 0 0) (vertex 11 0) (vertex 12 1);
             predict (vertex 12 1) (vertex 0 0) [a; b];
-            order (vertex 0 0) a;
-            order (vertex 0 0) b;
             shift (u, a) (vertex 12 1) (vertex 0 0) (vertex 0 0) (vertex 9 1);
             expand (vertex 9 1) (vertex 5 1);
             read (code "l") (vertex 0 0) (vertex 12 1) (vertex 13 2);
@@ -1383,18 +1393,19 @@ module Noncanonical3 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
             reduce (u, n0) (vertex 7 1) (vertex 0 0) (vertex 3 1);
             order (vertex 3 1) l;
             shift (u, l) (vertex 6 2) (vertex 9 1) (vertex 3 1) (vertex 4 2);
+            order (vertex 4 2) l;
             expand (vertex 4 2) (vertex 5 2);
             read (code "l") (vertex 0 0) (vertex 13 2) (vertex 13 3);
             read (code "l") (vertex 4 2) (vertex 5 2) (vertex 6 3);
             read (code "l") (vertex 10 2) (vertex 5 2) (vertex 6 3);
             predict (vertex 6 3) (vertex 4 2) [l];
-            order (vertex 4 2) l;
             predict (vertex 6 3) (vertex 10 2) [l];
             reduce (p, n2) (vertex 10 2) (vertex 0 0) (vertex 8 2);
             reduce (u, n1) (vertex 8 2) (vertex 0 0) (vertex 7 2);
             reduce (u, n0) (vertex 7 2) (vertex 0 0) (vertex 3 2);
             order (vertex 3 2) l;
             shift (u, l) (vertex 6 3) (vertex 4 2) (vertex 4 2) (vertex 4 3);
+            order (vertex 4 3) l;
             expand (vertex 4 3) (vertex 5 3);
             shift (u, l) (vertex 6 3) (vertex 10 2) (vertex 3 2) (vertex 4 3);
             reduce (u, s) (vertex 4 3) (vertex 0 0) (vertex 1 3);
@@ -1445,16 +1456,18 @@ module Noncanonical4 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
           eof
         ];
         trace = Trace.[
+            order (vertex 0 0) l;
             expand (vertex 0 0) (vertex 16 0);
             read (code "x") (vertex 0 0) (vertex 16 0) (vertex 17 1);
             predict (vertex 17 1) (vertex 0 0) [a; b; l];
-            order (vertex 0 0) l;
             reduce (u, l) (vertex 0 0) (vertex 0 0) (vertex 3 0);
             order (vertex 3 0) a;
             order (vertex 3 0) b;
             shift (u, a) (vertex 17 1) (vertex 0 0) (vertex 3 0) (vertex 11 1);
             expand (vertex 11 1) (vertex 16 1);
             shift (u, l) (vertex 17 1) (vertex 0 0) (vertex 0 0) (vertex 3 1);
+            order (vertex 3 1) a;
+            order (vertex 3 1) b;
             expand (vertex 3 1) (vertex 13 1);
             read (code "x") (vertex 0 0) (vertex 17 1) (vertex 18 2);
             read (code "x") (vertex 11 1) (vertex 16 1) (vertex 17 2);
@@ -1462,6 +1475,8 @@ module Noncanonical4 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
             shift (u, b) (vertex 18 2) (vertex 0 0) (vertex 3 0) (vertex 12 2);
             expand (vertex 12 2) (vertex 16 2);
             shift (u, l) (vertex 18 2) (vertex 0 0) (vertex 0 0) (vertex 3 2);
+            order (vertex 3 2) a;
+            order (vertex 3 2) b;
             expand (vertex 3 2) (vertex 13 2);
             predict (vertex 17 2) (vertex 11 1) [a; l];
             reduce (u, n2) (vertex 11 1) (vertex 3 0) (vertex 10 1);
@@ -1471,10 +1486,10 @@ module Noncanonical4 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
             reduce (u, l) (vertex 4 1) (vertex 4 1) (vertex 5 1);
             order (vertex 5 1) l;
             reduce (u, l) (vertex 5 1) (vertex 5 1) (vertex 3 1);
-            order (vertex 3 1) a;
             shift (u, a) (vertex 17 2) (vertex 11 1) (vertex 3 1) (vertex 11 2);
             expand (vertex 11 2) (vertex 16 2);
             shift (u, l) (vertex 17 2) (vertex 11 1) (vertex 4 1) (vertex 5 2);
+            order (vertex 5 2) l;
             expand (vertex 5 2) (vertex 16 2);
             shift (u, l) (vertex 17 2) (vertex 11 1) (vertex 5 1) (vertex 3 2);
             predict (vertex 14 2) (vertex 3 1) [a];
@@ -1482,6 +1497,7 @@ module Noncanonical4 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
             reduce (p, n2) (vertex 12 2) (vertex 3 0) (vertex 10 2);
             reduce (u, n1) (vertex 10 2) (vertex 3 0) (vertex 9 2);
             reduce (u, n0) (vertex 9 2) (vertex 3 0) (vertex 4 2);
+            order (vertex 4 2) l;
             reduce (u, s) (vertex 4 2) (vertex 0 0) (vertex 1 2);
             load eof (vertex 1 2) (vertex 2 3);
             reduce (u, l) (vertex 4 2) (vertex 4 2) (vertex 5 2);
@@ -1535,10 +1551,10 @@ module Noncanonical5 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
           eof
         ];
         trace = Trace.[
+            order (vertex 0 0) a;
             expand (vertex 0 0) (vertex 14 0);
             read (code "x") (vertex 0 0) (vertex 14 0) (vertex 15 1);
             predict (vertex 15 1) (vertex 0 0) [a];
-            order (vertex 0 0) a;
             shift (u, a) (vertex 15 1) (vertex 0 0) (vertex 0 0) (vertex 13 1);
             expand (vertex 13 1) (vertex 16 1);
             read (code "l") (vertex 13 1) (vertex 16 1) (vertex 17 2);
@@ -1598,10 +1614,10 @@ module Lookahead = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
           eof
         ];
         trace = Trace.[
+            order (vertex 0 0) d;
             expand (vertex 0 0) (vertex 14 0);
             read (code "x") (vertex 0 0) (vertex 14 0) (vertex 15 1);
             predict (vertex 15 1) (vertex 0 0) [d];
-            order (vertex 0 0) d;
             shift (u, d) (vertex 15 1) (vertex 0 0) (vertex 0 0) (vertex 13 1);
             expand (vertex 13 1) (vertex 16 1);
             read (code "x") (vertex 13 1) (vertex 16 1) (vertex 17 2);
@@ -1659,15 +1675,15 @@ module Lookahead2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
           eof
         ];
         trace = Trace.[
+            order (vertex 0 0) d;
             expand (vertex 0 0) (vertex 15 0);
             read (code "x") (vertex 0 0) (vertex 15 0) (vertex 16 1);
             predict (vertex 16 1) (vertex 0 0) [d];
-            order (vertex 0 0) d;
             shift (u, d) (vertex 16 1) (vertex 0 0) (vertex 0 0) (vertex 13 1);
+            order (vertex 13 1) d;
             expand (vertex 13 1) (vertex 17 1);
             read (code "x") (vertex 13 1) (vertex 17 1) (vertex 18 2);
             predict (vertex 18 2) (vertex 13 1) [d; l0; l1];
-            order (vertex 13 1) d;
             reduce (u, b) (vertex 13 1) (vertex 0 0) (vertex 4 1);
             order (vertex 4 1) l0;
             reduce (u, c) (vertex 13 1) (vertex 0 0) (vertex 9 1);
