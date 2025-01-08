@@ -58,7 +58,7 @@ module type TABLES = sig
   type symbol := T.Symbol.t
 
   val start: t -> state
-  val actions: t -> state -> symbol -> actions 
+  val actions: t -> state -> symbol -> actions
   val goto: t -> state -> symbol -> states
   val orders: t -> state -> T.Vars.t
   val back: t -> state * state -> state -> (state * state) option
@@ -121,13 +121,15 @@ module Make(Tables: TABLES) = struct
       method private successors v ns paths d =
         if Int.equal d 0
         then Paths.singleton (v, ns)
-        else Paths.fold (fun (v', ns') -> Paths.union @@ self#successors v' ns' (Gss.adjacent v' ns' stack) (pred d)) Paths.empty paths
+        else Paths.fold (fun (v', ns') ->
+            Paths.union @@ self#successors v' ns' (Gss.adjacent v' ns' stack) (pred d))
+            Paths.empty paths
 
       method private scan_back v ns paths p =
         (*Fmt.pr "SB %a %a@," T.Vertex.pp v (Fmt.parens Paths.pp) paths;*)
         if Paths.is_empty paths
         then Paths.singleton (v, ns)
-        else Paths.fold (fun (v', ns') -> 
+        else Paths.fold (fun (v', ns') ->
             Paths.union @@
             match Tables.back t p (T.Vertex.states v') with
             | Some p' -> self#scan_back v' ns' (Gss.adjacent v' ns' stack) p'
@@ -182,11 +184,7 @@ module Make(Tables: TABLES) = struct
               (T.Vertices.to_seq l))
           (T.Labeled_vars.to_seq @@ Tables.matches a);
         List.iter (fun x ->
-            if (match x with
-                | T.Symbol.Eof -> true
-                | T.Symbol.Code _ -> true
-                | _ -> false) &&
-               Tables.load @@ Tables.actions t (T.Vertex.states v) x
+            if Tables.load @@ Tables.actions t (T.Vertex.states v) x
             then self#load v x)
           xs
 

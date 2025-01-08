@@ -616,6 +616,43 @@ module Repeat_load = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     ]
   end)
 
+module Repeat_load2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
+    open Context
+
+    let Vector.[s'; s; a; u] = variables Vector.["S'"; "S"; "A"; "_"]
+    let syntactic = [s'; s]
+    let lexical = []
+
+    let start = s'
+
+    let parser =
+      Production.[
+        make (u, s') R.(var s * plus eof);
+        make (u, s) R.(codes "b" * var a);
+        make (u, a) R.(star (codes "a"));
+      ]
+
+    let scanner = []
+
+    let tests = [
+      Test.{
+        name = "base";
+        input = [
+          code "b";
+          code "a";
+          eof
+        ];
+        trace = Trace.[
+            load (code "b") (vertex 0 0) (vertex 1 1);
+            load (code "a") (vertex 1 1) (vertex 2 2);
+            reduce (u, a) (vertex 2 2) (vertex 1 1) (vertex 3 2);
+            reduce (u, s) (vertex 3 2) (vertex 0 0) (vertex 4 2);
+            load eof (vertex 4 2) (vertex 5 3);
+          ]
+      };
+    ]
+  end)
+
 module Left_recursion_load = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     open Context
 
@@ -1806,6 +1843,7 @@ let () =
     "right_nulled", test_cases Right_nulled.driver Right_nulled.tests;
     (*"right_nulled2", test_cases Right_nulled2.driver Right_nulled2.tests;*)
     "repeat_load", test_cases Repeat_load.driver Repeat_load.tests;
+    "repeat_load2", test_cases Repeat_load2.driver Repeat_load2.tests;
     "left_recursion_load", test_cases Left_recursion_load.driver Left_recursion_load.tests;
     "right_recursion_load", test_cases Right_recursion_load.driver Right_recursion_load.tests;
     "nest_load", test_cases Nest_load.driver Nest_load.tests;

@@ -1022,6 +1022,9 @@ module Lookahead = struct
     in
     let code_lookahead =
       Enhanced_lits.diff shift_lookahead (analysis.Analysis.first_per_lits lexical_lookahead)
+      |> Enhanced_lits.restrict (fun _ lts -> Lits.union
+                                    (Lits.extract_codes lts)
+                                    (Lits.extract_eof lts))
     in
     {right_nulled; shift_lookahead; reduce_lookahead; lexical_lookahead; code_lookahead}
 end
