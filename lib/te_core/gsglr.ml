@@ -189,11 +189,10 @@ module Make(Tables: TABLES) = struct
           xs
 
       method private order v =
-        if not (Orders'.domain_mem v orders) then
-          T.Vars.iter (fun x ->
-              self#log (Trace.order v x);
-              orders <- Orders'.add_multiple v (Orders.singleton x v) orders)
-            (Tables.orders t (T.Vertex.states v))
+        T.Vars.iter (fun x ->
+            self#log (Trace.order v x);
+            orders <- Orders'.add_multiple v (Orders.singleton x v) orders)
+          (Tables.orders t (T.Vertex.states v))
 
       method private load v x =
         Tables.goto t (T.Vertex.states v) x |>

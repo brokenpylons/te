@@ -39,6 +39,7 @@ module type CONTEXT = sig
   val text: string -> T.Symbols.t R.t
   val range: string -> string -> T.Symbols.t R.t
   val not_range: string -> string -> T.Symbols.t R.t
+  val with_ws: T.Symbols.t R.t -> Production.t list -> Production.t list
 end
 
 module type SPEC' = functor (Context: CONTEXT) -> sig
@@ -104,6 +105,20 @@ module Context: CONTEXT = struct
 
   let not_range from to_ =
     R.lits (T.Symbols.of_codes (T.Codes.comp (range_codes from to_)))
+
+  let with_ws_re ws r =
+    R.flat_map (fun x ->
+        let codes = T.Symbols.to_codes x in
+        if not (T.Codes.is_empty codes)
+        then R.concat (R.lits x) ws
+        else R.lits x)
+      r
+
+  let with_ws ws =
+    List.map (fun prod ->
+        Production.make
+          (Production.lhs prod) 
+          (with_ws_re ws (Production.rhs prod)))
 end
 
 module Build(Spec: SPEC') = struct
