@@ -778,6 +778,8 @@ let enhance sa ca =
     start start
 
 let enhanced_productions cprods (sa: (A.Start.single, _, Lits.t) A.t)  =
+  List.to_seq @@
+  List.of_seq @@
   Seq.map (fun (s, p, var) ->
       Enhanced_production.{
         lhs = (s, var);
@@ -865,7 +867,9 @@ module Analysis = struct
 
     let compute lhs nullable_per_state first_per_state self q =
       let (<|>) = Enhanced_lits.union in
-      first_per_state lhs q <|> if nullable_per_state lhs q then EM.find_multiple_or_empty (Enhanced_lits.of_vars @@ Enhanced_vars.singleton lhs) self else Enhanced_lits.empty
+      first_per_state lhs q <|> if nullable_per_state lhs q
+      then EM.find_multiple_or_empty (Enhanced_lits.of_vars @@ Enhanced_vars.singleton lhs) self
+      else Enhanced_lits.empty
 
     let per_state prods nullable_per_state first_per_state self =
       prods
@@ -875,7 +879,10 @@ module Analysis = struct
     let update prods nullable_per_state first_per_state self =
       Seq.fold_left (fun acc Enhanced_production.{lhs; rhs} ->
           Seq.fold_left (fun acc (_, q, lts) ->
-              EM.add_multiple lts (compute lhs nullable_per_state first_per_state self q) acc)
+              let lts = Enhanced_lits.extract_vars lts in
+              if not (Enhanced_lits.is_empty lts)
+              then EM.add_multiple lts (compute lhs nullable_per_state first_per_state self q) acc
+              else acc)
             acc (PA.transitions rhs))
         self prods
 
@@ -918,22 +925,28 @@ module Analysis = struct
       }
 
     let compute (prods: Enhanced_production.t Seq.t) previous =
+      print_endline "NULLABLE";
       let nullable_per_lits = Nullable.per_lits prods previous.nullable_per_lits in
+      print_endline "NULLABLE_PER_STATE";
       let nullable_per_state = wrap ~default:false @@ Nullable.per_state prods nullable_per_lits in
 
+      print_endline "FIRST";
       let first_per_lits = First.per_lits prods
           (fun lts -> NM.find_multiple_or_empty lts nullable_per_lits)
           first_seed previous.first_per_lits
       in
+      print_endline "FIRST_PER_STATE";
       let first_per_state = wrap ~default:Enhanced_lits.empty @@ First.per_state prods
           (fun lts -> NM.find_multiple_or_empty lts nullable_per_lits)
           first_seed first_per_lits
       in
+      print_endline "FOLLOW";
       let follow_per_lits = Follow.per_lits prods
           nullable_per_state
           first_per_state
           previous.follow_per_lits
       in
+      print_endline "FOLLOW_PER_STATE";
       let follow_per_state = wrap ~default:Enhanced_lits.empty @@ Follow.per_state prods
           nullable_per_state
           first_per_state
@@ -1200,29 +1213,39 @@ let with_actions lexical lookahead' a =
 
 let to_dot a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Actions_multimap.pp)) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
 
-let build syntactic lexical start prods  =
+let to_dot' a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Fmt.seq @@ Fmt.parens (Fmt.pair ~sep:(Fmt.const Fmt.string ": ") T.Var.pp Fmt.bool))) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
+
+let build syntactic lexical _longest_match start prods  =
   assert (T.Vars.disjoint syntactic lexical);
 
+  print_endline "CONSTRUCT";
   let iprods = index_productions prods in
   let c = construct ~supply:(T.State.fresh_supply ()) start lexical iprods in
+
+  print_endline "COLLAPSE";
   let d = collapse ~supply:(T.State.fresh_supply ()) c in
 
   let cprods = collapsed_productions d in
   let icprods = index_collapsed_productions cprods in
 
+  print_endline "LR";
   let lr_supply1, lr_supply2 = Supply.split2 @@ T.State.fresh_supply () in
   let p =
     lr ~supply:lr_supply1 (erase_scan d)
   in
 
+  print_endline "ENHANCE";
   let eprods1 = enhanced_productions icprods p in
 
+  print_endline "ANA";
   let pre_analysis = Analysis.Pre.compute eprods1 Analysis.Pre.empty in
   let analysis = Analysis.compute pre_analysis in
 
+  print_endline "LOOK";
   let ieprods1 = index_enhanced_productions eprods1 in
   let lookahead' = Lookahead.compute analysis ieprods1 lexical in
 
+  print_endline "NC";
   let nc =
     noncanonical lexical lookahead' p
     |> noncanonical_subset ~supply:lr_supply2
@@ -1230,7 +1253,11 @@ let build syntactic lexical start prods  =
 
   let back = return lexical eprods1 in
 
+  print_endline "END";
+
   Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot (with_actions lexical lookahead' nc)));
+
+  Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot' (with_nullable  lookahead' (A.map_labels (fun _ -> Noncanonical_items.join) nc))));
 
   (lookahead', nc, back)
 

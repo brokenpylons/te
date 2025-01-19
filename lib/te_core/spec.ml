@@ -39,7 +39,7 @@ module type CONTEXT = sig
   val text: string -> T.Symbols.t R.t
   val range: string -> string -> T.Symbols.t R.t
   val not_range: string -> string -> T.Symbols.t R.t
-  val with_ws: T.Symbols.t R.t -> Production.t list -> Production.t list
+  val with_ws: T.Vars.t -> T.Symbols.t R.t -> Production.t list -> Production.t list
 end
 
 module type SPEC' = functor (Context: CONTEXT) -> sig
@@ -48,6 +48,7 @@ module type SPEC' = functor (Context: CONTEXT) -> sig
   val start: T.Var.t
   val syntactic: T.Var.t list
   val lexical: T.Var.t list
+  val longest_match: T.Var.t list
   val parser: Production.t list
   val scanner: Production.t list
 end
@@ -106,19 +107,20 @@ module Context: CONTEXT = struct
   let not_range from to_ =
     R.lits (T.Symbols.of_codes (T.Codes.comp (range_codes from to_)))
 
-  let with_ws_re ws r =
+  let with_ws_re lexical ws r =
     R.flat_map (fun x ->
+        let vars = T.Symbols.to_vars x in
         let codes = T.Symbols.to_codes x in
-        if not (T.Codes.is_empty codes)
+        if not (T.Vars.disjoint lexical vars) || not (T.Codes.is_empty codes)
         then R.concat (R.lits x) ws
         else R.lits x)
       r
 
-  let with_ws ws =
+  let with_ws lexical ws =
     List.map (fun prod ->
         Production.make
           (Production.lhs prod) 
-          (with_ws_re ws (Production.rhs prod)))
+          (with_ws_re lexical ws (Production.rhs prod)))
 end
 
 module Build(Spec: SPEC') = struct
@@ -135,8 +137,9 @@ module Build(Spec: SPEC') = struct
   let driver () =
     let syntactic = T.Vars.of_list Spec'.syntactic in
     let lexical = T.Vars.of_list Spec'.lexical in
+    let longest_match = T.Vars.of_list Spec'.longest_match in
 
-    let (lookahead, g, b) = Tn.build syntactic lexical Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
+    let (lookahead, g, b) = Tn.build syntactic lexical longest_match Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
     let t = Tables.Unoptimized.make lexical lookahead g b in
     new X.driver t
 
@@ -172,7 +175,7 @@ module Test(Spec: SPEC) = struct
     let lexical = T.Vars.of_list Spec'.lexical in
     let syntactic = T.Vars.of_list Spec'.syntactic in
 
-    let (lookahead, g, b) = Tn.build syntactic lexical Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
+    let (lookahead, g, b) = Tn.build syntactic lexical T.Vars.empty Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
     let t = Tables.Unoptimized.make lexical lookahead g b in
     new X.driver t
 end

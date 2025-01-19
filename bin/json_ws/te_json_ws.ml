@@ -77,7 +77,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   let start = start
 
   let parser =
-    with_ws (var ws) Production.[
+    with_ws (var ws) (var ws) Production.[
       make (u, start) R.(var json * plus eof);
 
       make (u, json) R.(var ws * var value);
