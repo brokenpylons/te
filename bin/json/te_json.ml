@@ -74,6 +74,8 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     null_;
   ]
 
+  let longest_match = []
+
   let start = start
 
   let parser =
