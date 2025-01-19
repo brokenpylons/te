@@ -972,7 +972,7 @@ module Lookahead = struct
       lexical_lookahead: Enhanced_lits.t;
     }
 
-  let compute analysis lookback lexical number s q =
+  let compute analysis lookback lexical longest_match number s q =
     let lhss = Lookback.find number s q lookback in
     let right_nulled =
       lhss
@@ -985,9 +985,14 @@ module Lookahead = struct
     in
     let reduce_lookahead =
       lhss
-      |> List.filter_map (fun lhs ->
-          if analysis.Analysis.nullable_per_state (number, lhs) (s, q)
-          then Some (analysis.Analysis.follow_per_lits (Enhanced_lits.of_vars @@ Enhanced_vars.singleton lhs))
+      |> List.filter_map (fun ((_, var) as lhs) ->
+          if analysis.Analysis.nullable_per_state (number, lhs) (s, q) then
+            let lts = Enhanced_lits.of_vars @@ Enhanced_vars.singleton lhs in
+            let follow = analysis.Analysis.follow_per_lits lts in
+            let first = Enhanced_lits.strip @@ analysis.Analysis.first_per_lits lts in
+            Some (if T.Vars.mem var longest_match
+                  then Enhanced_lits.restrict (fun _ lts -> Lits.diff lts first) follow
+                  else follow)
           else None)
       |> List.fold_left Enhanced_lits.union Enhanced_lits.empty
     in
@@ -1183,7 +1188,7 @@ let print_productions prods =
       Fmt.pr "@[@[%a@] ::= @[%s@]@]@." Enhanced_var.pp prod.Enhanced_production.lhs (Dot.string_of_graph @@ to_dot''' (prod.Enhanced_production.rhs)))
     prods
 
-let build syntactic lexical _longest_match start prods  =
+let build syntactic lexical longest_match start prods  =
   assert (T.Vars.disjoint syntactic lexical);
 
   print_endline "CONSTRUCT";
@@ -1204,13 +1209,10 @@ let build syntactic lexical _longest_match start prods  =
   let pre_analysis = Analysis.Pre.compute eprods1 Analysis.Pre.empty in
   let analysis = Analysis.compute pre_analysis in
 
-  (*Fmt.pr "C %s@,"  (Dot.string_of_graph (to_dot'' c));
-  Fmt.pr "E %s@,"  (Dot.string_of_graph (to_dot''' e));*)
-
   print_endline "LOOK";
 
   let ieprods1 = index_enhanced_productions eprods1 in
-  let lookahead' = Lookahead.compute analysis ieprods1 lexical in
+  let lookahead' = Lookahead.compute analysis ieprods1 lexical longest_match in
 
   print_endline "NC";
   let nc =
@@ -1220,9 +1222,13 @@ let build syntactic lexical _longest_match start prods  =
 
   let back = return lexical eprods1 in
 
+  print_endline "END";
+
+  (*Fmt.pr "C %s@,"  (Dot.string_of_graph (to_dot'' c));
+  Fmt.pr "E %s@,"  (Dot.string_of_graph (to_dot''' e));*)
+
   (*print_productions eprods1;*)
 
-  print_endline "END";
   (*Fmt.pr "NL %s@,"  (Dot.string_of_graph (to_dot' (with_nullable lookahead' (A.map_labels (fun _ -> Noncanonical_items.join) nc))));
 
   Fmt.pr "LK %s@,"  (Dot.string_of_graph (to_dot''''' (with_lookahead lookahead' (A.map_labels (fun _ -> Noncanonical_items.join) nc))));
