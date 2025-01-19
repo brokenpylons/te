@@ -74,10 +74,12 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     null_;
   ]
 
+  let longest_match = []
+
   let start = start
 
   let parser =
-    with_ws (var ws) (var ws) Production.[
+    with_ws (T.Vars.of_list lexical) (var ws) Production.[
       make (u, start) R.(var json * plus eof);
 
       make (u, json) R.(var ws * var value);
