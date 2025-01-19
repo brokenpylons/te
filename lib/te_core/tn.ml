@@ -485,19 +485,43 @@ module Rhs = struct
   include Re.Concrete(Lits)
 end
 
-module Item = struct
-  type t = {lhs: T.Labeled_var.t; rhs: Rhs.t; is_kernel: bool; is_reduce: bool; distance: Size.t}
+module Preitem = struct
+  type t = {number: int; lhs: T.Labeled_var.t; rhs: Rhs.t; is_kernel: bool; is_reduce: bool; distance: Size.t}
   [@@deriving eq, ord]
 
-  let pp ppf {lhs; rhs; is_kernel; is_reduce; distance} =
-    Fmt.pf ppf "@[%a ::= %a %a %a %a@]"
+  let pp ppf {number; lhs; rhs; is_kernel; is_reduce; distance} =
+    Fmt.pf ppf "@[%i %a ::= %a %a %a %a@]"
+      number
       T.Labeled_var.pp lhs
       Rhs.pp rhs
       (pp_if is_kernel Fmt.string) "K"
       (pp_if is_reduce Fmt.string) "R"
       Size.pp distance
 end
-module Item_to = Balanced_binary_tree.Map.Size(Item)
+module Preitem_to = Balanced_binary_tree.Map.Size(Preitem)
+
+module Item = struct
+  type t = {number: int; state: T.State.t; lhs: T.Labeled_var.t; rhs: Rhs.t; is_kernel: bool; is_reduce: bool; distance: Size.t}
+  [@@deriving eq, ord]
+
+  let pp ppf {number; state; lhs; rhs; is_kernel; is_reduce; distance} =
+    Fmt.pf ppf "@[%i %a %a ::= %a %a %a %a@]"
+      number
+      T.State.pp state
+      T.Labeled_var.pp lhs
+      Rhs.pp rhs
+      (pp_if is_kernel Fmt.string) "K"
+      (pp_if is_reduce Fmt.string) "R"
+      Size.pp distance
+end
+
+module Items = struct
+  include Balanced_binary_tree.Set.Size(Item)
+  let pp = pp Item.pp
+
+  let is_reduce its =
+    exists (fun it -> it.is_reduce) its
+end
 
 module Production = struct
   type t = {lhs: T.Labeled_var.t; rhs: Rhs.t}
@@ -508,16 +532,19 @@ module Production = struct
       T.Labeled_var.pp lhs
       Rhs.pp rhs
 end
-module Productions = Balanced_binary_tree.Set.Size(Production)
-module Production_index = Multimap.Make3(T.Var_to)(Productions)
 
-module Items = struct
-  include Balanced_binary_tree.Set.Size(Item)
-  let pp = pp Item.pp
+module Numbered_production = struct
+  type t = {number: int; lhs: T.Labeled_var.t; rhs: Rhs.t}
+  [@@deriving eq, ord]
 
-  let is_reduce its =
-    exists (fun it -> it.is_reduce) its
+  let pp ppf {lhs; rhs; _} =
+    Fmt.pf ppf "@[%a ::= %a@]"
+      T.Labeled_var.pp lhs
+      Rhs.pp rhs
 end
+module Number_to = Balanced_binary_tree.Map.Size(Int)
+module Numbered_productions = Balanced_binary_tree.Set.Size(Numbered_production)
+module Production_index = Multimap.Make3(T.Var_to)(Numbered_productions)
 
 module Var_state = struct
   type t = T.Var.t * T.State.t
@@ -532,50 +559,11 @@ module Var_state_to = struct
 end
 
 (* Group by state *)
-module Collapsed_items = struct
-  module Part = struct
-    type t = {label: T.Var.t; tail: Rhs.t; is_kernel: bool; is_reduce: bool; distance: Size.t}
-    [@@deriving eq, ord]
-
-    let pp ppf {label; tail; is_kernel; is_reduce; distance} =
-      Fmt.pf ppf "@[%a %a %a %a %a@]"
-        T.Var.pp label
-        Rhs.pp tail
-        (pp_if is_kernel Fmt.string) "K"
-        (pp_if is_reduce Fmt.string) "R"
-        Size.pp distance
-  end
-  module Parts = struct
-    include Balanced_binary_tree.Set.Size(Part)
-    let pp = pp Part.pp
-  end
-  include Multimap.Make3(Var_state_to)(Parts)
-
-  let is_reduce its =
-    fold (fun _ part acc -> acc || part.is_reduce) false its
-
-  let heads its =
-    Seq.map fst @@ to_seq_multiple its
-
-  let nonkernel its =
-    fold (fun head part acc -> 
-        if not part.Part.is_kernel
-        then add head part acc
-        else acc)
-      empty its
-
-  let to_seq its =
-    Seq.map (fun (head, parts) -> (head, Parts.to_seq parts)) @@ to_seq_multiple its
-
-  let pp =
-    Var_state_to.pp Parts.pp
-end
-
 module Noncanonical_items = struct
-  include Multimap.Make3(T.State_to)(Collapsed_items.Set)
+  include Multimap.Make3(T.State_to)(Items)
 
   let join nits =
-    fold_multiple (fun _ its acc -> Collapsed_items.union its acc) Collapsed_items.empty nits
+    fold_multiple (fun _ its acc -> Items.union its acc) Items.empty nits
 
 end
 
@@ -587,12 +575,8 @@ module PA = struct
   include Fa.Make(T.State_pair)(T.State_pairs)(T.State_pair_graph)
 end
 
-module Collapsed_production = struct
-  type t = {lhs: T.Var.t; rhs: (A.Start.single, Collapsed_items.t, Lits.t) A.t}
-end
-
 module Enhanced_production = struct
-  type t = {lhs: Enhanced_var.t; rhs: (PA.Start.single, Collapsed_items.t, Enhanced_lits.t) PA.t}
+  type t = {number: int; lhs: Enhanced_var.t; rhs: (PA.Start.single, Items.t, Enhanced_lits.t) PA.t}
 end
 
 module Actions_multimap = struct
@@ -605,21 +589,29 @@ let refine xs =
   let f = R.refine xs in
   Seq.cons (Lits.comp (R.considered f)) (R.partitions f)
 
-let index_productions ps =
+let index_productions ~supply ps =
+  let supply = ref supply in
   Seq.fold_left (fun idx p ->
-      Production_index.add (T.Labeled_var.var p.Production.lhs) p idx)
+      let (number, supply') = Supply.get !supply in
+      supply := supply';
+      Production_index.add (T.Labeled_var.var p.Production.lhs) Numbered_production.{
+          number;
+          lhs = p.lhs;
+          rhs = p.rhs;
+        } idx)
     Production_index.empty
     ps
 
 let construct ~supply start lexical prods =
-  let module Gen = A.Gen(T.State_index(Item_to)) in
-  Gen.unfold_multiple ~supply ~merge:Lits.union (fun _ {lhs; rhs; is_kernel; is_reduce; distance} ->
+  let module Gen = A.Gen(T.State_index(Preitem_to)) in
+  Gen.unfold ~supply ~merge:Lits.union (fun q {number; lhs; rhs; is_kernel; is_reduce; distance} ->
       let fs = refine @@ Rhs.first rhs in
       let kernel = Seq.filter_map (fun lts ->
           let rhs' = Rhs.simplify @@ Rhs.derivative lts rhs in
           if Rhs.is_nothing rhs'
           then None
-          else Some (lts, Item.{
+          else Some (lts, Preitem.{
+              number;
               lhs;
               rhs = rhs';
               distance = if Rhs.is_infinite rhs' then Size.top else Size.succ distance;
@@ -633,105 +625,42 @@ let construct ~supply start lexical prods =
       (*let vars = if not @@ T.Vars.is_empty (T.Vars.inter vars lexical)
         then T.Vars.union vars lexical
         else vars
-      in*)
+        in*)
       let nonkernel =
         Seq.flat_map (fun var ->
-            Seq.map (fun Production.{lhs; rhs} ->
-                ((if T.Vars.mem var lexical then Lits.scan else Lits.call) (T.Vars.singleton var), Item.{
+            Seq.map (fun Numbered_production.{number; lhs; rhs} ->
+                ((if T.Vars.mem var lexical then Lits.scan else Lits.call) (T.Vars.singleton var), Preitem.{
+                     number;
                      lhs;
                      rhs;
                      distance = Size.zero;
                      is_kernel = false;
                      is_reduce = Rhs.is_nullable rhs;
                    }))
-              (Productions.to_seq @@ Production_index.find_multiple var prods))
+              (Numbered_productions.to_seq @@ Production_index.find_multiple var prods))
           (T.Vars.to_seq @@ vars)
       in
-      Item.{lhs; rhs; is_kernel; is_reduce; distance}, Seq.(kernel @ nonkernel))
-    (List.of_seq @@ Seq.map (fun Production.{lhs; rhs} ->
-         Item.{
-           lhs;
-           rhs;
-           distance = Size.zero;
-           is_kernel = false;
-           is_reduce = Rhs.is_nullable rhs;
-         })
-        (Productions.to_seq @@ Production_index.find_multiple start prods))
-
-let collapse_items p qs a =
-  Seq.fold_left (fun acc q ->
-      let it = A.labels q a in
-      let (label, var) = it.Item.lhs in
-      Collapsed_items.add (var, p)
-        Collapsed_items.Part.{
-          label;
-          tail = it.rhs;
-          is_kernel = it.is_kernel;
-          is_reduce = it.is_reduce;
-          distance = it.distance;
-        }
-        acc)
-    Collapsed_items.empty (T.States.to_seq qs)
+      Items.singleton @@ Item.{number; state = q; lhs; rhs; is_kernel; is_reduce; distance}, Seq.(kernel @ nonkernel))
+    (let Numbered_production.{number; lhs; rhs} =
+       Numbered_productions.the @@ Production_index.find_multiple start prods in
+     Preitem.{
+       number;
+       lhs;
+       rhs;
+       distance = Size.zero;
+       is_kernel = false;
+       is_reduce = Rhs.is_nullable rhs;
+     })
 
 let lr_items qs a =
   T.States.to_seq qs
   |> Seq.map (fun q -> A.labels q a)
-  |> Seq.fold_left Collapsed_items.union Collapsed_items.empty
+  |> Seq.fold_left Items.union Items.empty
 
 let noncanonical_items qs a =
   T.States.to_seq qs
   |> Seq.map (fun q -> (q, A.labels q a))
   |> Noncanonical_items.of_seq_multiple
-
-let collapse ~supply a =
-  let module Gen = A.Gen(T.State_index(T.States_to)) in
-  Gen.unfold ~supply ~merge:Lits.union (fun p from ->
-      let module R = Refine.Map(Lits)(T.States) in
-      let next =
-        A.adjacent_multiple from a
-        |> Seq.map (fun (s, lts) -> (lts, T.States.singleton s))
-        |> R.refine
-        |> R.partitions
-      in
-      (collapse_items p from a, next))
-    (A.start_multiple a)
-
-let extract p a =
-  A.unfold (fun _ from ->
-      let next =
-        A.adjacent from a
-        |> Seq.filter_map (fun (s, lts) ->
-            if Lits.is_delegate lts
-            then None
-            else Some (lts, s, s))
-      in
-      (A.labels from a, next))
-    p p
-
-let nonkernel_heads r a =
-  A.labels r a
-  |> Collapsed_items.nonkernel
-  |> Collapsed_items.heads
-
-(* XXX: does extracting null productions work? *)
-let nonkernel a =
-  let (let*) = Seq.bind in
-  let* (s, p, lts) = A.transitions a in
-  if Lits.is_delegate lts then
-    let* (var, _) = nonkernel_heads p a in
-    Seq.return (s, p, var)
-  else
-    let* (var, _) = nonkernel_heads s a in
-    Seq.return (s, s, var)
-
-let collapsed_productions a =
-  Seq.map (fun (_, p, var) ->
-      Collapsed_production.{lhs = var; rhs = extract p a})
-    (nonkernel a)
-
-let index_collapsed_productions cprods =
-  Seq.map (fun cprod -> (cprod.Collapsed_production.lhs, cprod)) cprods
-  |> T.Var_to.of_seq
 
 let closure a qs =
   let module C = Closure.Make(T.States) in
@@ -764,28 +693,52 @@ let noncanonical_subset ~supply a =
       (noncanonical_items from a, next))
     (closure a @@ A.start_multiple a)
 
-let enhance sa ca =
-  let start = (A.start sa, A.start ca) in
-  PA.unfold (fun _ (sa_from, ca_from) ->
-      let next = Seq.product (A.adjacent sa_from sa) (A.adjacent ca_from ca)
-                 |> Seq.filter_map (fun ((sa_to, sa_c), (ca_to, ca_c)) ->
-                     let c = Lits.inter sa_c ca_c in
+let enhance sa a =
+  let start = (A.start sa, A.start a) in
+  PA.unfold (fun _ (sa_from, a_from) ->
+      let next = Seq.product (A.adjacent sa_from sa) (A.adjacent a_from a)
+                 |> Seq.filter_map (fun ((sa_to, sa_c), (a_to, a_c)) ->
+                     let c = Lits.inter sa_c a_c in
                      if Lits.is_empty c
                      then None
-                     else Some (Enhanced_lits.make sa_from c, (sa_to, ca_to), (sa_to, ca_to)))
+                     else Some (Enhanced_lits.make sa_from c, (sa_to, a_to), (sa_to, a_to)))
       in
-      (A.labels ca_from ca, next))
+      let next' =
+        A.adjacent a_from a
+        |> Seq.filter_map (fun (s, lts) ->
+            if Lits.is_call lts
+            then Some (Enhanced_lits.make sa_from lts, (sa_from, s), (sa_from, s))
+            else None)
+      in
+      A.labels a_from a, Seq.(next @ next'))
     start start
 
-let enhanced_productions cprods (sa: (A.Start.single, _, Lits.t) A.t)  =
-  List.to_seq @@
-  List.of_seq @@
-  Seq.map (fun (s, p, var) ->
+let extract a =
+  PA.unfold (fun _ from ->
+      let next =
+        PA.adjacent from a
+        |> Seq.filter_map (fun (s, lts) ->
+            if Enhanced_lits.is_delegate lts
+            then None
+            else Some (lts, s, s))
+      in
+      (PA.labels from a, next))
+    (PA.start a) (PA.start a)
+
+let enhanced_production (s, _) q ea =
+  Seq.map (fun Item.{number; lhs = (_, var); _}  ->
       Enhanced_production.{
+        number;
         lhs = (s, var);
-        rhs = enhance (A.tail p sa) (T.Var_to.find var cprods).Collapsed_production.rhs;
+        rhs = extract @@ PA.tail q ea;
       })
-    (nonkernel sa)
+    (Items.to_seq @@ PA.labels q ea)
+
+let enhanced_productions ea =
+  PA.transitions ea
+  |> Seq.filter (fun (_, _, lts) -> Enhanced_lits.is_delegate lts)
+  |> Seq.flat_map (fun (s, q, _) -> enhanced_production s q ea)
+  |> Seq.append (enhanced_production (PA.start ea) (PA.start ea) ea)
 
 module Bool_set = struct
   type t = bool
@@ -804,7 +757,7 @@ module Analysis = struct
 
     let start _ label =
       let its = label in
-      Collapsed_items.is_reduce its
+      Items.is_reduce its
 
     let next self current _ adj =
       Seq.fold_left (fun acc (lts, visit) -> NM.find_multiple_or_empty lts self && visit () || acc)
@@ -818,11 +771,11 @@ module Analysis = struct
 
     let per_state prods self =
       prods
-      |> Seq.map (fun Enhanced_production.{lhs; rhs} -> (lhs, compute_multi_source rhs self))
-      |> Enhanced_var_to.of_seq
+      |> Seq.map (fun Enhanced_production.{number; rhs; _} -> (number, compute_multi_source rhs self))
+      |> Number_to.of_seq
 
     let update prods self =
-      Seq.fold_left (fun acc Enhanced_production.{lhs; rhs} ->
+      Seq.fold_left (fun acc Enhanced_production.{lhs; rhs; _} ->
           NM.add_multiple (Enhanced_lits.of_vars @@ Enhanced_vars.singleton lhs)
             (compute_single_source rhs self (PA.start rhs)) acc)
         self prods
@@ -850,11 +803,11 @@ module Analysis = struct
 
     let per_state prods nullable_per_lits seed self =
       prods
-      |> Seq.map (fun Enhanced_production.{lhs; rhs} -> (lhs, compute_multi_source rhs nullable_per_lits seed self))
-      |> Enhanced_var_to.of_seq
+      |> Seq.map (fun Enhanced_production.{number; rhs; _} -> (number, compute_multi_source rhs nullable_per_lits seed self))
+      |> Number_to.of_seq
 
     let update prods nullable_per_lits seed self =
-      Seq.fold_left (fun acc Enhanced_production.{lhs; rhs} ->
+      Seq.fold_left (fun acc Enhanced_production.{lhs; rhs; _} ->
           EM.add_multiple (Enhanced_lits.of_vars @@ Enhanced_vars.singleton lhs)
             (compute_single_source rhs nullable_per_lits seed self (PA.start rhs)) acc)
         self prods
@@ -865,23 +818,23 @@ module Analysis = struct
 
   module Follow = struct
 
-    let compute lhs nullable_per_state first_per_state self q =
+    let compute number lhs nullable_per_state first_per_state self q =
       let (<|>) = Enhanced_lits.union in
-      first_per_state lhs q <|> if nullable_per_state lhs q
+      first_per_state number q <|> if nullable_per_state number q
       then EM.find_multiple_or_empty (Enhanced_lits.of_vars @@ Enhanced_vars.singleton lhs) self
       else Enhanced_lits.empty
 
     let per_state prods nullable_per_state first_per_state self =
       prods
-      |> Seq.map (fun Enhanced_production.{lhs; _} -> (lhs, compute lhs nullable_per_state first_per_state self))
-      |> Enhanced_var_to.of_seq
+      |> Seq.map (fun Enhanced_production.{number; lhs; _} -> (number, compute number lhs nullable_per_state first_per_state self))
+      |> Number_to.of_seq
 
     let update prods nullable_per_state first_per_state self =
-      Seq.fold_left (fun acc Enhanced_production.{lhs; rhs} ->
+      Seq.fold_left (fun acc Enhanced_production.{number; lhs; rhs} ->
           Seq.fold_left (fun acc (_, q, lts) ->
               let lts = Enhanced_lits.extract_vars lts in
               if not (Enhanced_lits.is_empty lts)
-              then EM.add_multiple lts (compute lhs nullable_per_state first_per_state self q) acc
+              then EM.add_multiple lts (compute number lhs nullable_per_state first_per_state self q) acc
               else acc)
             acc (PA.transitions rhs))
         self prods
@@ -894,8 +847,8 @@ module Analysis = struct
     let (<|>) = Enhanced_lits.union in
     Enhanced_lits.extract_eof lts <|> Enhanced_lits.extract_vars lts <|> Enhanced_lits.extract_codes lts
 
-  let wrap ~default x lts q  =
-    try Enhanced_var_to.find lts x q with Not_found -> default
+  let wrap ~default x number q  =
+    try Number_to.find number x q with Not_found -> default
 
   let combine c f1 f2 lts q =
     c (f1 lts q) (f2 lts q)
@@ -907,11 +860,11 @@ module Analysis = struct
     type t =
       {
         nullable_per_lits: NM.t;
-        nullable_per_state: Enhanced_var.t -> PA.state -> bool;
+        nullable_per_state: int -> PA.state -> bool;
         first_per_lits: EM.t;
-        first_per_state: Enhanced_var.t -> PA.state -> Enhanced_lits.t;
+        first_per_state: int -> PA.state -> Enhanced_lits.t;
         follow_per_lits: EM.t;
-        follow_per_state: Enhanced_var.t -> PA.state -> Enhanced_lits.t;
+        follow_per_state: int -> PA.state -> Enhanced_lits.t;
       }
 
     let empty =
@@ -965,11 +918,11 @@ module Analysis = struct
   type t =
     {
       nullable_per_lits: Enhanced_lits.t -> bool;
-      nullable_per_state: Enhanced_var.t -> PA.state -> bool;
+      nullable_per_state: int -> PA.state -> bool;
       first_per_lits: Enhanced_lits.t -> Enhanced_lits.t;
-      first_per_state: Enhanced_var.t -> PA.state -> Enhanced_lits.t;
+      first_per_state: int -> PA.state -> Enhanced_lits.t;
       follow_per_lits: Enhanced_lits.t -> Enhanced_lits.t;
-      follow_per_state: Enhanced_var.t -> PA.state -> Enhanced_lits.t;
+      follow_per_state: int -> PA.state -> Enhanced_lits.t;
     }
 
   let compute (pre: Pre.t) =
@@ -984,18 +937,18 @@ module Analysis = struct
 end
 
 let index_enhanced_productions eprods =
-  Seq.fold_left (fun acc Enhanced_production.{lhs = (t, var); rhs} ->
-      T.Var_to.add var ((t, rhs) :: try T.Var_to.find var acc with Not_found -> []) acc)
-    T.Var_to.empty eprods
+  Seq.fold_left (fun acc Enhanced_production.{number; lhs; rhs} ->
+      Number_to.add number ((lhs, rhs) :: try Number_to.find number acc with Not_found -> []) acc)
+    Number_to.empty eprods
 
 module Lookback = struct
-  type t = Enhanced_production.t list T.Var_to.t
+  type t = Enhanced_production.t list Number_to.t
 
-  let find var s q lookback =
-    T.Var_to.find var lookback
-    |> List.filter_map (fun (t, rhs) ->
+  let find number s q lookback =
+    Number_to.find number lookback
+    |> List.filter_map (fun (lhs, rhs) ->
         if PA.state_mem (s, q) rhs
-        then Some ((t, var): Enhanced_var.t)
+        then Some (lhs: Enhanced_var.t)
         else None)
 end
 
@@ -1009,21 +962,18 @@ module Lookahead = struct
       lexical_lookahead: Enhanced_lits.t;
     }
 
-  let compute analysis lookback lexical var s q =
-    let lhss = Lookback.find var s q lookback in
+  let compute analysis lookback lexical number s q =
     let right_nulled =
-      List.exists (fun lhs -> analysis.Analysis.nullable_per_state lhs (s, q)) lhss
+      analysis.Analysis.nullable_per_state number (s, q)
     in
     let shift_lookahead =
-      lhss
-      |> List.map (fun lhs ->
-          analysis.Analysis.follow_per_state lhs (s, q))
-      |> List.fold_left Enhanced_lits.union Enhanced_lits.empty
+      analysis.Analysis.follow_per_state number (s, q)
     in
     let reduce_lookahead =
+      let lhss = Lookback.find number s q lookback in
       lhss
       |> List.filter_map (fun lhs ->
-          if analysis.Analysis.nullable_per_state lhs (s, q)
+          if analysis.Analysis.nullable_per_state number (s, q)
           then Some (analysis.Analysis.follow_per_lits (Enhanced_lits.of_vars @@ Enhanced_vars.singleton lhs))
           else None)
       |> List.fold_left Enhanced_lits.union Enhanced_lits.empty
@@ -1045,9 +995,9 @@ end
 let add_backlinks lookahead' lookback a =
   let (let*) = Seq.bind in
   A.extend ~merge:Lits.union (fun s its ->
-      let* (lhs, rhs) = Collapsed_items.heads its in
-      let* () = Seq.guard (lookahead' lhs s rhs).Lookahead.right_nulled in
-      let* (q, var) = List.to_seq @@ Lookback.find lhs s rhs lookback in
+      let* Item.{number; state; _} = Items.to_seq its in
+      let* () = Seq.guard (lookahead' number s state).Lookahead.right_nulled in
+      let* (q, var) = List.to_seq @@ Lookback.find number s state lookback in
       let* t = T.States.to_seq @@ A.goto q (fun lts -> T.Vars.mem var (Lits.to_vars lts)) a in
       Seq.return (s, t, Lits.return (T.Vars.singleton var)))
     a
@@ -1058,10 +1008,10 @@ let erase_scan a =
 let noncanonical lexical lookahead' a =
   let (let*) = Seq.bind in
   A.extend ~merge:Lits.union (fun s its ->
-      let* (lhs, rhs) = Collapsed_items.heads its in
-      let* () = Seq.guard (not @@ T.Vars.mem lhs lexical) in
+      let* {number; lhs = (_, var); state; _} = Items.to_seq its in
+      let* () = Seq.guard (not @@ T.Vars.mem var lexical) in
       let* (q, _) =
-        (lookahead' lhs s rhs).Lookahead.lexical_lookahead
+        (lookahead' number s state).Lookahead.lexical_lookahead
         |> Enhanced_lits.to_seq
       in
       let* (t, lts') = A.adjacent q a in
@@ -1076,9 +1026,7 @@ let return lexical eprods =
       if T.Vars.mem var lexical
       then None
       else Some rhs)
-  |> Seq.fold_left
-    (PA.merge ~merge_labels:Collapsed_items.union ~merge_lits:Enhanced_lits.union)
-    PA.empty
+  |> Seq.fold_left (PA.merge ~merge_labels:Items.union ~merge_lits:Enhanced_lits.union) PA.empty
   |> PA.rev
 
 let resolve_tail tail =
@@ -1090,55 +1038,53 @@ let resolve_tail tail =
 let shift lexical lookahead' s' a =
   let (let*) = Seq.bind in
   let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
-  let* (lhs, rhs) = Collapsed_items.heads its in
-  let* () = Seq.guard (not @@ T.Vars.mem lhs lexical) in
+  let* {number; lhs = (_, var); state; _} = Items.to_seq its in
+  let* () = Seq.guard (not @@ T.Vars.mem var lexical) in
   Seq.return
-    (Enhanced_lits.strip (lookahead' lhs s rhs).Lookahead.lexical_lookahead,
+    (Enhanced_lits.strip (lookahead' number s state).Lookahead.lexical_lookahead,
      T.Actions.shift)
 
 let load lexical lookahead' s' a =
   let (let*) = Seq.bind in
   let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
-  let* (lhs, rhs) = Collapsed_items.heads its in
-  let* () = Seq.guard (not @@ T.Vars.mem lhs lexical) in
+  let* {number; lhs = (_, var); state; _} = Items.to_seq its in
+  let* () = Seq.guard (not @@ T.Vars.mem var lexical) in
   Seq.return
-    (Enhanced_lits.strip (lookahead' lhs s rhs).Lookahead.code_lookahead,
+    (Enhanced_lits.strip (lookahead' number s state).Lookahead.code_lookahead,
      T.Actions.load)
 
 let matches lexical lookahead' s' a =
   let (let*) = Seq.bind in
   let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
-  let* (lhs, rhs), parts = Collapsed_items.to_seq its in
-  let* part = parts in
-  let* () = Seq.guard (T.Vars.mem lhs lexical && part.is_kernel && part.is_reduce) in
+  let* {number; lhs = (label, var); state; is_kernel; is_reduce; _} = Items.to_seq its in
+  let* () = Seq.guard (T.Vars.mem var lexical && is_kernel && is_reduce) in
   Seq.return
-    (Enhanced_lits.strip @@ (lookahead' lhs s rhs).Lookahead.reduce_lookahead,
-     T.Actions.matches (T.Labeled_vars.singleton (part.label, lhs)))
+    (Enhanced_lits.strip @@ (lookahead' number s state).Lookahead.reduce_lookahead,
+     T.Actions.matches (T.Labeled_vars.singleton (label, var)))
 
 let predictions lexical lookahead' s' a =
   let (let*) = Seq.bind in
   let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
-  let* (lhs, rhs) = Collapsed_items.heads its in
-  let* () = Seq.guard (T.Vars.mem lhs lexical) in
+  let* {number; lhs = (_, var); state; _} = Items.to_seq its in
+  let* () = Seq.guard (T.Vars.mem var lexical) in
   Seq.return
-    (Enhanced_lits.strip @@ (lookahead' lhs s rhs).Lookahead.shift_lookahead,
-     T.Actions.predictions (T.Vars.singleton lhs))
+    (Enhanced_lits.strip @@ (lookahead' number s state).Lookahead.shift_lookahead,
+     T.Actions.predictions (T.Vars.singleton var))
 
 let null lexical lookahead' s' a =
   let (let*) = Seq.bind in
   let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
-  let* (lhs, rhs), parts = Collapsed_items.to_seq its in
-  let* part = parts in
-  let right_nulled = (lookahead' lhs s rhs).Lookahead.right_nulled in
-  let* () = Seq.guard (not @@ T.Vars.mem lhs lexical && not @@ part.is_kernel && right_nulled) in
+  let* {number; lhs = (label, var); rhs; state; is_kernel; is_reduce; _} = Items.to_seq its in
+  let right_nulled = (lookahead' number s state).Lookahead.right_nulled in
+  let* () = Seq.guard (not @@ T.Vars.mem var lexical && not @@ is_kernel && right_nulled) in
   Seq.return
-    (Enhanced_lits.strip @@ (lookahead' lhs s rhs).Lookahead.reduce_lookahead,
+    (Enhanced_lits.strip @@ (lookahead' number s state).Lookahead.reduce_lookahead,
      T.Actions.null (T.Reductions.singleton
                        (T.Reduction.make
-                          (part.label, lhs)
+                          (label, var)
                           Null
-                          (if not part.is_reduce
-                           then Lists (resolve_tail part.tail)
+                          (if not is_reduce
+                           then Lists (resolve_tail rhs)
                            else Complete))))
 
 let shift_null lexical lookahead' s' a =
@@ -1146,38 +1092,36 @@ let shift_null lexical lookahead' s' a =
   let* (q, lts) = A.adjacent s' a in
   let* () = Seq.guard (Lits.is_scan' lts) in
   let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels q a) in
-  let* (lhs, rhs), parts = Collapsed_items.to_seq its in
-  let* part = parts in
-  let right_nulled = (lookahead' lhs s rhs).Lookahead.right_nulled in
-  let* () = Seq.guard (T.Vars.mem lhs lexical && not @@ part.is_kernel && right_nulled) in
+  let* {number; lhs = (label, var); rhs; state; is_kernel; is_reduce; _} = Items.to_seq its in
+  let right_nulled = (lookahead' number s state).Lookahead.right_nulled in
+  let* () = Seq.guard (T.Vars.mem var lexical && not @@ is_kernel && right_nulled) in
   Seq.return
-    (Enhanced_lits.strip @@ (lookahead' lhs s rhs).Lookahead.reduce_lookahead,
+    (Enhanced_lits.strip @@ (lookahead' number s state).Lookahead.reduce_lookahead,
      T.Actions.null (T.Reductions.singleton
-                       (T.Reduction.make (part.label, lhs)
+                       (T.Reduction.make (label, var)
                           Null
-                          (if not part.is_reduce
-                           then Lists (resolve_tail part.tail)
+                          (if not is_reduce
+                           then Lists (resolve_tail rhs)
                            else Complete))))
 
-let select_strategy part s' q =
-  match Size.to_int @@ part.Collapsed_items.Part.distance with
+let select_strategy distance s' q =
+  match Size.to_int @@ distance with
   | Some d -> T.Reduction.Strategy.Fixed d
   | None -> T.Reduction.Strategy.Scan (s', q)
 
 let reduce lexical lookahead' s' a =
   let (let*) = Seq.bind in
   let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
-  let* (lhs, rhs), parts = Collapsed_items.to_seq its in
-  let* part = parts in
-  let right_nulled = (lookahead' lhs s rhs).Lookahead.right_nulled in
-  let* () = Seq.guard (not @@ T.Vars.mem lhs lexical && part.is_kernel && right_nulled) in
+  let* {number; lhs = (label, var); rhs; state; is_kernel; is_reduce; distance} = Items.to_seq its in
+  let right_nulled = (lookahead' number s state).Lookahead.right_nulled in
+  let* () = Seq.guard (not @@ T.Vars.mem var lexical && is_kernel && right_nulled) in
   Seq.return
-    (Enhanced_lits.strip @@ (lookahead' lhs s rhs).Lookahead.reduce_lookahead,
+    (Enhanced_lits.strip @@ (lookahead' number s state).Lookahead.reduce_lookahead,
      T.Actions.reduce (T.Reductions.singleton
-                         (T.Reduction.make (part.label, lhs)
-                            (select_strategy part s' rhs)
-                            (if not part.is_reduce
-                             then Lists (resolve_tail part.tail)
+                         (T.Reduction.make (label, var)
+                            (select_strategy distance s' state)
+                            (if not is_reduce
+                             then Lists (resolve_tail rhs)
                              else Complete))))
 
 let actions lexical lookahead' s a =
@@ -1187,16 +1131,16 @@ let actions lexical lookahead' s a =
 (* FOR DEBUGGING *)
 let with_lookahead lookahead' a =
   A.map_labels (fun s its ->
-      Seq.map (fun (lhs, rhs) ->
-          (lhs, (lookahead' lhs s rhs).Lookahead.shift_lookahead))
-        (Collapsed_items.heads its))
+      Seq.map (fun Item.{number; lhs; state; _} ->
+          (lhs, (lookahead' number s state).Lookahead.code_lookahead))
+        (Items.to_seq its))
     a
 
 let with_nullable lookahead' a =
   A.map_labels (fun s its ->
-      Seq.map (fun (lhs, rhs) ->
-          (lhs, (lookahead' lhs s rhs).Lookahead.right_nulled))
-        (Collapsed_items.heads its))
+      Seq.map (fun Item.{number; lhs; state; _} ->
+          (lhs, (lookahead' number s state).Lookahead.right_nulled))
+        (Items.to_seq its))
     a
 
 let actions' lexical lookahead' s a =
@@ -1213,35 +1157,45 @@ let with_actions lexical lookahead' a =
 
 let to_dot a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Actions_multimap.pp)) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
 
-let to_dot' a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Fmt.seq @@ Fmt.parens (Fmt.pair ~sep:(Fmt.const Fmt.string ": ") T.Var.pp Fmt.bool))) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
+let to_dot' a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Fmt.seq @@ Fmt.parens (Fmt.pair ~sep:(Fmt.const Fmt.string ": ") T.Labeled_var.pp Fmt.bool))) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
+
+let to_dot'' a = A.to_dot ~string_of_labels:(Fmt.to_to_string Items.pp) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
+
+let to_dot''' a = PA.to_dot ~string_of_labels:(Fmt.to_to_string Items.pp) ~string_of_lits:(Fmt.to_to_string Enhanced_lits.pp) a
+
+let to_dot''''' a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Fmt.seq @@ Fmt.parens (Fmt.pair ~sep:(Fmt.const Fmt.string ": ") T.Labeled_var.pp Enhanced_lits.pp))) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
+
+let print_productions prods =
+  Seq.iter (fun prod ->
+      Fmt.pr "@[@[%a@] ::= @[%s@]@]@." Enhanced_var.pp prod.Enhanced_production.lhs (Dot.string_of_graph @@ to_dot''' (prod.Enhanced_production.rhs)))
+    prods
 
 let build syntactic lexical _longest_match start prods  =
   assert (T.Vars.disjoint syntactic lexical);
 
   print_endline "CONSTRUCT";
-  let iprods = index_productions prods in
-  let c = construct ~supply:(T.State.fresh_supply ()) start lexical iprods in
-
-  print_endline "COLLAPSE";
-  let d = collapse ~supply:(T.State.fresh_supply ()) c in
-
-  let cprods = collapsed_productions d in
-  let icprods = index_collapsed_productions cprods in
+  let iprods = index_productions ~supply:(T.State.fresh_supply ()) prods in
+  let c = erase_scan @@ construct ~supply:(T.State.fresh_supply ()) start lexical iprods in
 
   print_endline "LR";
   let lr_supply1, lr_supply2 = Supply.split2 @@ T.State.fresh_supply () in
   let p =
-    lr ~supply:lr_supply1 (erase_scan d)
+    lr ~supply:lr_supply1 c
   in
 
   print_endline "ENHANCE";
-  let eprods1 = enhanced_productions icprods p in
+  let e = enhance p c in
+  let eprods1 = enhanced_productions e in
 
   print_endline "ANA";
   let pre_analysis = Analysis.Pre.compute eprods1 Analysis.Pre.empty in
   let analysis = Analysis.compute pre_analysis in
 
+  (*Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot'' c));
+  Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot''' e));*)
+
   print_endline "LOOK";
+
   let ieprods1 = index_enhanced_productions eprods1 in
   let lookahead' = Lookahead.compute analysis ieprods1 lexical in
 
@@ -1255,9 +1209,13 @@ let build syntactic lexical _longest_match start prods  =
 
   print_endline "END";
 
+
+  Fmt.pr "LK %s@,"  (Dot.string_of_graph (to_dot''''' (with_lookahead lookahead' (A.map_labels (fun _ -> Noncanonical_items.join) nc))));
+
+  Fmt.pr "ITMS %s@,"  (Dot.string_of_graph (to_dot'' (A.map_labels (fun _ -> Noncanonical_items.join) nc)));
+
   Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot (with_actions lexical lookahead' nc)));
 
-  Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot' (with_nullable  lookahead' (A.map_labels (fun _ -> Noncanonical_items.join) nc))));
 
   (lookahead', nc, back)
 
