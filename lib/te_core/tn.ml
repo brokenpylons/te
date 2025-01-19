@@ -341,15 +341,26 @@ end = struct
 
   let pp = Fmt.pair T.State.pp T.Var.pp
 end
-
-module Enhanced_var_to = Balanced_binary_tree.Map.Size(Enhanced_var)
-
 module Enhanced_vars = struct
   include Multimap.Make3(T.State_to)(T.Vars)
 
   let singleton (evar: Enhanced_var.t) =
     uncurry singleton evar
 end
+
+module Numbered_enhanced_var: sig
+  type t = int * Enhanced_var.t
+  val compare: t -> t -> int
+  val pp: t Fmt.t
+end = struct
+  type t = int * Enhanced_var.t
+  [@@deriving ord]
+
+  let pp = Fmt.pair Fmt.int Enhanced_var.pp
+end
+module Number_to = Balanced_binary_tree.Map.Size(Int)
+module Numbered_enhanced_var_to = Balanced_binary_tree.Map.Size(Numbered_enhanced_var)
+
 
 module Enhanced_lits: sig
   include Re.LITS with type t = Lits.t T.State_to.t
@@ -542,7 +553,6 @@ module Numbered_production = struct
       T.Labeled_var.pp lhs
       Rhs.pp rhs
 end
-module Number_to = Balanced_binary_tree.Map.Size(Int)
 module Numbered_productions = Balanced_binary_tree.Set.Size(Numbered_production)
 module Production_index = Multimap.Make3(T.Var_to)(Numbered_productions)
 
@@ -771,8 +781,8 @@ module Analysis = struct
 
     let per_state prods self =
       prods
-      |> Seq.map (fun Enhanced_production.{number; rhs; _} -> (number, compute_multi_source rhs self))
-      |> Number_to.of_seq
+      |> Seq.map (fun Enhanced_production.{number; lhs; rhs} -> ((number, lhs), compute_multi_source rhs self))
+      |> Numbered_enhanced_var_to.of_seq
 
     let update prods self =
       Seq.fold_left (fun acc Enhanced_production.{lhs; rhs; _} ->
@@ -803,8 +813,8 @@ module Analysis = struct
 
     let per_state prods nullable_per_lits seed self =
       prods
-      |> Seq.map (fun Enhanced_production.{number; rhs; _} -> (number, compute_multi_source rhs nullable_per_lits seed self))
-      |> Number_to.of_seq
+      |> Seq.map (fun Enhanced_production.{number; lhs; rhs} -> ((number, lhs), compute_multi_source rhs nullable_per_lits seed self))
+      |> Numbered_enhanced_var_to.of_seq
 
     let update prods nullable_per_lits seed self =
       Seq.fold_left (fun acc Enhanced_production.{lhs; rhs; _} ->
@@ -820,14 +830,14 @@ module Analysis = struct
 
     let compute number lhs nullable_per_state first_per_state self q =
       let (<|>) = Enhanced_lits.union in
-      first_per_state number q <|> if nullable_per_state number q
+      first_per_state (number, lhs) q <|> if nullable_per_state (number, lhs) q
       then EM.find_multiple_or_empty (Enhanced_lits.of_vars @@ Enhanced_vars.singleton lhs) self
       else Enhanced_lits.empty
 
     let per_state prods nullable_per_state first_per_state self =
       prods
-      |> Seq.map (fun Enhanced_production.{number; lhs; _} -> (number, compute number lhs nullable_per_state first_per_state self))
-      |> Number_to.of_seq
+      |> Seq.map (fun Enhanced_production.{number; lhs; _} -> ((number, lhs), compute number lhs nullable_per_state first_per_state self))
+      |> Numbered_enhanced_var_to.of_seq
 
     let update prods nullable_per_state first_per_state self =
       Seq.fold_left (fun acc Enhanced_production.{number; lhs; rhs} ->
@@ -848,7 +858,7 @@ module Analysis = struct
     Enhanced_lits.extract_eof lts <|> Enhanced_lits.extract_vars lts <|> Enhanced_lits.extract_codes lts
 
   let wrap ~default x number q  =
-    try Number_to.find number x q with Not_found -> default
+    try Numbered_enhanced_var_to.find number x q with Not_found -> default
 
   let combine c f1 f2 lts q =
     c (f1 lts q) (f2 lts q)
@@ -860,11 +870,11 @@ module Analysis = struct
     type t =
       {
         nullable_per_lits: NM.t;
-        nullable_per_state: int -> PA.state -> bool;
+        nullable_per_state: Numbered_enhanced_var.t -> PA.state -> bool;
         first_per_lits: EM.t;
-        first_per_state: int -> PA.state -> Enhanced_lits.t;
+        first_per_state: Numbered_enhanced_var.t -> PA.state -> Enhanced_lits.t;
         follow_per_lits: EM.t;
-        follow_per_state: int -> PA.state -> Enhanced_lits.t;
+        follow_per_state: Numbered_enhanced_var.t -> PA.state -> Enhanced_lits.t;
       }
 
     let empty =
@@ -918,11 +928,11 @@ module Analysis = struct
   type t =
     {
       nullable_per_lits: Enhanced_lits.t -> bool;
-      nullable_per_state: int -> PA.state -> bool;
+      nullable_per_state: Numbered_enhanced_var.t -> PA.state -> bool;
       first_per_lits: Enhanced_lits.t -> Enhanced_lits.t;
-      first_per_state: int -> PA.state -> Enhanced_lits.t;
+      first_per_state: Numbered_enhanced_var.t -> PA.state -> Enhanced_lits.t;
       follow_per_lits: Enhanced_lits.t -> Enhanced_lits.t;
-      follow_per_state: int -> PA.state -> Enhanced_lits.t;
+      follow_per_state: Numbered_enhanced_var.t -> PA.state -> Enhanced_lits.t;
     }
 
   let compute (pre: Pre.t) =
@@ -963,17 +973,20 @@ module Lookahead = struct
     }
 
   let compute analysis lookback lexical number s q =
+    let lhss = Lookback.find number s q lookback in
     let right_nulled =
-      analysis.Analysis.nullable_per_state number (s, q)
+      lhss
+      |> List.exists (fun lhs -> analysis.Analysis.nullable_per_state (number, lhs) (s, q))
     in
     let shift_lookahead =
-      analysis.Analysis.follow_per_state number (s, q)
+      lhss
+      |> List.map (fun lhs -> analysis.Analysis.follow_per_state (number, lhs) (s, q))
+      |> List.fold_left Enhanced_lits.union Enhanced_lits.empty
     in
     let reduce_lookahead =
-      let lhss = Lookback.find number s q lookback in
       lhss
       |> List.filter_map (fun lhs ->
-          if analysis.Analysis.nullable_per_state number (s, q)
+          if analysis.Analysis.nullable_per_state (number, lhs) (s, q)
           then Some (analysis.Analysis.follow_per_lits (Enhanced_lits.of_vars @@ Enhanced_vars.singleton lhs))
           else None)
       |> List.fold_left Enhanced_lits.union Enhanced_lits.empty
@@ -1191,8 +1204,8 @@ let build syntactic lexical _longest_match start prods  =
   let pre_analysis = Analysis.Pre.compute eprods1 Analysis.Pre.empty in
   let analysis = Analysis.compute pre_analysis in
 
-  (*Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot'' c));
-  Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot''' e));*)
+  Fmt.pr "C %s@,"  (Dot.string_of_graph (to_dot'' c));
+  Fmt.pr "E %s@,"  (Dot.string_of_graph (to_dot''' e));
 
   print_endline "LOOK";
 
@@ -1207,8 +1220,10 @@ let build syntactic lexical _longest_match start prods  =
 
   let back = return lexical eprods1 in
 
-  print_endline "END";
+  print_productions eprods1;
 
+  print_endline "END";
+  Fmt.pr "NL %s@,"  (Dot.string_of_graph (to_dot' (with_nullable lookahead' (A.map_labels (fun _ -> Noncanonical_items.join) nc))));
 
   Fmt.pr "LK %s@,"  (Dot.string_of_graph (to_dot''''' (with_lookahead lookahead' (A.map_labels (fun _ -> Noncanonical_items.join) nc))));
 

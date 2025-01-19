@@ -471,8 +471,8 @@ module Same_label_reduce = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
             reduce (u, a) (vertex 1 1) (vertex 0 0) (vertex 4 1);
             reduce (u, s) (vertex 4 1) (vertex 0 0) (vertex 2 1);
             load eof (vertex 2 1) (vertex 3 2);
-            reduce (u, b) (vertex 1 1) (vertex 0 0) (vertex 4 1);
-            reduce (u, s) (vertex 4 1) (vertex 0 0) (vertex 2 1);
+            reduce (u, b) (vertex 1 1) (vertex 0 0) (vertex 5 1);
+            reduce (u, s) (vertex 5 1) (vertex 0 0) (vertex 2 1);
           ]
       };
     ]
@@ -506,6 +506,9 @@ module Same_label_reduce2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
         ];
         trace = Trace.[
             load (code "a") (vertex 0 0) (vertex 1 1);
+            reduce (u, a) (vertex 1 1) (vertex 0 0) (vertex 4 1);
+            reduce (u, s) (vertex 4 1) (vertex 0 0) (vertex 2 1);
+            load eof (vertex 2 1) (vertex 3 2);
           ]
       };
     ]
