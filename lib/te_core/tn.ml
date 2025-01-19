@@ -1204,8 +1204,8 @@ let build syntactic lexical _longest_match start prods  =
   let pre_analysis = Analysis.Pre.compute eprods1 Analysis.Pre.empty in
   let analysis = Analysis.compute pre_analysis in
 
-  Fmt.pr "C %s@,"  (Dot.string_of_graph (to_dot'' c));
-  Fmt.pr "E %s@,"  (Dot.string_of_graph (to_dot''' e));
+  (*Fmt.pr "C %s@,"  (Dot.string_of_graph (to_dot'' c));
+  Fmt.pr "E %s@,"  (Dot.string_of_graph (to_dot''' e));*)
 
   print_endline "LOOK";
 
@@ -1220,16 +1220,16 @@ let build syntactic lexical _longest_match start prods  =
 
   let back = return lexical eprods1 in
 
-  print_productions eprods1;
+  (*print_productions eprods1;*)
 
   print_endline "END";
-  Fmt.pr "NL %s@,"  (Dot.string_of_graph (to_dot' (with_nullable lookahead' (A.map_labels (fun _ -> Noncanonical_items.join) nc))));
+  (*Fmt.pr "NL %s@,"  (Dot.string_of_graph (to_dot' (with_nullable lookahead' (A.map_labels (fun _ -> Noncanonical_items.join) nc))));
 
   Fmt.pr "LK %s@,"  (Dot.string_of_graph (to_dot''''' (with_lookahead lookahead' (A.map_labels (fun _ -> Noncanonical_items.join) nc))));
 
   Fmt.pr "ITMS %s@,"  (Dot.string_of_graph (to_dot'' (A.map_labels (fun _ -> Noncanonical_items.join) nc)));
 
-  Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot (with_actions lexical lookahead' nc)));
+  Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot (with_actions lexical lookahead' nc)));*)
 
 
   (lookahead', nc, back)
