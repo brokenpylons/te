@@ -1149,6 +1149,6 @@ end)
 
 let _ =
   let d = X.driver () in
-  X.Run.file (fun c -> d#read c) "test.json";
+  X.Run.file (fun c -> d#read c) "test.c";
   Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);
   Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))

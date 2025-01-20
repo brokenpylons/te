@@ -1,4 +1,4 @@
 (executable
  (public_name te)
- (name te_c_ws)
+ (name te_c)
  (libraries te_core te_bot))
