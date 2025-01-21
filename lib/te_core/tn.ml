@@ -1061,7 +1061,6 @@ let resolve_tail nullable' tail =
       else Rhs.nothing) 
       tail
   in
-  Fmt.pr "%a@." Rhs.pp tail;
   assert (not @@ Rhs.is_infinite tail);
   tail
   |> Rhs.to_seq ~cmp:T.Var.compare (T.Vars.to_seq % Lits.to_vars)

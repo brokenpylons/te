@@ -140,9 +140,7 @@ module Build(Spec: SPEC') = struct
     let longest_match = T.Vars.of_list Spec'.longest_match in
 
     let (lookahead', nullable', g, b) = Tn.build syntactic lexical longest_match Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
-    print_endline ("TABLES");
     let t = Tables.Unoptimized.make lexical lookahead' nullable' g b in
-    print_endline ("DRIVER");
     new X.driver t
 
   module Run = struct
