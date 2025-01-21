@@ -124,7 +124,7 @@ module Abstract = struct
 
   let is_infinite =
     let rec go = function
-      | Nothing -> true
+      | Nothing -> false
       | Null -> false
       | Any -> true
       | Lits _ -> false
