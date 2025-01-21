@@ -139,8 +139,10 @@ module Build(Spec: SPEC') = struct
     let lexical = T.Vars.of_list Spec'.lexical in
     let longest_match = T.Vars.of_list Spec'.longest_match in
 
-    let (lookahead, g, b) = Tn.build syntactic lexical longest_match Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
-    let t = Tables.Unoptimized.make lexical lookahead g b in
+    let (lookahead', nullable', g, b) = Tn.build syntactic lexical longest_match Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
+    print_endline ("TABLES");
+    let t = Tables.Unoptimized.make lexical lookahead' nullable' g b in
+    print_endline ("DRIVER");
     new X.driver t
 
   module Run = struct
@@ -175,8 +177,8 @@ module Test(Spec: SPEC) = struct
     let lexical = T.Vars.of_list Spec'.lexical in
     let syntactic = T.Vars.of_list Spec'.syntactic in
 
-    let (lookahead, g, b) = Tn.build syntactic lexical T.Vars.empty Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
-    let t = Tables.Unoptimized.make lexical lookahead g b in
+    let (lookahead', nullable', g, b) = Tn.build syntactic lexical T.Vars.empty Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
+    let t = Tables.Unoptimized.make lexical lookahead' nullable' g b in
     new X.driver t
 end
 
