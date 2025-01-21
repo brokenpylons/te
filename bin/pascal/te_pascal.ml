@@ -137,6 +137,40 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       multiplying_operator;
       adding_operator;
       relational_operator;
+      comma;
+      semi;
+      eq;
+      lparen;
+      rparen;
+      dotdot;
+      colon;
+      dot;
+      kw_label;
+      kw_const;
+      kw_type;
+      kw_var;
+      kw_packed;
+      kw_array;
+      kw_record;
+      kw_end;
+      kw_begin;
+      kw_goto;
+      kw_else;
+      kw_case;
+      kw_repeat;
+      kw_while;
+      kw_set;
+      kw_file;
+      kw_procedure;
+      kw_function;
+      kw_not;
+      kw_nil;
+      kw_then;
+      kw_until;
+      kw_with;
+      kw_program;
+      kw_for;
+      kw_downto;
 
       u;
       block';
@@ -324,6 +358,40 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       "multiplying_operator";
       "adding_operator";
       "relational_operator";
+      "comma";
+      "semi";
+      "eq";
+      "lparen";
+      "rparen";
+      "dotdot";
+      "colon";
+      "dot";
+      "kw_label";
+      "kw_const";
+      "kw_type";
+      "kw_var";
+      "kw_packed";
+      "kw_array";
+      "kw_record";
+      "kw_end";
+      "kw_begin";
+      "kw_goto";
+      "kw_else";
+      "kw_case";
+      "kw_repeat";
+      "kw_while";
+      "kw_set";
+      "kw_file";
+      "kw_procedure";
+      "kw_function";
+      "kw_not";
+      "kw_nil";
+      "kw_then";
+      "kw_until";
+      "kw_with";
+      "kw_program";
+      "kw_for";
+      "kw_downto";
 
       "_";
       "block'";
@@ -513,6 +581,40 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     multiplying_operator;
     adding_operator;
     relational_operator;
+    comma;
+    semi;
+    eq;
+    lparen;
+    rparen;
+    dotdot;
+    colon;
+    dot;
+    kw_label;
+    kw_const;
+    kw_type;
+    kw_var;
+    kw_packed;
+    kw_array;
+    kw_record;
+    kw_end;
+    kw_begin;
+    kw_goto;
+    kw_else;
+    kw_case;
+    kw_repeat;
+    kw_while;
+    kw_set;
+    kw_file;
+    kw_procedure;
+    kw_function;
+    kw_not;
+    kw_nil;
+    kw_then;
+    kw_until;
+    kw_with;
+    kw_program;
+    kw_for;
+    kw_downto;
   ]
 
   let longest_match = [
@@ -529,23 +631,23 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
 
       make (block', block) R.(opt (var label_declaration_part) * opt (var constant_definition_part) * opt (var type_definition_part) * opt (var variable_declaration_part) * star (var procedure_and_function_declaration_part) * var statement_part);
 
-      make (u, label_declaration_part) R.(text "label" * var label * star (text "," * var label) * text ";");
+      make (u, label_declaration_part) R.(var kw_label * var label * star (var comma * var label) * var semi);
 
-      make (u, constant_definition_part) R.((text "const" * var constant_definition * text ";") * star (var constant_definition * text ";"));
+      make (u, constant_definition_part) R.((var kw_const * var constant_definition * var semi) * star (var constant_definition * var semi));
 
-      make (u, type_definition_part) R.((text "type" * var type_definition * text ";") * star (var type_definition * text ";"));
+      make (u, type_definition_part) R.((var kw_type * var type_definition * var semi) * star (var type_definition * var semi));
 
-      make (u, variable_declaration_part) R.((text "var" * var variable_declaration * text ";") * star (var variable_declaration * text ";"));
+      make (u, variable_declaration_part) R.((var kw_var * var variable_declaration * var semi) * star (var variable_declaration * var semi));
 
-      make (u, procedure_and_function_declaration_part) R.((var procedure_declaration + var function_declaration) * text ";");
+      make (u, procedure_and_function_declaration_part) R.((var procedure_declaration + var function_declaration) * var semi);
 
       make (u, statement_part) (var compound_statement);
 
-      make (constantdefinition', constant_definition) R.(var identifier * text "=" * var constant);
+      make (constantdefinition', constant_definition) R.(var identifier * var eq * var constant);
 
       make (u, constant) R.(var sign * (var unsigned_number + var identifier) + var unsigned_number + var identifier + var character_string);
 
-      make (typedefinition', type_definition) R.(var identifier * text "=" * var type_denoter);
+      make (typedefinition', type_definition) R.(var identifier * var eq * var type_denoter);
 
       make (u, type_denoter) R.(var identifier + var new_type);
 
@@ -569,69 +671,69 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
 
       make (u, real_type_identifier) (var type_identifier);
 
-      make (enumeratedtype', enumerated_type) R.(text "(" * var identifier_list * text ")");
+      make (enumeratedtype', enumerated_type) R.(var lparen * var identifier_list * var rparen);
 
-      make (u, identifier_list) R.(var identifier * star (text "," * var identifier));
+      make (u, identifier_list) R.(var identifier * star (var comma * var identifier));
 
-      make (subrangetype', subrange_type) R.(var constant * text ".." * var constant);
+      make (subrangetype', subrange_type) R.(var constant * var dotdot * var constant);
 
       make (structuredtype', structured_type) R.(var new_structured_type + var identifier);
 
-      make (u, new_structured_type) R.(opt (text "packed") * var unpacked_structured_type);
+      make (u, new_structured_type) R.(opt (var kw_packed) * var unpacked_structured_type);
 
       make (u, unpacked_structured_type) R.(var array_type + var record_type + var set_type + var file_type);
 
-      make (arraytype', array_type) R.(text "array" * text "[" * var index_type * star (text "," * var index_type) * text "]" * text "of" * var component_type);
+      make (arraytype', array_type) R.(var kw_array * var dot * var index_type * star (var comma * var index_type) * var dot * var dotdot * var component_type);
 
       make (u, index_type) (var ordinal_type);
 
       make (u, component_type) (var type_denoter);
 
-      make (recordtype', record_type) R.(text "record" * opt (var field_list) * text "end");
+      make (recordtype', record_type) R.(var kw_record * opt (var field_list) * var kw_end);
 
-      make (u, field_list) R.(var fixed_part * opt (text ";" * var variant_part) + var variant_part);
+      make (u, field_list) R.(var fixed_part * opt (var semi * var variant_part) + var variant_part);
 
-      make (u, fixed_part) R.(var fixed_part * text ";" * var record_section + var record_section);
+      make (u, fixed_part) R.(var fixed_part * var semi * var record_section + var record_section);
 
-      make (u, record_section) R.(var identifier_list * text ":" * var type_denoter);
+      make (u, record_section) R.(var identifier_list * var colon * var type_denoter);
 
-      make (u, variant_part) R.(text "case" * var variant_selector * text "of" * var variant * star (text ";" * var variant));
+      make (u, variant_part) R.(var kw_case * var variant_selector * var dotdot * var variant * star (var semi * var variant));
 
-      make (u, variant_selector) R.(var tag_field * text ":" * var tag_type + var tag_type);
+      make (u, variant_selector) R.(var tag_field * var colon * var tag_type + var tag_type);
 
       make (u, tag_field) (var identifier);
 
-      make (variant', variant) R.(var case_constant_list * text ":" * text "(" * var field_list * text ")");
+      make (variant', variant) R.(var case_constant_list * var colon * var lparen * var field_list * var rparen);
 
       make (u, tag_type) (var identifier);
 
-      make (u, case_constant_list) R.(var case_constant * star (text "," * var case_constant));
+      make (u, case_constant_list) R.(var case_constant * star (var comma * var case_constant));
 
       make (u, case_constant) (var constant);
 
-      make (settype', set_type) R.(text "set" * text "of" * var base_type);
+      make (settype', set_type) R.(var kw_set * var dotdot * var base_type);
 
       make (u, base_type) (var ordinal_type);
 
-      make (filetype', file_type) R.(text "file" * text "of" * var component_type);
+      make (filetype', file_type) R.(var kw_file * var dotdot * var component_type);
 
       make (pointertype', pointer_type) R.(var new_pointer_type + var identifier);
 
-      make (u, new_pointer_type) R.(text "^" * var domain_type);
+      make (u, new_pointer_type) R.(var dot * var domain_type);
 
       make (u, domain_type) (var identifier);
 
-      make (variabledeclaration', variable_declaration) R.(var identifier_list * text ":" * var type_denoter);
+      make (variabledeclaration', variable_declaration) R.(var identifier_list * var colon * var type_denoter);
 
-      make (variableaccess', variable_access) R.(var identified_variable + var indexed_variable + var record_variable * text "." * var field_specifier + var identifier);
+      make (variableaccess', variable_access) R.(var identified_variable + var indexed_variable + var record_variable * var dot * var field_specifier + var identifier);
 
       make (entirevariable', entire_variable) (var identifier);
 
-      make (identifiedvariable', identified_variable) R.(var pointer_variable * text "^");
+      make (identifiedvariable', identified_variable) R.(var pointer_variable * var dot);
 
       make (pointervariable', pointer_variable) (var variable_access);
 
-      make (indexedvariable', indexed_variable) R.(var array_variable * text "[" * var index_expression * star (text "," * var index_expression) * text "]");
+      make (indexedvariable', indexed_variable) R.(var array_variable * var dot * var index_expression * star (var comma * var index_expression) * var dot);
 
       make (arrayvariable', array_variable) (var variable_access);
 
@@ -641,32 +743,32 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
 
       make (u, field_specifier) (var identifier);
 
-      make (proceduredeclaration', procedure_declaration) R.(var procedure_heading * text ";" * var directive + var procedure_identification * text ";" * var procedure_block + var procedure_heading * text ";" * var procedure_block);
+      make (proceduredeclaration', procedure_declaration) R.(var procedure_heading * var semi * var directive + var procedure_identification * var semi * var procedure_block + var procedure_heading * var semi * var procedure_block);
 
-      make (u, procedure_heading) R.(text "procedure" * var identifier * var formal_parameter_list);
+      make (u, procedure_heading) R.(var kw_procedure * var identifier * var formal_parameter_list);
 
-      make (u, procedure_identification) R.(text "procedure" * var identifier);
+      make (u, procedure_identification) R.(var kw_procedure * var identifier);
 
       make (u, procedure_block) (var block);
 
-      make (functiondeclaration', function_declaration) R.(var function_heading * text ";" * var directive + var function_identification * text ";" * var function_block + var function_heading * text ";" * var function_block);
+      make (functiondeclaration', function_declaration) R.(var function_heading * var semi * var directive + var function_identification * var semi * var function_block + var function_heading * var semi * var function_block);
 
 
-      make (u, function_heading) R.(text "function" * var identifier * opt (var formal_parameter_list) * text ":" * var result_type);
+      make (u, function_heading) R.(var kw_function * var identifier * opt (var formal_parameter_list) * var colon * var result_type);
 
-      make (u, function_identification) R.(text "function" * var identifier);
+      make (u, function_identification) R.(var kw_function * var identifier);
 
       make (u, result_type) (var identifier);
 
       make (u, function_block) (var block);
 
-      make (parameters', formal_parameter_list) R.(text "(" * var formal_parameter_section * star (text ";" * var formal_parameter_section) * text ")");
+      make (parameters', formal_parameter_list) R.(var lparen * var formal_parameter_section * star (var semi * var formal_parameter_section) * var rparen);
 
       make (u, formal_parameter_section) R.(var value_parameter_specification + var variable_parameter_specification + var procedural_parameter_specification + var functional_parameter_specification + var conformant_array_parameter_specification);
 
-      make (valueparameter', value_parameter_specification) R.(var identifier_list * text ":" * var identifier);
+      make (valueparameter', value_parameter_specification) R.(var identifier_list * var colon * var identifier);
 
-      make (variableparameter', variable_parameter_specification) R.(text "var" * var identifier_list * text ":" * var identifier);
+      make (variableparameter', variable_parameter_specification) R.(var kw_var * var identifier_list * var colon * var identifier);
 
       make (proceduralparameter', procedural_parameter_specification) (var procedure_heading);
 
@@ -674,17 +776,17 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
 
       make (arrayparameter', conformant_array_parameter_specification) R.(var value_conformant_array_specification + var variable_conformant_array_specification);
 
-      make (u, value_conformant_array_specification) R.(var identifier_list * text ":" * var conformant_array_schema);
+      make (u, value_conformant_array_specification) R.(var identifier_list * var colon * var conformant_array_schema);
 
-      make (u, variable_conformant_array_specification) R.(text "var" * var identifier_list * text ":" * var conformant_array_schema);
+      make (u, variable_conformant_array_specification) R.(var kw_var * var identifier_list * var colon * var conformant_array_schema);
 
       make (u, conformant_array_schema) R.(var packed_conformant_array_schema + var unpacked_conformant_array_schema);
 
-      make (u, packed_conformant_array_schema) R.(text "packed" * text "array" * text "[" * var index_type_specification * text "]" * text "of" * var identifier);
+      make (u, packed_conformant_array_schema) R.(var kw_packed * var kw_array * var dot * var index_type_specification * var dot * var dotdot * var identifier);
 
-      make (u, unpacked_conformant_array_schema) R.(text "array" * text "[" * var index_type_specification * star (text ";" * var index_type_specification) * text "]" * text "of" * (var identifier + var conformant_array_schema));
+      make (u, unpacked_conformant_array_schema) R.(var kw_array * var dot * var index_type_specification * star (var semi * var index_type_specification) * var dot * var dotdot * (var identifier + var conformant_array_schema));
 
-      make (u, index_type_specification) R.(var identifier * text ".." * var identifier * text ":" * var ordinal_type_identifier);
+      make (u, index_type_specification) R.(var identifier * var dotdot * var identifier * var colon * var ordinal_type_identifier);
 
       make (expression', expression) R.(var simple_expression * star (var relational_operator * var simple_expression));
 
@@ -694,55 +796,55 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
 
       make (term', term) R.(var factor * star (var multiplying_operator * var factor));
 
-      make (factor', factor) R.(var variable_access + var unsigned_constant + var function_designator + var set_constructor + text "(" * var expression * text ")" + text "not" * var factor);
+      make (factor', factor) R.(var variable_access + var unsigned_constant + var function_designator + var set_constructor + var lparen * var expression * var rparen + var kw_not * var factor);
 
-      make (u, unsigned_constant) R.(var unsigned_number + var character_string + text "nil");
+      make (u, unsigned_constant) R.(var unsigned_number + var character_string + var kw_nil);
 
-      make (setconstructor', set_constructor) R.(text "[" * opt (var member_designator * star (text "," * var member_designator)) * text "]");
+      make (setconstructor', set_constructor) R.(var dot * opt (var member_designator * star (var comma * var member_designator)) * var dot);
 
-      make (u, member_designator) R.(var expression * opt (text ".." * var expression));
+      make (u, member_designator) R.(var expression * opt (var dotdot * var expression));
 
       make (functiondesignator', function_designator) R.(var identifier * var actual_parameter_list);
 
-      make (u, actual_parameter_list) R.(text "(" * var actual_parameter * star (text "," * star (var actual_parameter + var write_parameter)) * text ")");
+      make (u, actual_parameter_list) R.(var lparen * var actual_parameter * star (var comma * star (var actual_parameter + var write_parameter)) * var rparen);
 
       make (actualparameter', actual_parameter) (var expression);
 
-      make (statement', statement) R.(opt (var label * text ":") * (var simple_statement + var structured_statement));
+      make (statement', statement) R.(opt (var label * var colon) * (var simple_statement + var structured_statement));
 
       make (simplestatement', simple_statement) R.(var assignment_statement + var procedure_statement + var goto_statement);
 
-      make (assignmentstatement', assignment_statement) R.(var variable_access * text ":=" * var expression);
+      make (assignmentstatement', assignment_statement) R.(var variable_access * var dotdot * var expression);
 
       make (procedurestatement', procedure_statement) R.(var identifier * opt (var actual_parameter_list));
 
-      make (gotostatement', goto_statement) R.(text "goto" * var label);
+      make (gotostatement', goto_statement) R.(var kw_goto * var label);
 
       make (structuredstatement', structured_statement) R.(var compound_statement + var conditional_statement + var repetitive_statement + var with_statement);
 
-      make (u, statement_sequence) R.(var statement * star (text ";" * opt (var statement)));
+      make (u, statement_sequence) R.(var statement * star (var semi * opt (var statement)));
 
-      make (compoundstatement', compound_statement) R.(text "begin" * opt (var statement_sequence) * text "end");
+      make (compoundstatement', compound_statement) R.(var kw_begin * opt (var statement_sequence) * var kw_end);
 
       make (u, conditional_statement) R.(var if_statement + var case_statement);
 
-      make (ifstatement', if_statement) R.(text "if" * var expression * text "then" * var statement * opt (var else_part));
+      make (ifstatement', if_statement) R.(var dotdot * var expression * var kw_then * var statement * opt (var else_part));
 
-      make (elsepart', else_part) R.(text "else" * var statement);
+      make (elsepart', else_part) R.(var kw_else * var statement);
 
-      make (casestatement', case_statement) R.(text "case" * var case_index * text "of" * var case_list_element *  star (text ";" * var case_list_element) * opt (text ";") * text "end");
+      make (casestatement', case_statement) R.(var kw_case * var case_index * var dotdot * var case_list_element *  star (var semi * var case_list_element) * opt (var semi) * var kw_end);
 
-      make (caseelement', case_list_element) R.(var case_constant_list * text ":" * var statement);
+      make (caseelement', case_list_element) R.(var case_constant_list * var colon * var statement);
 
       make (u, case_index) (var expression);
 
       make (u, repetitive_statement) R.(var repeat_statement + var while_statement + var for_statement);
 
-      make (repeatstatement', repeat_statement) R.(text "repeat" * opt (var statement_sequence) * text "until" * var expression);
+      make (repeatstatement', repeat_statement) R.(var kw_repeat * opt (var statement_sequence) * var kw_until * var expression);
 
-      make (whilestatement', while_statement) R.(text "while" * var expression * text "do" * var statement);
+      make (whilestatement', while_statement) R.(var kw_while * var expression * var dotdot * var statement);
 
-      make (forstatement', for_statement) R.(text "for" * var control_variable * text ":=" * var initial_value * (text "to" + text "downto") * var final_value * text "do" * var statement);
+      make (forstatement', for_statement) R.(var kw_for * var control_variable * var dotdot * var initial_value * (var dotdot + var kw_downto) * var final_value * var dotdot * var statement);
 
       make (u, control_variable) (var entire_variable);
 
@@ -750,15 +852,15 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
 
       make (u, final_value) (var expression);
 
-      make (withstatement', with_statement) R.(text "with" * var record_variable_list * text "do" * var statement);
+      make (withstatement', with_statement) R.(var kw_with * var record_variable_list * var dotdot * var statement);
 
-      make (u, record_variable_list) R.(var record_variable * star (text "," * var record_variable));
+      make (u, record_variable_list) R.(var record_variable * star (var comma * var record_variable));
 
-      make (u, write_parameter) R.(var expression * text ":" * var expression * opt (text ":" * var expression));
+      make (u, write_parameter) R.(var expression * var colon * var expression * opt (var colon * var expression));
 
-      make (program', program) R.(var program_heading * text ";" * var program_block * text ".");
+      make (program', program) R.(var program_heading * var semi * var program_block * var dot);
 
-      make (u, program_heading) R.(text "program" * var identifier * opt (text "(" * var program_parameter_list * text ")"));
+      make (u, program_heading) R.(var kw_program * var identifier * opt (var lparen * var program_parameter_list * var rparen));
 
       make (u, program_parameter_list) (var identifier_list);
 
@@ -787,6 +889,41 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (u, multiplying_operator) R.(codes "*/" * text "div" * text "mod" * text "and");
       make (u, adding_operator) R.(codes "+-" * text "or");
       make (u, relational_operator) R.(codes "=<>" * text "<>" * text ">=" * text "in");
+
+      make (u, comma) (text ",");
+      make (u, semi) (text ";");
+      make (u, eq) (text "=");
+      make (u, lparen) (text "(");
+      make (u, rparen) (text ")");
+      make (u, dotdot) (text "..");
+      make (u, colon) (text ":");
+      make (u, dot) (text ".");
+      make (u, kw_label) (text "label");
+      make (u, kw_const) (text "const");
+      make (u, kw_type) (text "type");
+      make (u, kw_var) (text "var");
+      make (u, kw_packed) (text "packed");
+      make (u, kw_array) (text "array");
+      make (u, kw_record) (text "record");
+      make (u, kw_end) (text "end");
+      make (u, kw_begin) (text "begin");
+      make (u, kw_goto) (text "goto");
+      make (u, kw_else) (text "else");
+      make (u, kw_case) (text "case");
+      make (u, kw_repeat) (text "repeat");
+      make (u, kw_while) (text "while");
+      make (u, kw_set) (text "set");
+      make (u, kw_file) (text "file");
+      make (u, kw_procedure) (text "procedure");
+      make (u, kw_function) (text "function");
+      make (u, kw_not) (text "not");
+      make (u, kw_nil) (text "nil");
+      make (u, kw_then) (text "then");
+      make (u, kw_until) (text "until");
+      make (u, kw_with) (text "with");
+      make (u, kw_program) (text "program");
+      make (u, kw_for) (text "for");
+      make (u, kw_downto) (text "downto");
 
       make (u, ws) R.(star (codes " \n\r\t"));
     ]
