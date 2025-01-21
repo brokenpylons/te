@@ -635,7 +635,7 @@ let construct ~supply start lexical prods =
       (*let vars = if not @@ T.Vars.is_empty (T.Vars.inter vars lexical)
         then T.Vars.union vars lexical
         else vars
-        in*)
+      in*)
       let nonkernel =
         Seq.flat_map (fun var ->
             Seq.map (fun Numbered_production.{number; lhs; rhs} ->
@@ -647,7 +647,11 @@ let construct ~supply start lexical prods =
                      is_kernel = false;
                      is_reduce = Rhs.is_nullable rhs;
                    }))
-              (Numbered_productions.to_seq @@ Production_index.find_multiple var prods))
+              (Numbered_productions.to_seq @@ 
+               try Production_index.find_multiple var prods 
+               with Not_found -> 
+                 Fmt.pr "%a" T.Var.pp var;
+                 assert false))
           (T.Vars.to_seq @@ vars)
       in
       Items.singleton @@ Item.{number; state = q; lhs; rhs; is_kernel; is_reduce; distance}, Seq.(kernel @ nonkernel))
