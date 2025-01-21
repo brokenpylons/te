@@ -110,8 +110,7 @@ module Context: CONTEXT = struct
   let with_ws_re lexical ws r =
     R.flat_map (fun x ->
         let vars = T.Symbols.to_vars x in
-        let codes = T.Symbols.to_codes x in
-        if not (T.Vars.disjoint lexical vars) || not (T.Codes.is_empty codes)
+        if not (T.Vars.disjoint lexical vars)
         then R.concat (R.lits x) ws
         else R.lits x)
       r
