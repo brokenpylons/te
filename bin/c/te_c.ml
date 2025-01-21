@@ -67,6 +67,49 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       pointer;
       bitcomp;
       lneg;
+      semi;
+      lparen;
+      rparen;
+      comma;
+      lbrace;
+      rbrace;
+      colon;
+      lbrak;
+      rbrak;
+      assign;
+      plus_;
+      minus;
+      ellip;
+      bor;
+      band;
+      lor_;
+      land_;
+      bxor;
+      eq;
+      noteq;
+      lt;
+      gt;
+      gte;
+      lte;
+      lshift;
+      rshift;
+      times;
+      div;
+      rem;
+      plusplus;
+      minusminus;
+      dot;
+      arrow;
+      timesassign;
+      divassign;
+      remassign;
+      plusassign;
+      minusassign;
+      lshiftassign;
+      rshiftassign;
+      landassign;
+      lxorassign;
+      lorassign;
 
       program;
       list_external_declaration;
@@ -385,6 +428,49 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       "pointer";
       "bitcomp";
       "lneg";
+      "semi";
+      "lparen";
+      "rparen";
+      "comma";
+      "lbrace";
+      "rbrace";
+      "colon";
+      "lbrak";
+      "rbrak";
+      "assign";
+      "plus_";
+      "minus";
+      "ellip";
+      "bor";
+      "band";
+      "lor_";
+      "land_";
+      "bxor";
+      "eq";
+      "noteq";
+      "lt";
+      "gt";
+      "gte";
+      "lte";
+      "lshift";
+      "rshift";
+      "times";
+      "div";
+      "rem";
+      "plusplus";
+      "minusminus";
+      "dot";
+      "arrow";
+      "timesassign";
+      "divassign";
+      "remassign";
+      "plusassign";
+      "minusassign";
+      "lshiftassign";
+      "rshiftassign";
+      "landassign";
+      "lxorassign";
+      "lorassign";
 
       "program";
       "list_external_declaration";
@@ -770,6 +856,49 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     pointer;
     bitcomp;
     lneg;
+    semi;
+    lparen;
+    rparen;
+    comma;
+    lbrace;
+    rbrace;
+    colon;
+    lbrak;
+    rbrak;
+    assign;
+    plus_;
+    minus;
+    ellip;
+    bor;
+    band;
+    lor_;
+    land_;
+    bxor;
+    eq;
+    noteq;
+    lt;
+    gt;
+    gte;
+    lte;
+    lshift;
+    rshift;
+    times;
+    div;
+    rem;
+    plusplus;
+    minusminus;
+    dot;
+    arrow;
+    timesassign;
+    divassign;
+    remassign;
+    plusassign;
+    minusassign;
+    lshiftassign;
+    rshiftassign;
+    landassign;
+    lxorassign;
+    lorassign;
     ws;
   ]
 
@@ -798,8 +927,8 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (oldfuncint', function_def) R.(var declarator * var list_dec * var compound_stm);
       make (newfuncint', function_def) R.(var declarator * var compound_stm);
 
-      make (nodeclarator', dec) R.(var list_declaration_specifier * text ";");
-      make (declarators', dec) R.(var list_declaration_specifier * var list_init_declarator * text ";");
+      make (nodeclarator', dec) R.(var list_declaration_specifier * var semi);
+      make (declarators', dec) R.(var list_declaration_specifier * var list_init_declarator * var semi);
 
       make (u, list_dec) (var dec);
       make (u, list_dec) R.(var dec * var list_dec);
@@ -812,10 +941,10 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (specprop', declaration_specifier) (var type_qualifier);
 
       make (u, list_init_declarator) (var init_declarator);
-      make (u, list_init_declarator) R.(var init_declarator * text "," * var list_init_declarator);
+      make (u, list_init_declarator) R.(var init_declarator * var comma * var list_init_declarator);
 
       make (onlydecl', init_declarator) (var declarator);
-      make (initdecl', init_declarator) R.(var declarator * text "=" * var initializer_);
+      make (initdecl', init_declarator) R.(var declarator * var assign * var initializer_);
 
       make (tvoid', type_specifier) (var type_void);
       make (tchar', type_specifier) (var type_char);
@@ -839,8 +968,8 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (const', type_qualifier) (var const);
       make (nooptim', type_qualifier) (var volatile);
 
-      make (tag', struct_or_union_spec) R.(var struct_or_union * var ident * text "{" * var list_struct_dec * text "}");
-      make (unique', struct_or_union_spec) R.(var struct_or_union * text "{" * var list_struct_dec * text "}");
+      make (tag', struct_or_union_spec) R.(var struct_or_union * var ident * var lbrace * var list_struct_dec * var rbrace);
+      make (unique', struct_or_union_spec) R.(var struct_or_union * var lbrace * var list_struct_dec * var rbrace);
       make (tagtype', struct_or_union_spec) R.(var struct_or_union * var ident);
 
       make (struct', struct_or_union) (var struct_);
@@ -849,7 +978,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (u, list_struct_dec) (var struct_dec);
       make (u, list_struct_dec) R.(var struct_dec * var list_struct_dec);
 
-      make (structen', struct_dec) R.(var list_spec_qual * var list_struct_declarator * text ";");
+      make (structen', struct_dec) R.(var list_spec_qual * var list_struct_declarator * var semi);
 
       make (u, list_spec_qual) (var spec_qual);
       make (u, list_spec_qual) R.(var spec_qual * var list_spec_qual);
@@ -858,35 +987,35 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (qualspec', spec_qual) (var type_qualifier);
 
       make (u, list_struct_declarator) (var struct_declarator);
-      make (u, list_struct_declarator) R.(var struct_declarator * text "," * var list_struct_declarator);
+      make (u, list_struct_declarator) R.(var struct_declarator * var comma * var list_struct_declarator);
 
       make (decl', struct_declarator) (var declarator);
-      make (field', struct_declarator) R.(text ":" * var constant_expression);
-      make (decfield', struct_declarator) R.(var declarator * text ":" * var constant_expression);
+      make (field', struct_declarator) R.(var colon * var constant_expression);
+      make (decfield', struct_declarator) R.(var declarator * var colon * var constant_expression);
 
 
-      make (enumdec', enum_specifier) R.(var enum * text "{" * var list_enumerator * text "}");
-      make (enumname', enum_specifier) R.(var enum * var ident * text "{" * var list_enumerator * text "}");
+      make (enumdec', enum_specifier) R.(var enum * var lbrace * var list_enumerator * var rbrace);
+      make (enumname', enum_specifier) R.(var enum * var ident * var lbrace * var list_enumerator * var rbrace);
       make (enumvar', enum_specifier) R.(var enum * var ident);
 
       make (u, list_enumerator) (var enumerator);
-      make (u, list_enumerator) R.(var enumerator * text ",");
-      make (u, list_enumerator) R.(var enumerator * text "," * var list_enumerator);
+      make (u, list_enumerator) R.(var enumerator * var comma);
+      make (u, list_enumerator) R.(var enumerator * var comma * var list_enumerator);
 
       make (plain', enumerator) (var ident);
-      make (enuminit', enumerator) R.(var ident * text "=" * var constant_expression);
+      make (enuminit', enumerator) R.(var ident * var assign * var constant_expression);
 
 
       make (beginpointer', declarator) R.(var pointer * var direct_declarator);
       make (nopointer', declarator) (var direct_declarator);
 
       make (name', direct_declarator) (var ident);
-      make (parendecl', direct_declarator) R.(text "(" * var declarator * text ")");
-      make (innitarray', direct_declarator) R.(var direct_declarator * text "[" * var constant_expression * text "]");
-      make (incomplete', direct_declarator) R.(var direct_declarator * text "[" * text "]");
-      make (newfuncdec', direct_declarator) R.(var direct_declarator * text "(" * var parameter_type * text ")");
-      make (oldfuncdef', direct_declarator) R.(var direct_declarator * text "(" * var list_ident * text ")");
-      make (oldfuncdec', direct_declarator) R.(var direct_declarator * text "(" * text ")");
+      make (parendecl', direct_declarator) R.(var lparen * var declarator * var rparen);
+      make (innitarray', direct_declarator) R.(var direct_declarator * var lbrak * var constant_expression * var rbrak);
+      make (incomplete', direct_declarator) R.(var direct_declarator * var lbrak * var rbrak);
+      make (newfuncdec', direct_declarator) R.(var direct_declarator * var lparen * var parameter_type * var rparen);
+      make (oldfuncdef', direct_declarator) R.(var direct_declarator * var lparen * var list_ident * var rparen);
+      make (oldfuncdec', direct_declarator) R.(var direct_declarator * var lparen * var rparen);
 
       make (point', pointer) (var pointer);
       make (pointqual', pointer) R.(var pointer * var list_type_qualifier);
@@ -897,24 +1026,24 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (u, list_type_qualifier) R.(var type_qualifier * var list_type_qualifier);
 
       make (allspec', parameter_type) (var parameter_declarations);
-      make (more', parameter_type) R.(var parameter_declarations * text "," * text "...");
+      make (more', parameter_type) R.(var parameter_declarations * var comma * var ellip);
 
       make (paramdec', parameter_declarations) (var parameter_declaration);
-      make (moreparamdec', parameter_declarations) R.(var parameter_declarations * text "," * var parameter_declaration);
+      make (moreparamdec', parameter_declarations) R.(var parameter_declarations * var comma * var parameter_declaration);
 
       make (onlytype', parameter_declaration) (var list_declaration_specifier);
       make (typeandparam', parameter_declaration) R.(var list_declaration_specifier * var declarator);
       make (abstract', parameter_declaration) R.(var list_declaration_specifier * var abstract_declarator);
 
       make (u, list_ident) (var ident);
-      make (u, list_ident) R.(var ident * text "," * var list_ident);
+      make (u, list_ident) R.(var ident * var comma * var list_ident);
 
       make (initexpr', initializer_) (var exp2);
-      make (initlistone', initializer_) R.(text "{" * var initializers * text "}");
-      make (initlisttwo', initializer_) R.(text "{" * var initializers * text "," * text "}");
+      make (initlistone', initializer_) R.(var lbrace * var initializers * var rbrace);
+      make (initlisttwo', initializer_) R.(var lbrace * var initializers * var comma * var rbrace);
 
       make (aninit', initializers) (var initializer_);
-      make (moreinit', initializers) R.(var initializers * text "," * var initializer_);
+      make (moreinit', initializers) R.(var initializers * var comma * var initializer_);
 
       make (plaintype', type_name) (var list_spec_qual);
       make (extendedtype', type_name) R.(var list_spec_qual * var abstract_declarator);
@@ -923,15 +1052,15 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (advanced', abstract_declarator) (var dir_abs_dec);
       make (pointadvanced', abstract_declarator) R.(var pointer * var dir_abs_dec);
 
-      make (withinparentes', dir_abs_dec) R.(text "(" * var abstract_declarator * text ")");
-      make (array', dir_abs_dec) R.(text "[" * text "]");
-      make (initiatedarray', dir_abs_dec) R.(text "[" * var constant_expression * text "]");
-      make (uninitiated', dir_abs_dec) R.(var dir_abs_dec * text "[" * text "]");
-      make (initiated', dir_abs_dec) R.(var dir_abs_dec * text "[" * var constant_expression * text "]");
-      make (oldfunction', dir_abs_dec) R.(text "(" * text ")");
-      make (newfunction', dir_abs_dec) R.(text "(" * var parameter_type * text ")");
-      make (oldfuncexpr', dir_abs_dec) R.(var dir_abs_dec * text "(" * text ")");
-      make (newfuncexpr', dir_abs_dec) R.(var dir_abs_dec * text "(" * var parameter_type * text ")");
+      make (withinparentes', dir_abs_dec) R.(var lparen * var abstract_declarator * var rparen);
+      make (array', dir_abs_dec) R.(var lbrak * var rbrak);
+      make (initiatedarray', dir_abs_dec) R.(var lbrak * var constant_expression * var rbrak);
+      make (uninitiated', dir_abs_dec) R.(var dir_abs_dec * var lbrak * var rbrak);
+      make (initiated', dir_abs_dec) R.(var dir_abs_dec * var lbrak * var constant_expression * var rbrak);
+      make (oldfunction', dir_abs_dec) R.(var lparen * var rparen);
+      make (newfunction', dir_abs_dec) R.(var lparen * var parameter_type * var rparen);
+      make (oldfuncexpr', dir_abs_dec) R.(var dir_abs_dec * var lparen * var rparen);
+      make (newfuncexpr', dir_abs_dec) R.(var dir_abs_dec * var lparen * var parameter_type * var rparen);
 
       make (labels', stm) (var labeled_stm);
       make (comps', stm) (var compound_stm);
@@ -940,70 +1069,70 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (iters', stm) (var iter_stm);
       make (jumps', stm) (var jump_stm);
 
-      make (slabelone', labeled_stm) R.(var ident * text ":" * var stm);
-      make (slabeltwo', labeled_stm) R.(var case * var constant_expression * text ":" * var stm);
-      make (slabelthree', labeled_stm) R.(var default * text ":" * var stm);
+      make (slabelone', labeled_stm) R.(var ident * var colon * var stm);
+      make (slabeltwo', labeled_stm) R.(var case * var constant_expression * var colon * var stm);
+      make (slabelthree', labeled_stm) R.(var default * var colon * var stm);
 
-      make (scompone', compound_stm) R.(text "{" * text "}");
-      make (scomptwo', compound_stm) R.(text "{" * var list_stm * text "}");
-      make (scompthree', compound_stm) R.(text "{" * var list_dec * text "}");
-      make (scompfour', compound_stm) R.(text "{" * var list_dec * var list_stm * text "}");
+      make (scompone', compound_stm) R.(var lbrace * var rbrace);
+      make (scomptwo', compound_stm) R.(var lbrace * var list_stm * var rbrace);
+      make (scompthree', compound_stm) R.(var lbrace * var list_dec * var rbrace);
+      make (scompfour', compound_stm) R.(var lbrace * var list_dec * var list_stm * var rbrace);
 
-      make (sexprone', expression_stm) (text ";");
-      make (sexprtwo', expression_stm) R.(var exp * text ";");
+      make (sexprone', expression_stm) (var semi);
+      make (sexprtwo', expression_stm) R.(var exp * var semi);
 
-      make (sselone', selection_stm) R.(var if_ * text "(" * var exp * text ")" * var stm);
-      make (sseltwo', selection_stm) R.(var if_ * text "(" * var exp * text ")" * var stm * var else_ * var stm);
-      make (sselthree', selection_stm) R.(var switch * text "(" * var exp * text ")" * var stm);
+      make (sselone', selection_stm) R.(var if_ * var lparen * var exp * var rparen * var stm);
+      make (sseltwo', selection_stm) R.(var if_ * var lparen * var exp * var rparen * var stm * var else_ * var stm);
+      make (sselthree', selection_stm) R.(var switch * var lparen * var exp * var rparen * var stm);
 
-      make (siterone', iter_stm) R.(var while_ * text "(" * var exp * text ")" * var stm);
-      make (sitertwo', iter_stm) R.(var do_ * var stm * var while_ * text "(" * var exp * text ")" * text ";");
-      make (siterthree', iter_stm) R.(var for_ * text "(" * var expression_stm * var expression_stm * text ")" * var stm);
-      make (siterfour', iter_stm) R.(var for_ * text "(" * var expression_stm * var expression_stm * var exp * text ")" * var stm);
+      make (siterone', iter_stm) R.(var while_ * var lparen * var exp * var rparen * var stm);
+      make (sitertwo', iter_stm) R.(var do_ * var stm * var while_ * var lparen * var exp * var rparen * var semi);
+      make (siterthree', iter_stm) R.(var for_ * var lparen * var expression_stm * var expression_stm * var rparen * var stm);
+      make (siterfour', iter_stm) R.(var for_ * var lparen * var expression_stm * var expression_stm * var exp * var rparen * var stm);
 
-      make (sjumpone', jump_stm) R.(var goto * var ident * text ";");
-      make (sjumptwo', jump_stm) R.(var continue * text ";");
-      make (sjumpthree', jump_stm) R.(var break * text ";");
-      make (sjumpfour', jump_stm) R.(var return * text ";");
-      make (sjumpfive', jump_stm) R.(var return * var exp * text ";");
+      make (sjumpone', jump_stm) R.(var goto * var ident * var semi);
+      make (sjumptwo', jump_stm) R.(var continue * var semi);
+      make (sjumpthree', jump_stm) R.(var break * var semi);
+      make (sjumpfour', jump_stm) R.(var return * var semi);
+      make (sjumpfive', jump_stm) R.(var return * var exp * var semi);
 
       make (u, list_stm) (var stm);
       make (u, list_stm) R.(var stm * var list_stm);
 
-      make (ecomma', exp) R.(var exp * text "," * var exp2);
+      make (ecomma', exp) R.(var exp * var comma * var exp2);
       make (eassign', exp2) R.(var exp15 * var assignment_op * var exp2);
       make (econdition', exp3) R.(var exp4 * var ternary_if * var exp * var ternary_else * var exp3);
-      make (elor', exp4) R.(var exp4 * text "||" * var exp5);
-      make (eland', exp5) R.(var exp5 * text "&&" * var exp6);
-      make (ebitor', exp6) R.(var exp6 * text "|" * var exp7);
-      make (ebitexor', exp7) R.(var exp7 * text "^" * var exp8);
-      make (ebitand', exp8) R.(var exp8 * text "&" * var exp9);
-      make (eeq', exp9) R.(var exp9 * text "==" * var exp10);
-      make (eneq', exp9) R.(var exp9 * text "!=" * var exp10);
-      make (elthen', exp10) R.(var exp10 * text "<" * var exp11);
-      make (egrthen', exp10) R.(var exp10 * text ">" * var exp11);
-      make (ele', exp10) R.(var exp10 * text "<=" * var exp11);
-      make (ege', exp10) R.(var exp10 * text ">=" * var exp11);
-      make (eleft', exp11) R.(var exp11 * text "<<" * var exp12);
-      make (eright', exp11) R.(var exp11 * text ">>" * var exp12);
-      make (eplus', exp12) R.(var exp12 * text "+" * var exp13);
-      make (eminus', exp12) R.(var exp12 * text "-" * var exp13);
-      make (etimes', exp13) R.(var exp13 * text "*" * var exp14);
-      make (ediv', exp13) R.(var exp13 * text "/" * var exp14);
-      make (emod', exp13) R.(var exp13 * text "%" * var exp14);
-      make (etypeconv', exp14) R.(text "(" * var type_name * text ")" * var exp14);
-      make (epreinc', exp15) R.(text "++" * var exp15);
-      make (epredec', exp15) R.(text "--" * var exp15);
+      make (elor', exp4) R.(var exp4 * var lor_ * var exp5);
+      make (eland', exp5) R.(var exp5 * var land_ * var exp6);
+      make (ebitor', exp6) R.(var exp6 * var bor * var exp7);
+      make (ebitexor', exp7) R.(var exp7 * var bxor * var exp8);
+      make (ebitand', exp8) R.(var exp8 * var band * var exp9);
+      make (eeq', exp9) R.(var exp9 * var eq * var exp10);
+      make (eneq', exp9) R.(var exp9 * var noteq * var exp10);
+      make (elthen', exp10) R.(var exp10 * var lt * var exp11);
+      make (egrthen', exp10) R.(var exp10 * var gt * var exp11);
+      make (ele', exp10) R.(var exp10 * var lte * var exp11);
+      make (ege', exp10) R.(var exp10 * var gte * var exp11);
+      make (eleft', exp11) R.(var exp11 * var lshift * var exp12);
+      make (eright', exp11) R.(var exp11 * var rshift * var exp12);
+      make (eplus', exp12) R.(var exp12 * var plus_ * var exp13);
+      make (eminus', exp12) R.(var exp12 * var minus * var exp13);
+      make (etimes', exp13) R.(var exp13 * var times * var exp14);
+      make (ediv', exp13) R.(var exp13 * var div * var exp14);
+      make (emod', exp13) R.(var exp13 * var rem * var exp14);
+      make (etypeconv', exp14) R.(var lparen * var type_name * var rparen * var exp14);
+      make (epreinc', exp15) R.(var plusplus * var exp15);
+      make (epredec', exp15) R.(var minusminus * var exp15);
       make (epreop', exp15) R.(var unary_operator * var exp14);
       make (ebytesexpr', exp15) R.(var sizeof * var exp15);
-      make (ebytestype', exp15) R.(var sizeof * text "(" * var type_name * text ")");
-      make (earray', exp16) R.(var exp16 * text "[" * var exp * text "]");
-      make (efunk', exp16) R.(var exp16 * text "(" * text ")");
-      make (efunkpar', exp16) R.(var exp16 * text "(" * var list_exp2 * text ")");
-      make (eselect', exp16) R.(var exp16 * text "." * var ident);
-      make (epoint', exp16) R.(var exp16 * text "->" * var ident);
-      make (epostinc', exp16) R.(var exp16 * text "++");
-      make (epostdec', exp16) R.(var exp16 * text "--");
+      make (ebytestype', exp15) R.(var sizeof * var lparen * var type_name * var rparen);
+      make (earray', exp16) R.(var exp16 * var lbrak * var exp * var rbrak);
+      make (efunk', exp16) R.(var exp16 * var lparen * var rparen);
+      make (efunkpar', exp16) R.(var exp16 * var lparen * var list_exp2 * var rparen);
+      make (eselect', exp16) R.(var exp16 * var dot * var ident);
+      make (epoint', exp16) R.(var exp16 * var arrow * var ident);
+      make (epostinc', exp16) R.(var exp16 * var plusplus);
+      make (epostdec', exp16) R.(var exp16 * var minusminus);
       make (evar', exp17) (var ident);
       make (econst', exp17) (var constant);
       make (estring', exp17) (var string);
@@ -1028,7 +1157,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (especial', constant_expression) (var exp3);
 
       make (u, list_exp2) (var exp2);
-      make (u, list_exp2) R.(var exp2 * text "," * var list_exp2);
+      make (u, list_exp2) R.(var exp2 * var comma * var list_exp2);
 
       make (u, exp) (var exp2);
       make (u, exp2) (var exp3);
@@ -1046,26 +1175,26 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (u, exp14) (var exp15);
       make (u, exp15) (var exp16);
       make (u, exp16) (var exp17);
-      make (u, exp17) R.(text "(" * var exp * text ")");
+      make (u, exp17) R.(var lparen * var exp * var rparen);
 
       make (address', unary_operator) (var address);
       make (indirection', unary_operator) (var indirection);
-      make (plus', unary_operator) (text "+");
-      make (negative', unary_operator) (text "-");
+      make (plus', unary_operator) (var plus_);
+      make (negative', unary_operator) (var minus);
       make (complement', unary_operator) (var bitcomp);
       make (logicalneg', unary_operator) (var lneg);
 
-      make (assign', assignment_op) (text "=");
-      make (assignmul', assignment_op) (text "*=");
-      make (assigndiv', assignment_op) (text "/=");
-      make (assignmod', assignment_op) (text "%=");
-      make (assignadd', assignment_op) (text "+=");
-      make (assignsub', assignment_op) (text "-=");
-      make (assignleft', assignment_op) (text "<<=");
-      make (assignright', assignment_op) (text ">>=");
-      make (assignand', assignment_op) (text "&=");
-      make (assignxor', assignment_op) (text "^=");
-      make (assignor', assignment_op) (text "|=");
+      make (assign', assignment_op) (var assign);
+      make (assignmul', assignment_op) (var timesassign);
+      make (assigndiv', assignment_op) (var divassign);
+      make (assignmod', assignment_op) (var remassign);
+      make (assignadd', assignment_op) (var plusassign);
+      make (assignsub', assignment_op) (var minusassign);
+      make (assignleft', assignment_op) (var lshiftassign);
+      make (assignright', assignment_op) (var rshiftassign);
+      make (assignand', assignment_op) (var landassign);
+      make (assignxor', assignment_op) (var lxorassign);
+      make (assignor', assignment_op) (var lorassign);
     ]
 
   let scanner =
@@ -1141,6 +1270,50 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (u, pointer) (codes "*");
       make (u, bitcomp) (codes "~");
       make (u, lneg) (codes "!");
+
+      make (u, semi) (text ";");
+      make (u, lparen) (text "(");
+      make (u, rparen) (text ")");
+      make (u, comma) (text ",");
+      make (u, lbrace) (text "{");
+      make (u, rbrace) (text "}");
+      make (u, colon) (text ":");
+      make (u, lbrak) (text "[");
+      make (u, rbrak) (text "]");
+      make (u, assign) (text "=");
+      make (u, plus_) (text "+");
+      make (u, minus) (text "-");
+      make (u, ellip) (text "...");
+      make (u, bor) (text "|");
+      make (u, band) (text "&");
+      make (u, lor_) (text "||");
+      make (u, land_) (text "&&");
+      make (u, bxor) (text "^");
+      make (u, eq) (text "==");
+      make (u, noteq) (text "!=");
+      make (u, lt) (text "<");
+      make (u, gt) (text ">");
+      make (u, gte) (text ">=");
+      make (u, lte) (text "<=");
+      make (u, lshift) (text "<<");
+      make (u, rshift) (text ">>");
+      make (u, times) (text "*");
+      make (u, div) (text "/");
+      make (u, rem) (text "%");
+      make (u, plusplus) (text "++");
+      make (u, minusminus) (text "--");
+      make (u, dot) (text ".");
+      make (u, arrow) (text "->");
+      make (u, timesassign) (text "*=");
+      make (u, divassign) (text "/=");
+      make (u, remassign) (text "%=");
+      make (u, plusassign) (text "+=");
+      make (u, minusassign) (text "-=");
+      make (u, lshiftassign) (text "<<=");
+      make (u, rshiftassign) (text ">>=");
+      make (u, landassign) (text "&=");
+      make (u, lxorassign) (text "^=");
+      make (u, lorassign) (text "|=");
 
       make (u, ws) R.(star (codes " \n\r\t"));
     ]
