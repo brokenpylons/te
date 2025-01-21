@@ -20,6 +20,12 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       member;
       elements;
       element;
+      lbrac;
+      rbrac;
+      lbrak;
+      rbrak;
+      comma;
+      colon;
       ws;
 
       u;
@@ -45,6 +51,12 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       "member";
       "elements";
       "element";
+      "lbrac";
+      "rbrac";
+      "lbrak";
+      "rbrak";
+      "comma";
+      "colon";
       "ws";
 
       "_";
@@ -72,6 +84,12 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     true_;
     false_;
     null_;
+    lbrac;
+    rbrac;
+    lbrak;
+    rbrak;
+    comma;
+    colon;
   ]
 
   let longest_match = []
@@ -92,12 +110,12 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (false', value) (var false_);
       make (null', value) (var null_);
 
-      make (u, object_) R.(codes "{" * opt (var members) * codes "}");
-      make (u, members) R.(star (var member * codes ",") * var member);
-      make (u, member) R.(var string * codes ":" * var value);
+      make (u, object_) R.(var lbrac * opt (var members) * var rbrac);
+      make (u, members) R.(star (var member * var comma) * var member);
+      make (u, member) R.(var string * var colon * var value);
 
-      make (u, array) R.(codes "[" * opt (var elements) * codes "]");
-      make (u, elements) R.(star (var element * codes ",") * var element);
+      make (u, array) R.(var lbrak * opt (var elements) * var rbrak);
+      make (u, elements) R.(star (var element * var comma) * var element);
       make (u, element) (var value);
     ]
 
@@ -117,6 +135,12 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (u, true_) (text "true");
       make (u, false_) (text "false");
       make (u, null_) (text "null");
+      make (u, lbrac) (codes "{");
+      make (u, rbrac) (codes "}");
+      make (u, lbrak) (codes "[");
+      make (u, rbrak) (codes "]");
+      make (u, comma) (codes ",");
+      make (u, colon) (codes ":");
       make (u, ws) R.(star (codes " \n\r\t"));
     ]
 
