@@ -595,6 +595,59 @@ module Right_nulled2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     ]
   end)
 
+module Right_nulled3 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
+    open Context
+
+    let Vector.[s'; s; a; u] = variables Vector.["S'"; "S"; "a"; "_"]
+    let syntactic = [s'; s; a]
+    let lexical = []
+
+    let start = s'
+
+    let parser =
+      Production.[
+        make (u, s') R.(var s * plus eof);
+        make (u, s) R.(var a * star (codes ";" * var a));
+        make (u, a) (codes "x")
+      ]
+
+    let scanner = []
+
+    let tests = [
+      Test.{
+        name = "n0";
+        input = [
+          code "x";
+          eof
+        ];
+        trace = Trace.[
+            load (code "x") (vertex 0 0) (vertex 1 1);
+            reduce (u, a) (vertex 1 1) (vertex 0 0) (vertex 4 1);
+            reduce (u, s) (vertex 4 1) (vertex 0 0) (vertex 2 1);
+            load eof (vertex 2 1) (vertex 3 2);
+          ]
+      };
+      Test.{
+        name = "n1";
+        input = [
+          code "x";
+          code ";";
+          code "x";
+          eof
+        ];
+        trace = Trace.[
+            load (code "x") (vertex 0 0) (vertex 1 1);
+            reduce (u, a) (vertex 1 1) (vertex 0 0) (vertex 4 1);
+            load (code ";") (vertex 4 1) (vertex 5 2);
+            load (code "x") (vertex 5 2) (vertex 1 3);
+            reduce (u, a) (vertex 1 3) (vertex 5 2) (vertex 4 3);
+            reduce (u, s) (vertex 4 3) (vertex 0 0) (vertex 2 3);
+            load eof (vertex 2 3) (vertex 3 4);
+          ]
+      };
+    ]
+end)
+
 module Repeat_load = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     open Context
 
@@ -1878,7 +1931,8 @@ let () =
     "same_label_reduce", test_cases Same_label_reduce.driver Same_label_reduce.tests;
     "same_label_reduce2", test_cases Same_label_reduce2.driver Same_label_reduce2.tests;
     "right_nulled", test_cases Right_nulled.driver Right_nulled.tests;
-    (*"right_nulled2", test_cases Right_nulled2.driver Right_nulled2.tests;*)
+    "right_nulled2", test_cases Right_nulled2.driver Right_nulled2.tests;
+    "right_nulled3", test_cases Right_nulled3.driver Right_nulled3.tests;
     "repeat_load", test_cases Repeat_load.driver Repeat_load.tests;
     "repeat_load2", test_cases Repeat_load2.driver Repeat_load2.tests;
     "left_recursion_load", test_cases Left_recursion_load.driver Left_recursion_load.tests;

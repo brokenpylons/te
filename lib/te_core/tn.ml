@@ -760,7 +760,7 @@ module Bool_set = struct
 end
 
 module Analysis = struct
-  module NM' = Lits_multimap(Bool_set)
+  module SM = Lits_multimap(Bool_set)
   module NM = Enhanced_lits_multimap(Bool_set)
   module EM = Enhanced_lits_multimap(Enhanced_lits)
 
@@ -861,74 +861,12 @@ module Analysis = struct
   let wrap ~default x number q  =
     try Numbered_enhanced_var_to.find number x q with Not_found -> default
 
-  let combine c f1 f2 lts q =
-    c (f1 lts q) (f2 lts q)
-
-  let combine' c f1 f2 lts =
+  let combine c f1 f2 lts =
     c (f1 lts) (f2 lts)
-
-  module Pre = struct
-    type t =
-      {
-        nullable_per_lits: NM.t;
-        nullable_per_state: Numbered_enhanced_var.t -> PA.state -> bool;
-        first_per_lits: EM.t;
-        first_per_state: Numbered_enhanced_var.t -> PA.state -> Enhanced_lits.t;
-        follow_per_lits: EM.t;
-        follow_per_state: Numbered_enhanced_var.t -> PA.state -> Enhanced_lits.t;
-      }
-
-    let empty =
-      {
-        nullable_per_lits = NM.empty;
-        nullable_per_state = (fun _ _ -> false);
-        first_per_lits = EM.empty;
-        first_per_state = (fun _ _ -> Enhanced_lits.empty);
-        follow_per_lits = EM.empty;
-        follow_per_state = (fun _ _ -> Enhanced_lits.empty);
-      }
-
-    let compute (prods: Enhanced_production.t Seq.t) previous =
-      print_endline "NULLABLE";
-      let nullable_per_lits = Nullable.per_lits prods previous.nullable_per_lits in
-      print_endline "NULLABLE_PER_STATE";
-      let nullable_per_state = wrap ~default:false @@ Nullable.per_state prods nullable_per_lits in
-
-      print_endline "FIRST";
-      let first_per_lits = First.per_lits prods
-          (fun lts -> NM.find_multiple_or_empty lts nullable_per_lits)
-          first_seed previous.first_per_lits
-      in
-      print_endline "FIRST_PER_STATE";
-      let first_per_state = wrap ~default:Enhanced_lits.empty @@ First.per_state prods
-          (fun lts -> NM.find_multiple_or_empty lts nullable_per_lits)
-          first_seed first_per_lits
-      in
-      print_endline "FOLLOW";
-      let follow_per_lits = Follow.per_lits prods
-          nullable_per_state
-          first_per_state
-          previous.follow_per_lits
-      in
-      print_endline "FOLLOW_PER_STATE";
-      let follow_per_state = wrap ~default:Enhanced_lits.empty @@ Follow.per_state prods
-          nullable_per_state
-          first_per_state
-          follow_per_lits
-      in
-      {
-        nullable_per_lits;
-        nullable_per_state = combine (||) nullable_per_state previous.nullable_per_state;
-        first_per_lits;
-        first_per_state = combine Enhanced_lits.union first_per_state previous.first_per_state;
-        follow_per_lits;
-        follow_per_state = combine Enhanced_lits.union follow_per_state previous.follow_per_state;
-      }
-  end
 
   type t =
     {
-      nullable_per_lits': Lits.t -> bool;
+      nullable_per_lits_stripped: Lits.t -> bool;
       nullable_per_lits: Enhanced_lits.t -> bool;
       nullable_per_state: Numbered_enhanced_var.t -> PA.state -> bool;
       first_per_lits: Enhanced_lits.t -> Enhanced_lits.t;
@@ -937,16 +875,44 @@ module Analysis = struct
       follow_per_state: Numbered_enhanced_var.t -> PA.state -> Enhanced_lits.t;
     }
 
-  let compute (pre: Pre.t) =
-    let nullable_per_lits' = NM.strip pre.nullable_per_lits in
+  let compute (prods: Enhanced_production.t Seq.t) =
+    print_endline "NULLABLE";
+    let nullable_per_lits = Nullable.per_lits prods NM.empty in
+
+    print_endline "NULLABLE_PER_STATE";
+    let nullable_per_state = wrap ~default:false @@ Nullable.per_state prods nullable_per_lits in
+
+    print_endline "FIRST";
+    let first_per_lits = First.per_lits prods
+        (fun lts -> NM.find_multiple_or_empty lts nullable_per_lits)
+        first_seed EM.empty
+    in
+    print_endline "FIRST_PER_STATE";
+    let first_per_state = wrap ~default:Enhanced_lits.empty @@ First.per_state prods
+        (fun lts -> NM.find_multiple_or_empty lts nullable_per_lits)
+        first_seed first_per_lits
+    in
+    print_endline "FOLLOW";
+    let follow_per_lits = Follow.per_lits prods
+        nullable_per_state
+        first_per_state
+        EM.empty
+    in
+    print_endline "FOLLOW_PER_STATE";
+    let follow_per_state = wrap ~default:Enhanced_lits.empty @@ Follow.per_state prods
+        nullable_per_state
+        first_per_state
+        follow_per_lits
+    in
+    let nullable_per_lits_stripped = NM.strip nullable_per_lits in
     {
-      nullable_per_lits' = (fun lts -> NM'.find_multiple_or_empty lts nullable_per_lits');
-      nullable_per_lits = (fun lts -> NM.find_multiple_or_empty lts pre.nullable_per_lits);
-      nullable_per_state = pre.nullable_per_state;
-      first_per_lits = combine' Enhanced_lits.union first_seed (fun lts -> EM.find_multiple_or_empty lts pre.first_per_lits);
-      first_per_state = pre.first_per_state;
-      follow_per_lits = (fun lts -> EM.find_multiple_or_empty lts pre.follow_per_lits);
-      follow_per_state = pre.follow_per_state;
+      nullable_per_lits_stripped = (fun lts -> SM.find_multiple_or_empty lts nullable_per_lits_stripped);
+      nullable_per_lits = (fun lts -> NM.find_multiple_or_empty lts nullable_per_lits);
+      nullable_per_state = nullable_per_state;
+      first_per_lits = combine Enhanced_lits.union first_seed (fun lts -> EM.find_multiple_or_empty lts first_per_lits);
+      first_per_state = first_per_state;
+      follow_per_lits = (fun lts -> EM.find_multiple_or_empty lts follow_per_lits);
+      follow_per_state = follow_per_state;
     }
 end
 
@@ -1015,7 +981,7 @@ module Lookahead = struct
 end
 
 let nullable analysis lts = 
-  analysis.Analysis.nullable_per_lits' lts
+  analysis.Analysis.nullable_per_lits_stripped lts
 
 let add_backlinks lookahead' lookback a =
   let (let*) = Seq.bind in
@@ -1058,7 +1024,7 @@ let resolve_tail nullable' tail =
   let tail = Rhs.simplify @@ Rhs.flat_map (fun lts -> 
       if nullable' lts
       then Rhs.lits lts
-      else Rhs.nothing) 
+      else Rhs.nothing)
       tail
   in
   assert (not @@ Rhs.is_infinite tail);
@@ -1220,8 +1186,7 @@ let build syntactic lexical longest_match start prods  =
   let eprods1 = enhanced_productions e in
 
   print_endline "ANA";
-  let pre_analysis = Analysis.Pre.compute eprods1 Analysis.Pre.empty in
-  let analysis = Analysis.compute pre_analysis in
+  let analysis = Analysis.compute eprods1 in
 
   print_endline "LOOK";
 
