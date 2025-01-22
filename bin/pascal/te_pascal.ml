@@ -753,7 +753,6 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
 
       make (functiondeclaration', function_declaration) R.(var function_heading * var semi * var directive + var function_identification * var semi * var function_block + var function_heading * var semi * var function_block);
 
-
       make (u, function_heading) R.(var kw_function * var identifier * opt (var formal_parameter_list) * var colon * var result_type);
 
       make (u, function_identification) R.(var kw_function * var identifier);
