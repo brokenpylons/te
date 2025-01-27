@@ -5,449 +5,227 @@ module T = Types
 module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   open Context
 
-  let Vector.[
-      start;
-      ws;
+  let s = T.Var.supply
+  let (start, s) = variable s "start"
+  let (ws, s) = variable s "ws"
 
-      block;
-      label_declaration_part;
-      constant_definition_part;
-      type_definition_part;
-      variable_declaration_part;
-      procedure_and_function_declaration_part;
-      statement_part;
-      constant_definition;
-      constant;
-      type_definition;
-      type_denoter;
-      new_type;
-      simple_type_identifier;
-      structured_type_identifier;
-      pointer_type_identifier;
-      type_identifier;
-      simple_type;
-      ordinal_type;
-      new_ordinal_type;
-      ordinal_type_identifier;
-      real_type_identifier;
-      enumerated_type;
-      identifier_list;
-      subrange_type;
-      structured_type;
-      new_structured_type;
-      unpacked_structured_type;
-      array_type;
-      index_type;
-      component_type;
-      record_type;
-      field_list;
-      fixed_part;
-      record_section;
-      variant_part;
-      variant_selector;
-      tag_field;
-      variant;
-      tag_type;
-      case_constant_list;
-      case_constant;
-      set_type;
-      base_type;
-      file_type;
-      pointer_type;
-      new_pointer_type;
-      domain_type;
-      variable_declaration;
-      variable_access;
-      entire_variable;
-      identified_variable;
-      pointer_variable;
-      indexed_variable;
-      array_variable;
-      index_expression;
-      record_variable;
-      field_specifier;
-      procedure_declaration;
-      procedure_heading;
-      procedure_identification;
-      procedure_block;
-      function_declaration;
-      function_heading;
-      function_identification;
-      result_type;
-      function_block;
-      formal_parameter_list;
-      formal_parameter_section;
-      value_parameter_specification;
-      variable_parameter_specification;
-      procedural_parameter_specification;
-      functional_parameter_specification;
-      conformant_array_parameter_specification;
-      value_conformant_array_specification;
-      variable_conformant_array_specification;
-      conformant_array_schema;
-      packed_conformant_array_schema;
-      unpacked_conformant_array_schema;
-      index_type_specification;
-      expression;
-      simple_expression;
-      unsigned_simple_expression;
-      term;
-      factor;
-      unsigned_constant;
-      set_constructor;
-      member_designator;
-      function_designator;
-      actual_parameter_list;
-      actual_parameter;
-      statement;
-      simple_statement;
-      assignment_statement;
-      procedure_statement;
-      goto_statement;
-      structured_statement;
-      statement_sequence;
-      compound_statement;
-      conditional_statement;
-      if_statement;
-      else_part;
-      case_statement;
-      case_list_element;
-      case_index;
-      repetitive_statement;
-      repeat_statement;
-      while_statement;
-      for_statement;
-      control_variable;
-      initial_value;
-      final_value;
-      with_statement;
-      record_variable_list;
-      write_parameter;
-      program;
-      program_heading;
-      program_parameter_list;
-      program_block;
+  let (block, s) = variable s "block"
+  let (label_declaration_part, s) = variable s "label_declaration_part"
+  let (constant_definition_part, s) = variable s "constant_definition_part"
+  let (type_definition_part, s) = variable s "type_definition_part"
+  let (variable_declaration_part, s) = variable s "variable_declaration_part"
+  let (procedure_and_function_declaration_part, s) = variable s "procedure_and_function_declaration_part"
+  let (statement_part, s) = variable s "statement_part"
+  let (constant_definition, s) = variable s "constant_definition"
+  let (constant, s) = variable s "constant"
+  let (type_definition, s) = variable s "type_definition"
+  let (type_denoter, s) = variable s "type_denoter"
+  let (new_type, s) = variable s "new_type"
+  let (simple_type_identifier, s) = variable s "simple_type_identifier"
+  let (structured_type_identifier, s) = variable s "structured_type_identifier"
+  let (pointer_type_identifier, s) = variable s "pointer_type_identifier"
+  let (type_identifier, s) = variable s "type_identifier"
+  let (simple_type, s) = variable s "simple_type"
+  let (ordinal_type, s) = variable s "ordinal_type"
+  let (new_ordinal_type, s) = variable s "new_ordinal_type"
+  let (ordinal_type_identifier, s) = variable s "ordinal_type_identifier"
+  let (real_type_identifier, s) = variable s "real_type_identifier"
+  let (enumerated_type, s) = variable s "enumerated_type"
+  let (identifier_list, s) = variable s "identifier_list"
+  let (subrange_type, s) = variable s "subrange_type"
+  let (structured_type, s) = variable s "structured_type"
+  let (new_structured_type, s) = variable s "new_structured_type"
+  let (unpacked_structured_type, s) = variable s "unpacked_structured_type"
+  let (array_type, s) = variable s "array_type"
+  let (index_type, s) = variable s "index_type"
+  let (component_type, s) = variable s "component_type"
+  let (record_type, s) = variable s "record_type"
+  let (field_list, s) = variable s "field_list"
+  let (fixed_part, s) = variable s "fixed_part"
+  let (record_section, s) = variable s "record_section"
+  let (variant_part, s) = variable s "variant_part"
+  let (variant_selector, s) = variable s "variant_selector"
+  let (tag_field, s) = variable s "tag_field"
+  let (variant, s) = variable s "variant"
+  let (tag_type, s) = variable s "tag_type"
+  let (case_constant_list, s) = variable s "case_constant_list"
+  let (case_constant, s) = variable s "case_constant"
+  let (set_type, s) = variable s "set_type"
+  let (base_type, s) = variable s "base_type"
+  let (file_type, s) = variable s "file_type"
+  let (pointer_type, s) = variable s "pointer_type"
+  let (new_pointer_type, s) = variable s "new_pointer_type"
+  let (domain_type, s) = variable s "domain_type"
+  let (variable_declaration, s) = variable s "variable_declaration"
+  let (variable_access, s) = variable s "variable_access"
+  let (entire_variable, s) = variable s "entire_variable"
+  let (identified_variable, s) = variable s "identified_variable"
+  let (pointer_variable, s) = variable s "pointer_variable"
+  let (indexed_variable, s) = variable s "indexed_variable"
+  let (array_variable, s) = variable s "array_variable"
+  let (index_expression, s) = variable s "index_expression"
+  let (record_variable, s) = variable s "record_variable"
+  let (field_specifier, s) = variable s "field_specifier"
+  let (procedure_declaration, s) = variable s "procedure_declaration"
+  let (procedure_heading, s) = variable s "procedure_heading"
+  let (procedure_identification, s) = variable s "procedure_identification"
+  let (procedure_block, s) = variable s "procedure_block"
+  let (function_declaration, s) = variable s "function_declaration"
+  let (function_heading, s) = variable s "function_heading"
+  let (function_identification, s) = variable s "function_identification"
+  let (result_type, s) = variable s "result_type"
+  let (function_block, s) = variable s "function_block"
+  let (formal_parameter_list, s) = variable s "formal_parameter_list"
+  let (formal_parameter_section, s) = variable s "formal_parameter_section"
+  let (value_parameter_specification, s) = variable s "value_parameter_specification"
+  let (variable_parameter_specification, s) = variable s "variable_parameter_specification"
+  let (procedural_parameter_specification, s) = variable s "procedural_parameter_specification"
+  let (functional_parameter_specification, s) = variable s "functional_parameter_specification"
+  let (conformant_array_parameter_specification, s) = variable s "conformant_array_parameter_specification"
+  let (value_conformant_array_specification, s) = variable s "value_conformant_array_specification"
+  let (variable_conformant_array_specification, s) = variable s "variable_conformant_array_specification"
+  let (conformant_array_schema, s) = variable s "conformant_array_schema"
+  let (packed_conformant_array_schema, s) = variable s "packed_conformant_array_schema"
+  let (unpacked_conformant_array_schema, s) = variable s "unpacked_conformant_array_schema"
+  let (index_type_specification, s) = variable s "index_type_specification"
+  let (expression, s) = variable s "expression"
+  let (simple_expression, s) = variable s "simple_expression"
+  let (unsigned_simple_expression, s) = variable s "unsigned_simple_expression"
+  let (term, s) = variable s "term"
+  let (factor, s) = variable s "factor"
+  let (unsigned_constant, s) = variable s "unsigned_constant"
+  let (set_constructor, s) = variable s "set_constructor"
+  let (member_designator, s) = variable s "member_designator"
+  let (function_designator, s) = variable s "function_designator"
+  let (actual_parameter_list, s) = variable s "actual_parameter_list"
+  let (actual_parameter, s) = variable s "actual_parameter"
+  let (statement, s) = variable s "statement"
+  let (simple_statement, s) = variable s "simple_statement"
+  let (assignment_statement, s) = variable s "assignment_statement"
+  let (procedure_statement, s) = variable s "procedure_statement"
+  let (goto_statement, s) = variable s "goto_statement"
+  let (structured_statement, s) = variable s "structured_statement"
+  let (statement_sequence, s) = variable s "statement_sequence"
+  let (compound_statement, s) = variable s "compound_statement"
+  let (conditional_statement, s) = variable s "conditional_statement"
+  let (if_statement, s) = variable s "if_statement"
+  let (else_part, s) = variable s "else_part"
+  let (case_statement, s) = variable s "case_statement"
+  let (case_list_element, s) = variable s "case_list_element"
+  let (case_index, s) = variable s "case_index"
+  let (repetitive_statement, s) = variable s "repetitive_statement"
+  let (repeat_statement, s) = variable s "repeat_statement"
+  let (while_statement, s) = variable s "while_statement"
+  let (for_statement, s) = variable s "for_statement"
+  let (control_variable, s) = variable s "control_variable"
+  let (initial_value, s) = variable s "initial_value"
+  let (final_value, s) = variable s "final_value"
+  let (with_statement, s) = variable s "with_statement"
+  let (record_variable_list, s) = variable s "record_variable_list"
+  let (write_parameter, s) = variable s "write_parameter"
+  let (program, s) = variable s "program"
+  let (program_heading, s) = variable s "program_heading"
+  let (program_parameter_list, s) = variable s "program_parameter_list"
+  let (program_block, s) = variable s "program_block"
 
-      identifier;
-      directive;
-      unsigned_number;
-      sign;
-      label;
-      character_string;
-      multiplying_operator;
-      adding_operator;
-      relational_operator;
-      comma;
-      semi;
-      eq;
-      lparen;
-      rparen;
-      dotdot;
-      colon;
-      dot;
-      kw_label;
-      kw_const;
-      kw_type;
-      kw_var;
-      kw_packed;
-      kw_array;
-      kw_record;
-      kw_end;
-      kw_begin;
-      kw_goto;
-      kw_else;
-      kw_case;
-      kw_repeat;
-      kw_while;
-      kw_set;
-      kw_file;
-      kw_procedure;
-      kw_function;
-      kw_not;
-      kw_nil;
-      kw_then;
-      kw_until;
-      kw_with;
-      kw_program;
-      kw_for;
-      kw_downto;
+  let (identifier, s) = variable s "identifier"
+  let (directive, s) = variable s "directive"
+  let (unsigned_number, s) = variable s "unsigned_number"
+  let (sign, s) = variable s "sign"
+  let (label, s) = variable s "label"
+  let (character_string, s) = variable s "character_string"
+  let (multiplying_operator, s) = variable s "multiplying_operator"
+  let (adding_operator, s) = variable s "adding_operator"
+  let (relational_operator, s) = variable s "relational_operator"
+  let (comma, s) = variable s "comma"
+  let (semi, s) = variable s "semi"
+  let (eq, s) = variable s "eq"
+  let (lparen, s) = variable s "lparen"
+  let (rparen, s) = variable s "rparen"
+  let (dotdot, s) = variable s "dotdot"
+  let (colon, s) = variable s "colon"
+  let (dot, s) = variable s "dot"
+  let (kw_label, s) = variable s "kw_label"
+  let (kw_const, s) = variable s "kw_const"
+  let (kw_type, s) = variable s "kw_type"
+  let (kw_var, s) = variable s "kw_var"
+  let (kw_packed, s) = variable s "kw_packed"
+  let (kw_array, s) = variable s "kw_array"
+  let (kw_record, s) = variable s "kw_record"
+  let (kw_end, s) = variable s "kw_end"
+  let (kw_begin, s) = variable s "kw_begin"
+  let (kw_goto, s) = variable s "kw_goto"
+  let (kw_else, s) = variable s "kw_else"
+  let (kw_case, s) = variable s "kw_case"
+  let (kw_repeat, s) = variable s "kw_repeat"
+  let (kw_while, s) = variable s "kw_while"
+  let (kw_set, s) = variable s "kw_set"
+  let (kw_file, s) = variable s "kw_file"
+  let (kw_procedure, s) = variable s "kw_procedure"
+  let (kw_function, s) = variable s "kw_function"
+  let (kw_not, s) = variable s "kw_not"
+  let (kw_nil, s) = variable s "kw_nil"
+  let (kw_then, s) = variable s "kw_then"
+  let (kw_until, s) = variable s "kw_until"
+  let (kw_with, s) = variable s "kw_with"
+  let (kw_program, s) = variable s "kw_program"
+  let (kw_for, s) = variable s "kw_for"
+  let (kw_downto, s) = variable s "kw_downto"
 
-      u;
-      block';
-      constantdefinition';
-      typedefinition';
-      simpletype';
-      enumeratedtype';
-      subrangetype';
-      structuredtype';
-      arraytype';
-      recordtype';
-      variant';
-      settype';
-      filetype';
-      pointertype';
-      variabledeclaration';
-      variableaccess';
-      entirevariable';
-      identifiedvariable';
-      pointervariable';
-      indexedvariable';
-      arrayvariable';
-      recordvariable';
-      proceduredeclaration';
-      functiondeclaration';
-      parameters';
-      valueparameter';
-      variableparameter';
-      proceduralparameter';
-      functionalparameter';
-      arrayparameter';
-      expression';
-      simpleepression';
-      unsignedsimpleexpression';
-      term';
-      factor';
-      setconstructor';
-      functiondesignator';
-      actualparameter';
-      statement';
-      simplestatement';
-      assignmentstatement';
-      procedurestatement';
-      gotostatement';
-      structuredstatement';
-      compoundstatement';
-      ifstatement';
-      elsepart';
-      casestatement';
-      caseelement';
-      repeatstatement';
-      whilestatement';
-      forstatement';
-      withstatement';
-      program';
-    ] = variables Vector.[
-      "start";
-      "ws";
-
-      "block";
-      "label_declaration_part";
-      "constant_definition_part";
-      "type_definition_part";
-      "variable_declaration_part";
-      "procedure_and_function_declaration_part";
-      "statement_part";
-      "constant_definition";
-      "constant";
-      "type_definition";
-      "type_denoter";
-      "new_type";
-      "simple_type_identifier";
-      "structured_type_identifier";
-      "pointer_type_identifier";
-      "type_identifier";
-      "simple_type";
-      "ordinal_type";
-      "new_ordinal_type";
-      "ordinal_type_identifier";
-      "real_type_identifier";
-      "enumerated_type";
-      "identifier_list";
-      "subrange_type";
-      "structured_type";
-      "new_structured_type";
-      "unpacked_structured_type";
-      "array_type";
-      "index_type";
-      "component_type";
-      "record_type";
-      "field_list";
-      "fixed_part";
-      "record_section";
-      "variant_part";
-      "variant_selector";
-      "tag_field";
-      "variant";
-      "tag_type";
-      "case_constant_list";
-      "case_constant";
-      "set_type";
-      "base_type";
-      "file_type";
-      "pointer_type";
-      "new_pointer_type";
-      "domain_type";
-      "variable_declaration";
-      "variable_access";
-      "entire_variable";
-      "identified_variable";
-      "pointer_variable";
-      "indexed_variable";
-      "array_variable";
-      "index_expression";
-      "record_variable";
-      "field_specifier";
-      "procedure_declaration";
-      "procedure_heading";
-      "procedure_identification";
-      "procedure_block";
-      "function_declaration";
-      "function_heading";
-      "function_identification";
-      "result_type";
-      "function_block";
-      "formal_parameter_list";
-      "formal_parameter_section";
-      "value_parameter_specification";
-      "variable_parameter_specification";
-      "procedural_parameter_specification";
-      "functional_parameter_specification";
-      "conformant_array_parameter_specification";
-      "value_conformant_array_specification";
-      "variable_conformant_array_specification";
-      "conformant_array_schema";
-      "packed_conformant_array_schema";
-      "unpacked_conformant_array_schema";
-      "index_type_specification";
-      "expression";
-      "simple_expression";
-      "unsigned_simple_expression";
-      "term";
-      "factor";
-      "unsigned_constant";
-      "set_constructor";
-      "member_designator";
-      "function_designator";
-      "actual_parameter_list";
-      "actual_parameter";
-      "statement";
-      "simple_statement";
-      "assignment_statement";
-      "procedure_statement";
-      "goto_statement";
-      "structured_statement";
-      "statement_sequence";
-      "compound_statement";
-      "conditional_statement";
-      "if_statement";
-      "else_part";
-      "case_statement";
-      "case_list_element";
-      "case_index";
-      "repetitive_statement";
-      "repeat_statement";
-      "while_statement";
-      "for_statement";
-      "control_variable";
-      "initial_value";
-      "final_value";
-      "with_statement";
-      "record_variable_list";
-      "write_parameter";
-      "program";
-      "program_heading";
-      "program_parameter_list";
-      "program_block";
-
-      "identifier";
-      "directive";
-      "unsigned_number";
-      "sign";
-      "label";
-      "character_string";
-      "multiplying_operator";
-      "adding_operator";
-      "relational_operator";
-      "comma";
-      "semi";
-      "eq";
-      "lparen";
-      "rparen";
-      "dotdot";
-      "colon";
-      "dot";
-      "kw_label";
-      "kw_const";
-      "kw_type";
-      "kw_var";
-      "kw_packed";
-      "kw_array";
-      "kw_record";
-      "kw_end";
-      "kw_begin";
-      "kw_goto";
-      "kw_else";
-      "kw_case";
-      "kw_repeat";
-      "kw_while";
-      "kw_set";
-      "kw_file";
-      "kw_procedure";
-      "kw_function";
-      "kw_not";
-      "kw_nil";
-      "kw_then";
-      "kw_until";
-      "kw_with";
-      "kw_program";
-      "kw_for";
-      "kw_downto";
-
-      "_";
-      "block'";
-      "constantdefinition'";
-      "typedefinition'";
-      "simpletype'";
-      "enumeratedtype'";
-      "subrangetype'";
-      "structuredtype'";
-      "arraytype'";
-      "recordtype'";
-      "variant'";
-      "settype'";
-      "filetype'";
-      "pointertype'";
-      "variabledeclaration'";
-      "variableaccess'";
-      "entirevariable'";
-      "identifiedvariable'";
-      "pointervariable'";
-      "indexedvariable'";
-      "arrayvariable'";
-      "recordvariable'";
-      "proceduredeclaration'";
-      "functiondeclaration'";
-      "parameters'";
-      "valueparameter'";
-      "variableparameter'";
-      "proceduralparameter'";
-      "functionalparameter'";
-      "arrayparameter'";
-      "expression'";
-      "simpleepression'";
-      "unsignedsimpleexpression'";
-      "term'";
-      "factor'";
-      "setconstructor'";
-      "functiondesignator'";
-      "actualparameter'";
-      "statement'";
-      "simplestatement'";
-      "assignmentstatement'";
-      "procedurestatement'";
-      "gotostatement'";
-      "structuredstatement'";
-      "compoundstatement'";
-      "ifstatement'";
-      "elsepart'";
-      "casestatement'";
-      "caseelement'";
-      "repeatstatement'";
-      "whilestatement'";
-      "forstatement'";
-      "withstatement'";
-      "program'";
-    ]
+  let (u, s) = variable s "u"
+  let (block', s) = variable s "block'"
+  let (constantdefinition', s) = variable s "constantdefinition'"
+  let (typedefinition', s) = variable s "typedefinition'"
+  let (simpletype', s) = variable s "simpletype'"
+  let (enumeratedtype', s) = variable s "enumeratedtype'"
+  let (subrangetype', s) = variable s "subrangetype'"
+  let (structuredtype', s) = variable s "structuredtype'"
+  let (arraytype', s) = variable s "arraytype'"
+  let (recordtype', s) = variable s "recordtype'"
+  let (variant', s) = variable s "variant'"
+  let (settype', s) = variable s "settype'"
+  let (filetype', s) = variable s "filetype'"
+  let (pointertype', s) = variable s "pointertype'"
+  let (variabledeclaration', s) = variable s "variabledeclaration'"
+  let (variableaccess', s) = variable s "variableaccess'"
+  let (entirevariable', s) = variable s "entirevariable'"
+  let (identifiedvariable', s) = variable s "identifiedvariable'"
+  let (pointervariable', s) = variable s "pointervariable'"
+  let (indexedvariable', s) = variable s "indexedvariable'"
+  let (arrayvariable', s) = variable s "arrayvariable'"
+  let (recordvariable', s) = variable s "recordvariable'"
+  let (proceduredeclaration', s) = variable s "proceduredeclaration'"
+  let (functiondeclaration', s) = variable s "functiondeclaration'"
+  let (parameters', s) = variable s "parameters'"
+  let (valueparameter', s) = variable s "valueparameter'"
+  let (variableparameter', s) = variable s "variableparameter'"
+  let (proceduralparameter', s) = variable s "proceduralparameter'"
+  let (functionalparameter', s) = variable s "functionalparameter'"
+  let (arrayparameter', s) = variable s "arrayparameter'"
+  let (expression', s) = variable s "expression'"
+  let (simpleepression', s) = variable s "simpleepression'"
+  let (unsignedsimpleexpression', s) = variable s "unsignedsimpleexpression'"
+  let (term', s) = variable s "term'"
+  let (factor', s) = variable s "factor'"
+  let (setconstructor', s) = variable s "setconstructor'"
+  let (functiondesignator', s) = variable s "functiondesignator'"
+  let (actualparameter', s) = variable s "actualparameter'"
+  let (statement', s) = variable s "statement'"
+  let (simplestatement', s) = variable s "simplestatement'"
+  let (assignmentstatement', s) = variable s "assignmentstatement'"
+  let (procedurestatement', s) = variable s "procedurestatement'"
+  let (gotostatement', s) = variable s "gotostatement'"
+  let (structuredstatement', s) = variable s "structuredstatement'"
+  let (compoundstatement', s) = variable s "compoundstatement'"
+  let (ifstatement', s) = variable s "ifstatement'"
+  let (elsepart', s) = variable s "elsepart'"
+  let (casestatement', s) = variable s "casestatement'"
+  let (caseelement', s) = variable s "caseelement'"
+  let (repeatstatement', s) = variable s "repeatstatement'"
+  let (whilestatement', s) = variable s "whilestatement'"
+  let (forstatement', s) = variable s "forstatement'"
+  let (withstatement', s) = variable s "withstatement'"
+  let (program', _) = variable s "program'"
 
   let syntactic = [
     start;
