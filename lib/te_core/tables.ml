@@ -8,8 +8,8 @@ module Goto_partial_map = struct
   let pp = pp T.States.pp
 end
 module Back_map = struct
-  include Multimap.Make1(T.State_to)(T.State_pair_partial)
-  let pp = T.State_to.pp T.State_pair_partial.pp
+  include Multimap.Make1(T.State_to)(T.State_pairs)
+  let pp = T.State_to.pp T.State_pairs.pp
 end
 
 let actions lexical lookahead' nullable' a =
@@ -41,7 +41,7 @@ let back b =
   PA.to_segments b
   |> Seq.map (fun ((s, _), adj) ->
       (s, adj
-          |> Seq.map (fun (((s, _) as p), _) -> (s, Some p))
+          |> Seq.map (fun (((s, _) as p), _) -> (s, T.State_pairs.singleton p))
           |> Back_map.of_seq_multiple))
   |> T.State_pair_to.of_seq
 
@@ -93,7 +93,7 @@ module Unoptimized = struct
   let back t p s =
     t.back
     |> T.State_pair_to.find p
-    |> Back_map.find_multiple_or ~default:None s
+    |> Back_map.find_multiple_or ~default:T.State_pairs.empty s
 
   let shift a =
     a.T.Actions.shift

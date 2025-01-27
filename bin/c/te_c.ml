@@ -5,729 +5,368 @@ module T = Types
 module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   open Context
 
-  let Vector.[
-      start;
-      ws;
+  let s = T.Var.supply
+  let (start, s) = variable s "start"
+  let (ws, s) = variable s "ws"
 
-      ident;
-      string;
-      char;
-      integer;
-      unsigned;
-      long;
-      unsignedlong;
-      hexadecimal;
-      hexunsigned;
-      hexlong;
-      hexunslong;
-      octal;
-      octalunsigned;
-      octallong;
-      octalunslong;
-      double;
-      float;
-      longdouble;
-      type_void;
-      type_char;
-      type_short;
-      type_int;
-      type_long;
-      type_float;
-      type_double;
-      type_signed;
-      type_unsigned;
-      type_typedef;
-      typedef;
-      extern;
-      static;
-      auto;
-      register;
-      const;
-      volatile;
-      struct_;
-      union;
-      enum;
-      case;
-      default;
-      if_;
-      else_;
-      switch;
-      while_;
-      do_;
-      for_;
-      goto;
-      continue;
-      break;
-      return;
-      sizeof;
-      ternary_if;
-      ternary_else;
-      address;
-      indirection;
-      pointer;
-      bitcomp;
-      lneg;
-      semi;
-      lparen;
-      rparen;
-      comma;
-      lbrace;
-      rbrace;
-      colon;
-      lbrak;
-      rbrak;
-      assign;
-      plus_;
-      minus;
-      ellip;
-      bor;
-      band;
-      lor_;
-      land_;
-      bxor;
-      eq;
-      noteq;
-      lt;
-      gt;
-      gte;
-      lte;
-      lshift;
-      rshift;
-      times;
-      div;
-      rem;
-      plusplus;
-      minusminus;
-      dot;
-      arrow;
-      timesassign;
-      divassign;
-      remassign;
-      plusassign;
-      minusassign;
-      lshiftassign;
-      rshiftassign;
-      landassign;
-      lxorassign;
-      lorassign;
+  let (ident, s) = variable s "ident"
+  let (string, s) = variable s "string"
+  let (char, s) = variable s "char"
+  let (integer, s) = variable s "integer"
+  let (unsigned, s) = variable s "unsigned"
+  let (long, s) = variable s "long"
+  let (unsignedlong, s) = variable s "unsignedlong"
+  let (hexadecimal, s) = variable s "hexadecimal"
+  let (hexunsigned, s) = variable s "hexunsigned"
+  let (hexlong, s) = variable s "hexlong"
+  let (hexunslong, s) = variable s "hexunslong"
+  let (octal, s) = variable s "octal"
+  let (octalunsigned, s) = variable s "octalunsigned"
+  let (octallong, s) = variable s "octallong"
+  let (octalunslong, s) = variable s "octalunslong"
+  let (double, s) = variable s "double"
+  let (float, s) = variable s "float"
+  let (longdouble, s) = variable s "longdouble"
+  let (type_void, s) = variable s "type_void"
+  let (type_char, s) = variable s "type_char"
+  let (type_short, s) = variable s "type_short"
+  let (type_int, s) = variable s "type_int"
+  let (type_long, s) = variable s "type_long"
+  let (type_float, s) = variable s "type_float"
+  let (type_double, s) = variable s "type_double"
+  let (type_signed, s) = variable s "type_signed"
+  let (type_unsigned, s) = variable s "type_unsigned"
+  let (type_typedef, s) = variable s "type_typedef"
+  let (typedef, s) = variable s "typedef"
+  let (extern, s) = variable s "extern"
+  let (static, s) = variable s "static"
+  let (auto, s) = variable s "auto"
+  let (register, s) = variable s "register"
+  let (const, s) = variable s "const"
+  let (volatile, s) = variable s "volatile"
+  let (struct_, s) = variable s "struct_"
+  let (union, s) = variable s "union"
+  let (enum, s) = variable s "enum"
+  let (case, s) = variable s "case"
+  let (default, s) = variable s "default"
+  let (if_, s) = variable s "if_"
+  let (else_, s) = variable s "else_"
+  let (switch, s) = variable s "switch"
+  let (while_, s) = variable s "while_"
+  let (do_, s) = variable s "do_"
+  let (for_, s) = variable s "for_"
+  let (goto, s) = variable s "goto"
+  let (continue, s) = variable s "continue"
+  let (break, s) = variable s "break"
+  let (return, s) = variable s "return"
+  let (sizeof, s) = variable s "sizeof"
+  let (ternary_if, s) = variable s "ternary_if"
+  let (ternary_else, s) = variable s "ternary_else"
+  let (address, s) = variable s "address"
+  let (indirection, s) = variable s "indirection"
+  let (pointer, s) = variable s "pointer"
+  let (bitcomp, s) = variable s "bitcomp"
+  let (lneg, s) = variable s "lneg"
+  let (semi, s) = variable s "semi"
+  let (lparen, s) = variable s "lparen"
+  let (rparen, s) = variable s "rparen"
+  let (comma, s) = variable s "comma"
+  let (lbrace, s) = variable s "lbrace"
+  let (rbrace, s) = variable s "rbrace"
+  let (colon, s) = variable s "colon"
+  let (lbrak, s) = variable s "lbrak"
+  let (rbrak, s) = variable s "rbrak"
+  let (assign, s) = variable s "assign"
+  let (plus_, s) = variable s "plus_"
+  let (minus, s) = variable s "minus"
+  let (ellip, s) = variable s "ellip"
+  let (bor, s) = variable s "bor"
+  let (band, s) = variable s "band"
+  let (lor_, s) = variable s "lor_"
+  let (land_, s) = variable s "land_"
+  let (bxor, s) = variable s "bxor"
+  let (eq, s) = variable s "eq"
+  let (noteq, s) = variable s "noteq"
+  let (lt, s) = variable s "lt"
+  let (gt, s) = variable s "gt"
+  let (gte, s) = variable s "gte"
+  let (lte, s) = variable s "lte"
+  let (lshift, s) = variable s "lshift"
+  let (rshift, s) = variable s "rshift"
+  let (times, s) = variable s "times"
+  let (div, s) = variable s "div"
+  let (rem, s) = variable s "rem"
+  let (plusplus, s) = variable s "plusplus"
+  let (minusminus, s) = variable s "minusminus"
+  let (dot, s) = variable s "dot"
+  let (arrow, s) = variable s "arrow"
+  let (timesassign, s) = variable s "timesassign"
+  let (divassign, s) = variable s "divassign"
+  let (remassign, s) = variable s "remassign"
+  let (plusassign, s) = variable s "plusassign"
+  let (minusassign, s) = variable s "minusassign"
+  let (lshiftassign, s) = variable s "lshiftassign"
+  let (rshiftassign, s) = variable s "rshiftassign"
+  let (landassign, s) = variable s "landassign"
+  let (lxorassign, s) = variable s "lxorassign"
+  let (lorassign, s) = variable s "lorassign"
 
-      program;
-      list_external_declaration;
-      external_declaration;
-      function_def;
-      dec;
-      list_dec;
-      list_declaration_specifier;
-      declaration_specifier;
-      list_init_declarator;
-      init_declarator;
-      type_specifier;
-      storage_class_specifier;
-      type_qualifier;
-      struct_or_union_spec;
-      struct_or_union;
-      list_struct_dec;
-      struct_dec;
-      list_spec_qual;
-      spec_qual;
-      list_struct_declarator;
-      struct_declarator;
-      enum_specifier;
-      list_enumerator;
-      enumerator;
-      declarator;
-      direct_declarator;
-      list_type_qualifier;
-      parameter_type;
-      parameter_declarations;
-      parameter_declaration;
-      list_ident;
-      initializer_;
-      initializers;
-      type_name;
-      abstract_declarator;
-      dir_abs_dec;
-      stm;
-      labeled_stm;
-      compound_stm;
-      expression_stm;
-      selection_stm;
-      iter_stm;
-      jump_stm;
-      list_stm;
-      constant;
-      constant_expression;
-      list_exp2;
-      exp;
-      exp2;
-      exp3;
-      exp4;
-      exp5;
-      exp6;
-      exp7;
-      exp8;
-      exp9;
-      exp10;
-      exp11;
-      exp12;
-      exp13;
-      exp14;
-      exp15;
-      exp16;
-      exp17;
-      unary_operator;
-      assignment_op;
+  let (program, s) = variable s "program"
+  let (list_external_declaration, s) = variable s "list_external_declaration"
+  let (external_declaration, s) = variable s "external_declaration"
+  let (function_def, s) = variable s "function_def"
+  let (dec, s) = variable s "dec"
+  let (list_dec, s) = variable s "list_dec"
+  let (list_declaration_specifier, s) = variable s "list_declaration_specifier"
+  let (declaration_specifier, s) = variable s "declaration_specifier"
+  let (list_init_declarator, s) = variable s "list_init_declarator"
+  let (init_declarator, s) = variable s "init_declarator"
+  let (type_specifier, s) = variable s "type_specifier"
+  let (storage_class_specifier, s) = variable s "storage_class_specifier"
+  let (type_qualifier, s) = variable s "type_qualifier"
+  let (struct_or_union_spec, s) = variable s "struct_or_union_spec"
+  let (struct_or_union, s) = variable s "struct_or_union"
+  let (list_struct_dec, s) = variable s "list_struct_dec"
+  let (struct_dec, s) = variable s "struct_dec"
+  let (list_spec_qual, s) = variable s "list_spec_qual"
+  let (spec_qual, s) = variable s "spec_qual"
+  let (list_struct_declarator, s) = variable s "list_struct_declarator"
+  let (struct_declarator, s) = variable s "struct_declarator"
+  let (enum_specifier, s) = variable s "enum_specifier"
+  let (list_enumerator, s) = variable s "list_enumerator"
+  let (enumerator, s) = variable s "enumerator"
+  let (declarator, s) = variable s "declarator"
+  let (direct_declarator, s) = variable s "direct_declarator"
+  let (list_type_qualifier, s) = variable s "list_type_qualifier"
+  let (parameter_type, s) = variable s "parameter_type"
+  let (parameter_declarations, s) = variable s "parameter_declarations"
+  let (parameter_declaration, s) = variable s "parameter_declaration"
+  let (list_ident, s) = variable s "list_ident"
+  let (initializer_, s) = variable s "initializer_"
+  let (initializers, s) = variable s "initializers"
+  let (type_name, s) = variable s "type_name"
+  let (abstract_declarator, s) = variable s "abstract_declarator"
+  let (dir_abs_dec, s) = variable s "dir_abs_dec"
+  let (stm, s) = variable s "stm"
+  let (labeled_stm, s) = variable s "labeled_stm"
+  let (compound_stm, s) = variable s "compound_stm"
+  let (expression_stm, s) = variable s "expression_stm"
+  let (selection_stm, s) = variable s "selection_stm"
+  let (iter_stm, s) = variable s "iter_stm"
+  let (jump_stm, s) = variable s "jump_stm"
+  let (list_stm, s) = variable s "list_stm"
+  let (constant, s) = variable s "constant"
+  let (constant_expression, s) = variable s "constant_expression"
+  let (list_exp2, s) = variable s "list_exp2"
+  let (exp, s) = variable s "exp"
+  let (exp2, s) = variable s "exp2"
+  let (exp3, s) = variable s "exp3"
+  let (exp4, s) = variable s "exp4"
+  let (exp5, s) = variable s "exp5"
+  let (exp6, s) = variable s "exp6"
+  let (exp7, s) = variable s "exp7"
+  let (exp8, s) = variable s "exp8"
+  let (exp9, s) = variable s "exp9"
+  let (exp10, s) = variable s "exp10"
+  let (exp11, s) = variable s "exp11"
+  let (exp12, s) = variable s "exp12"
+  let (exp13, s) = variable s "exp13"
+  let (exp14, s) = variable s "exp14"
+  let (exp15, s) = variable s "exp15"
+  let (exp16, s) = variable s "exp16"
+  let (exp17, s) = variable s "exp17"
+  let (unary_operator, s) = variable s "unary_operator"
+  let (assignment_op, s) = variable s "assignment_op"
 
-      progr';
-      afunc';
-      global';
-      oldfunc';
-      newfunc';
-      oldfuncint';
-      newfuncint';
-      nodeclarator';
-      declarators';
-      type';
-      storage';
-      specprop';
-      onlydecl';
-      initdecl';
-      tvoid';
-      tchar';
-      tshort';
-      tint';
-      tlong';
-      tfloat';
-      tdouble';
-      tsigned';
-      tunsigned';
-      tstruct';
-      tenum';
-      tname';
-      mytype';
-      globalprograms';
-      localprogram';
-      localblock';
-      localreg';
-      const';
-      nooptim';
-      tag';
-      unique';
-      tagtype';
-      struct';
-      union';
-      structen';
-      typespec';
-      qualspec';
-      decl';
-      field';
-      decfield';
-      enumdec';
-      enumname';
-      enumvar';
-      plain';
-      enuminit';
-      beginpointer';
-      nopointer';
-      name';
-      parendecl';
-      innitarray';
-      incomplete';
-      newfuncdec';
-      oldfuncdef';
-      oldfuncdec';
-      point';
-      pointqual';
-      pointpoint';
-      pointqualpoint';
-      allspec';
-      more';
-      paramdec';
-      moreparamdec';
-      onlytype';
-      typeandparam';
-      abstract';
-      initexpr';
-      initlistone';
-      initlisttwo';
-      aninit';
-      moreinit';
-      plaintype';
-      extendedtype';
-      pointerstart';
-      advanced';
-      pointadvanced';
-      withinparentes';
-      array';
-      initiatedarray';
-      uninitiated';
-      initiated';
-      oldfunction';
-      newfunction';
-      oldfuncexpr';
-      newfuncexpr';
-      labels';
-      comps';
-      exprs';
-      sels';
-      iters';
-      jumps';
-      slabelone';
-      slabeltwo';
-      slabelthree';
-      scompone';
-      scomptwo';
-      scompthree';
-      scompfour';
-      sexprone';
-      sexprtwo';
-      sselone';
-      sseltwo';
-      sselthree';
-      siterone';
-      sitertwo';
-      siterthree';
-      siterfour';
-      sjumpone';
-      sjumptwo';
-      sjumpthree';
-      sjumpfour';
-      sjumpfive';
-      ecomma';
-      eassign';
-      econdition';
-      elor';
-      eland';
-      ebitor';
-      ebitexor';
-      ebitand';
-      eeq';
-      eneq';
-      elthen';
-      egrthen';
-      ele';
-      ege';
-      eleft';
-      eright';
-      eplus';
-      eminus';
-      etimes';
-      ediv';
-      emod';
-      etypeconv';
-      epreinc';
-      epredec';
-      epreop';
-      ebytesexpr';
-      ebytestype';
-      earray';
-      efunk';
-      efunkpar';
-      eselect';
-      epoint';
-      epostinc';
-      epostdec';
-      evar';
-      econst';
-      estring';
-      echar';
-      eunsigned';
-      elong';
-      eunsignlong';
-      ehexadec';
-      ehexaunsign';
-      ehexalong';
-      ehexaunslong';
-      eoctal';
-      eoctalunsign';
-      eoctallong';
-      eoctalunslong';
-      edouble';
-      efloat';
-      elongdouble';
-      eint';
-      especial';
-      address';
-      indirection';
-      plus';
-      negative';
-      complement';
-      logicalneg';
-      assign';
-      assignmul';
-      assigndiv';
-      assignmod';
-      assignadd';
-      assignsub';
-      assignleft';
-      assignright';
-      assignand';
-      assignxor';
-      assignor';
+  let (progr', s) = variable s "progr'"
+  let (afunc', s) = variable s "afunc'"
+  let (global', s) = variable s "global'"
+  let (oldfunc', s) = variable s "oldfunc'"
+  let (newfunc', s) = variable s "newfunc'"
+  let (oldfuncint', s) = variable s "oldfuncint'"
+  let (newfuncint', s) = variable s "newfuncint'"
+  let (nodeclarator', s) = variable s "nodeclarator'"
+  let (declarators', s) = variable s "declarators'"
+  let (type', s) = variable s "type'"
+  let (storage', s) = variable s "storage'"
+  let (specprop', s) = variable s "specprop'"
+  let (onlydecl', s) = variable s "onlydecl'"
+  let (initdecl', s) = variable s "initdecl'"
+  let (tvoid', s) = variable s "tvoid'"
+  let (tchar', s) = variable s "tchar'"
+  let (tshort', s) = variable s "tshort'"
+  let (tint', s) = variable s "tint'"
+  let (tlong', s) = variable s "tlong'"
+  let (tfloat', s) = variable s "tfloat'"
+  let (tdouble', s) = variable s "tdouble'"
+  let (tsigned', s) = variable s "tsigned'"
+  let (tunsigned', s) = variable s "tunsigned'"
+  let (tstruct', s) = variable s "tstruct'"
+  let (tenum', s) = variable s "tenum'"
+  let (tname', s) = variable s "tname'"
+  let (mytype', s) = variable s "mytype'"
+  let (globalprograms', s) = variable s "globalprograms'"
+  let (localprogram', s) = variable s "localprogram'"
+  let (localblock', s) = variable s "localblock'"
+  let (localreg', s) = variable s "localreg'"
+  let (const', s) = variable s "const'"
+  let (nooptim', s) = variable s "nooptim'"
+  let (tag', s) = variable s "tag'"
+  let (unique', s) = variable s "unique'"
+  let (tagtype', s) = variable s "tagtype'"
+  let (struct', s) = variable s "struct'"
+  let (union', s) = variable s "union'"
+  let (structen', s) = variable s "structen'"
+  let (typespec', s) = variable s "typespec'"
+  let (qualspec', s) = variable s "qualspec'"
+  let (decl', s) = variable s "decl'"
+  let (field', s) = variable s "field'"
+  let (decfield', s) = variable s "decfield'"
+  let (enumdec', s) = variable s "enumdec'"
+  let (enumname', s) = variable s "enumname'"
+  let (enumvar', s) = variable s "enumvar'"
+  let (plain', s) = variable s "plain'"
+  let (enuminit', s) = variable s "enuminit'"
+  let (beginpointer', s) = variable s "beginpointer'"
+  let (nopointer', s) = variable s "nopointer'"
+  let (name', s) = variable s "name'"
+  let (parendecl', s) = variable s "parendecl'"
+  let (innitarray', s) = variable s "innitarray'"
+  let (incomplete', s) = variable s "incomplete'"
+  let (newfuncdec', s) = variable s "newfuncdec'"
+  let (oldfuncdef', s) = variable s "oldfuncdef'"
+  let (oldfuncdec', s) = variable s "oldfuncdec'"
+  let (point', s) = variable s "point'"
+  let (pointqual', s) = variable s "pointqual'"
+  let (pointpoint', s) = variable s "pointpoint'"
+  let (pointqualpoint', s) = variable s "pointqualpoint'"
+  let (allspec', s) = variable s "allspec'"
+  let (more', s) = variable s "more'"
+  let (paramdec', s) = variable s "paramdec'"
+  let (moreparamdec', s) = variable s "moreparamdec'"
+  let (onlytype', s) = variable s "onlytype'"
+  let (typeandparam', s) = variable s "typeandparam'"
+  let (abstract', s) = variable s "abstract'"
+  let (initexpr', s) = variable s "initexpr'"
+  let (initlistone', s) = variable s "initlistone'"
+  let (initlisttwo', s) = variable s "initlisttwo'"
+  let (aninit', s) = variable s "aninit'"
+  let (moreinit', s) = variable s "moreinit'"
+  let (plaintype', s) = variable s "plaintype'"
+  let (extendedtype', s) = variable s "extendedtype'"
+  let (pointerstart', s) = variable s "pointerstart'"
+  let (advanced', s) = variable s "advanced'"
+  let (pointadvanced', s) = variable s "pointadvanced'"
+  let (withinparentes', s) = variable s "withinparentes'"
+  let (array', s) = variable s "array'"
+  let (initiatedarray', s) = variable s "initiatedarray'"
+  let (uninitiated', s) = variable s "uninitiated'"
+  let (initiated', s) = variable s "initiated'"
+  let (oldfunction', s) = variable s "oldfunction'"
+  let (newfunction', s) = variable s "newfunction'"
+  let (oldfuncexpr', s) = variable s "oldfuncexpr'"
+  let (newfuncexpr', s) = variable s "newfuncexpr'"
+  let (labels', s) = variable s "labels'"
+  let (comps', s) = variable s "comps'"
+  let (exprs', s) = variable s "exprs'"
+  let (sels', s) = variable s "sels'"
+  let (iters', s) = variable s "iters'"
+  let (jumps', s) = variable s "jumps'"
+  let (slabelone', s) = variable s "slabelone'"
+  let (slabeltwo', s) = variable s "slabeltwo'"
+  let (slabelthree', s) = variable s "slabelthree'"
+  let (scompone', s) = variable s "scompone'"
+  let (scomptwo', s) = variable s "scomptwo'"
+  let (scompthree', s) = variable s "scompthree'"
+  let (scompfour', s) = variable s "scompfour'"
+  let (sexprone', s) = variable s "sexprone'"
+  let (sexprtwo', s) = variable s "sexprtwo'"
+  let (sselone', s) = variable s "sselone'"
+  let (sseltwo', s) = variable s "sseltwo'"
+  let (sselthree', s) = variable s "sselthree'"
+  let (siterone', s) = variable s "siterone'"
+  let (sitertwo', s) = variable s "sitertwo'"
+  let (siterthree', s) = variable s "siterthree'"
+  let (siterfour', s) = variable s "siterfour'"
+  let (sjumpone', s) = variable s "sjumpone'"
+  let (sjumptwo', s) = variable s "sjumptwo'"
+  let (sjumpthree', s) = variable s "sjumpthree'"
+  let (sjumpfour', s) = variable s "sjumpfour'"
+  let (sjumpfive', s) = variable s "sjumpfive'"
+  let (ecomma', s) = variable s "ecomma'"
+  let (eassign', s) = variable s "eassign'"
+  let (econdition', s) = variable s "econdition'"
+  let (elor', s) = variable s "elor'"
+  let (eland', s) = variable s "eland'"
+  let (ebitor', s) = variable s "ebitor'"
+  let (ebitexor', s) = variable s "ebitexor'"
+  let (ebitand', s) = variable s "ebitand'"
+  let (eeq', s) = variable s "eeq'"
+  let (eneq', s) = variable s "eneq'"
+  let (elthen', s) = variable s "elthen'"
+  let (egrthen', s) = variable s "egrthen'"
+  let (ele', s) = variable s "ele'"
+  let (ege', s) = variable s "ege'"
+  let (eleft', s) = variable s "eleft'"
+  let (eright', s) = variable s "eright'"
+  let (eplus', s) = variable s "eplus'"
+  let (eminus', s) = variable s "eminus'"
+  let (etimes', s) = variable s "etimes'"
+  let (ediv', s) = variable s "ediv'"
+  let (emod', s) = variable s "emod'"
+  let (etypeconv', s) = variable s "etypeconv'"
+  let (epreinc', s) = variable s "epreinc'"
+  let (epredec', s) = variable s "epredec'"
+  let (epreop', s) = variable s "epreop'"
+  let (ebytesexpr', s) = variable s "ebytesexpr'"
+  let (ebytestype', s) = variable s "ebytestype'"
+  let (earray', s) = variable s "earray'"
+  let (efunk', s) = variable s "efunk'"
+  let (efunkpar', s) = variable s "efunkpar'"
+  let (eselect', s) = variable s "eselect'"
+  let (epoint', s) = variable s "epoint'"
+  let (epostinc', s) = variable s "epostinc'"
+  let (epostdec', s) = variable s "epostdec'"
+  let (evar', s) = variable s "evar'"
+  let (econst', s) = variable s "econst'"
+  let (estring', s) = variable s "estring'"
+  let (echar', s) = variable s "echar'"
+  let (eunsigned', s) = variable s "eunsigned'"
+  let (elong', s) = variable s "elong'"
+  let (eunsignlong', s) = variable s "eunsignlong'"
+  let (ehexadec', s) = variable s "ehexadec'"
+  let (ehexaunsign', s) = variable s "ehexaunsign'"
+  let (ehexalong', s) = variable s "ehexalong'"
+  let (ehexaunslong', s) = variable s "ehexaunslong'"
+  let (eoctal', s) = variable s "eoctal'"
+  let (eoctalunsign', s) = variable s "eoctalunsign'"
+  let (eoctallong', s) = variable s "eoctallong'"
+  let (eoctalunslong', s) = variable s "eoctalunslong'"
+  let (edouble', s) = variable s "edouble'"
+  let (efloat', s) = variable s "efloat'"
+  let (elongdouble', s) = variable s "elongdouble'"
+  let (eint', s) = variable s "eint'"
+  let (especial', s) = variable s "especial'"
+  let (address', s) = variable s "address'"
+  let (indirection', s) = variable s "indirection'"
+  let (plus', s) = variable s "plus'"
+  let (negative', s) = variable s "negative'"
+  let (complement', s) = variable s "complement'"
+  let (logicalneg', s) = variable s "logicalneg'"
+  let (assign', s) = variable s "assign'"
+  let (assignmul', s) = variable s "assignmul'"
+  let (assigndiv', s) = variable s "assigndiv'"
+  let (assignmod', s) = variable s "assignmod'"
+  let (assignadd', s) = variable s "assignadd'"
+  let (assignsub', s) = variable s "assignsub'"
+  let (assignleft', s) = variable s "assignleft'"
+  let (assignright', s) = variable s "assignright'"
+  let (assignand', s) = variable s "assignand'"
+  let (assignxor', s) = variable s "assignxor'"
+  let (assignor', s) = variable s "assignor'"
 
-      u;
-    ] = variables Vector.[
-      "start";
-      "ws";
+  let (u, _) = variable s "u"
 
-      "ident";
-      "string";
-      "char";
-      "integer";
-      "unsigned";
-      "long";
-      "unsignedlong";
-      "hexadecimal";
-      "hexunsigned";
-      "hexlong";
-      "hexunslong";
-      "octal";
-      "octalunsigned";
-      "octallong";
-      "octalunslong";
-      "double";
-      "float";
-      "longdouble";
-      "type_void";
-      "type_char";
-      "type_short";
-      "type_int";
-      "type_long";
-      "type_float";
-      "type_double";
-      "type_signed";
-      "type_unsigned";
-      "type_typedef";
-      "typedef";
-      "extern";
-      "static";
-      "auto";
-      "register";
-      "const";
-      "volatile";
-      "struct_";
-      "union";
-      "enum";
-      "case";
-      "default";
-      "if_";
-      "else_";
-      "switch";
-      "while_";
-      "do_";
-      "for_";
-      "goto";
-      "continue";
-      "break";
-      "return";
-      "sizeof";
-      "ternary_if";
-      "ternary_else";
-      "address";
-      "indirection";
-      "pointer";
-      "bitcomp";
-      "lneg";
-      "semi";
-      "lparen";
-      "rparen";
-      "comma";
-      "lbrace";
-      "rbrace";
-      "colon";
-      "lbrak";
-      "rbrak";
-      "assign";
-      "plus_";
-      "minus";
-      "ellip";
-      "bor";
-      "band";
-      "lor_";
-      "land_";
-      "bxor";
-      "eq";
-      "noteq";
-      "lt";
-      "gt";
-      "gte";
-      "lte";
-      "lshift";
-      "rshift";
-      "times";
-      "div";
-      "rem";
-      "plusplus";
-      "minusminus";
-      "dot";
-      "arrow";
-      "timesassign";
-      "divassign";
-      "remassign";
-      "plusassign";
-      "minusassign";
-      "lshiftassign";
-      "rshiftassign";
-      "landassign";
-      "lxorassign";
-      "lorassign";
-
-      "program";
-      "list_external_declaration";
-      "external_declaration";
-      "function_def";
-      "dec";
-      "list_dec";
-      "list_declaration_specifier";
-      "declaration_specifier";
-      "list_init_declarator";
-      "init_declarator";
-      "type_specifier";
-      "storage_class_specifier";
-      "type_qualifier";
-      "struct_or_union_spec";
-      "struct_or_union";
-      "list_struct_dec";
-      "struct_dec";
-      "list_spec_qual";
-      "spec_qual";
-      "list_struct_declarator";
-      "struct_declarator";
-      "enum_specifier";
-      "list_enumerator";
-      "enumerator";
-      "declarator";
-      "direct_declarator";
-      "list_type_qualifier";
-      "parameter_type";
-      "parameter_declarations";
-      "parameter_declaration";
-      "list_ident";
-      "initializer_";
-      "initializers";
-      "type_name";
-      "abstract_declarator";
-      "dir_abs_dec";
-      "stm";
-      "labeled_stm";
-      "compound_stm";
-      "expression_stm";
-      "selection_stm";
-      "iter_stm";
-      "jump_stm";
-      "list_stm";
-      "constant";
-      "constant_expression";
-      "list_exp2";
-      "exp";
-      "exp2";
-      "exp3";
-      "exp4";
-      "exp5";
-      "exp6";
-      "exp7";
-      "exp8";
-      "exp9";
-      "exp10";
-      "exp11";
-      "exp12";
-      "exp13";
-      "exp14";
-      "exp15";
-      "exp16";
-      "exp17";
-      "unary_operator";
-      "assignment_op";
-
-      "progr'";
-      "afunc'";
-      "global'";
-      "oldfunc'";
-      "newfunc'";
-      "oldfuncint'";
-      "newfuncint'";
-      "nodeclarator'";
-      "declarators'";
-      "type'";
-      "storage'";
-      "specprop'";
-      "onlydecl'";
-      "initdecl'";
-      "tvoid'";
-      "tchar'";
-      "tshort'";
-      "tint'";
-      "tlong'";
-      "tfloat'";
-      "tdouble'";
-      "tsigned'";
-      "tunsigned'";
-      "tstruct'";
-      "tenum'";
-      "tname'";
-      "mytype'";
-      "globalprograms'";
-      "localprogram'";
-      "localblock'";
-      "localreg'";
-      "const'";
-      "nooptim'";
-      "tag'";
-      "unique'";
-      "tagtype'";
-      "struct'";
-      "union'";
-      "structen'";
-      "typespec'";
-      "qualspec'";
-      "decl'";
-      "field'";
-      "decfield'";
-      "enumdec'";
-      "enumname'";
-      "enumvar'";
-      "plain'";
-      "enuminit'";
-      "beginpointer'";
-      "nopointer'";
-      "name'";
-      "parendecl'";
-      "innitarray'";
-      "incomplete'";
-      "newfuncdec'";
-      "oldfuncdef'";
-      "oldfuncdec'";
-      "point'";
-      "pointqual'";
-      "pointpoint'";
-      "pointqualpoint'";
-      "allspec'";
-      "more'";
-      "paramdec'";
-      "moreparamdec'";
-      "onlytype'";
-      "typeandparam'";
-      "abstract'";
-      "initexpr'";
-      "initlistone'";
-      "initlisttwo'";
-      "aninit'";
-      "moreinit'";
-      "plaintype'";
-      "extendedtype'";
-      "pointerstart'";
-      "advanced'";
-      "pointadvanced'";
-      "withinparentes'";
-      "array'";
-      "initiatedarray'";
-      "uninitiated'";
-      "initiated'";
-      "oldfunction'";
-      "newfunction'";
-      "oldfuncexpr'";
-      "newfuncexpr'";
-      "labels'";
-      "comps'";
-      "exprs'";
-      "sels'";
-      "iters'";
-      "jumps'";
-      "slabelone'";
-      "slabeltwo'";
-      "slabelthree'";
-      "scompone'";
-      "scomptwo'";
-      "scompthree'";
-      "scompfour'";
-      "sexprone'";
-      "sexprtwo'";
-      "sselone'";
-      "sseltwo'";
-      "sselthree'";
-      "siterone'";
-      "sitertwo'";
-      "siterthree'";
-      "siterfour'";
-      "sjumpone'";
-      "sjumptwo'";
-      "sjumpthree'";
-      "sjumpfour'";
-      "sjumpfive'";
-      "ecomma'";
-      "eassign'";
-      "econdition'";
-      "elor'";
-      "eland'";
-      "ebitor'";
-      "ebitexor'";
-      "ebitand'";
-      "eeq'";
-      "eneq'";
-      "elthen'";
-      "egrthen'";
-      "ele'";
-      "ege'";
-      "eleft'";
-      "eright'";
-      "eplus'";
-      "eminus'";
-      "etimes'";
-      "ediv'";
-      "emod'";
-      "etypeconv'";
-      "epreinc'";
-      "epredec'";
-      "epreop'";
-      "ebytesexpr'";
-      "ebytestype'";
-      "earray'";
-      "efunk'";
-      "efunkpar'";
-      "eselect'";
-      "epoint'";
-      "epostinc'";
-      "epostdec'";
-      "evar'";
-      "econst'";
-      "estring'";
-      "echar'";
-      "eunsigned'";
-      "elong'";
-      "eunsignlong'";
-      "ehexadec'";
-      "ehexaunsign'";
-      "ehexalong'";
-      "ehexaunslong'";
-      "eoctal'";
-      "eoctalunsign'";
-      "eoctallong'";
-      "eoctalunslong'";
-      "edouble'";
-      "efloat'";
-      "elongdouble'";
-      "eint'";
-      "especial'";
-      "address'";
-      "indirection'";
-      "plus'";
-      "negative'";
-      "complement'";
-      "logicalneg'";
-      "assign'";
-      "assignmul'";
-      "assigndiv'";
-      "assignmod'";
-      "assignadd'";
-      "assignsub'";
-      "assignleft'";
-      "assignright'";
-      "assignand'";
-      "assignxor'";
-      "assignor'";
-
-      "_";
-    ]
   let syntactic = [
     start;
     program;

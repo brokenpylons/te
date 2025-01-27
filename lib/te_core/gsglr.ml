@@ -54,6 +54,8 @@ module type TABLES = sig
   type actions = T.Actions.t
   type state := T.State.t
   type states := T.States.t
+  type state_pair := T.State_pair.t
+  type state_pairs := T.State_pairs.t
 
   type symbol := T.Symbol.t
 
@@ -61,7 +63,7 @@ module type TABLES = sig
   val actions: t -> state -> symbol -> actions
   val goto: t -> state -> symbol -> states
   val orders: t -> state -> T.Vars.t
-  val back: t -> state * state -> state -> (state * state) option
+  val back: t -> state_pair -> state -> state_pairs
 
   val shift: actions -> bool
   val load: actions -> bool
@@ -130,10 +132,15 @@ module Make(Tables: TABLES) = struct
         if Paths.is_empty paths
         then Paths.singleton (v, ns)
         else Paths.fold (fun (v', ns') ->
+            let ps = Tables.back t p (T.Vertex.states v') in
             Paths.union @@
-            match Tables.back t p (T.Vertex.states v') with
-            | Some p' -> self#scan_back v' ns' (Gss.adjacent v' ns' stack) p'
-            | None -> Paths.singleton (v, ns))
+            if T.State_pairs.is_empty ps then
+              Paths.singleton (v, ns)
+            else
+              T.State_pairs.fold (fun p' ->
+                  Paths.union @@
+                  self#scan_back v' ns' (Gss.adjacent v' ns' stack) p')
+                Paths.empty ps)
             Paths.empty paths
 
       method private enumerate pos (xss: T.Reduction.Reminder.t) =

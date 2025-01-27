@@ -224,6 +224,10 @@ module Var = struct
         (supply, (x, Some label)))
       supply labels
 
+  let make' supply label =
+    let (x, supply) = Supply.get supply in
+    (x, Some label), supply
+
   let dummy = (-1, None)
 
   let value_pp ppf = function

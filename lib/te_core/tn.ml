@@ -361,6 +361,11 @@ end
 module Number_to = Balanced_binary_tree.Map.Size(Int)
 module Numbered_enhanced_var_to = Balanced_binary_tree.Map.Size(Numbered_enhanced_var)
 
+module Numbered_state_pair = struct
+  type t = int * T.State.t * T.State.t
+  [@@deriving ord]
+end
+module Numbered_state_pair_to = Balanced_binary_tree.Map.Height(Numbered_state_pair)
 
 module Enhanced_lits: sig
   include Re.LITS with type t = Lits.t T.State_to.t
@@ -612,7 +617,7 @@ let index_productions ~supply ps =
     Production_index.empty
     ps
 
-let construct ~supply start lexical prods =
+let construct ?(overexpand = false)  ~supply start lexical prods =
   let module Gen = A.Gen(T.State_index(Preitem_to)) in
   Gen.unfold ~supply ~merge:Lits.union (fun q {number; lhs; rhs; is_kernel; is_reduce; distance} ->
       let fs = refine @@ Rhs.first rhs in
@@ -631,11 +636,13 @@ let construct ~supply start lexical prods =
           fs
       in
       let vars = Lits.to_vars @@ Seq.fold_left Lits.union Lits.empty fs in
-      (* OVEREXPAND *)
-      (*let vars = if not @@ T.Vars.is_empty (T.Vars.inter vars lexical)
-        then T.Vars.union vars lexical
+      let vars =
+        if overexpand then
+          if not @@ T.Vars.disjoint vars lexical
+          then T.Vars.union vars lexical
+          else vars
         else vars
-      in*)
+      in
       let nonkernel =
         Seq.flat_map (fun var ->
             Seq.map (fun Numbered_production.{number; lhs; rhs} ->
@@ -648,7 +655,7 @@ let construct ~supply start lexical prods =
                      is_reduce = Rhs.is_nullable rhs;
                    }))
               (Numbered_productions.to_seq @@ 
-               try Production_index.find_multiple var prods 
+               try Production_index.find_multiple var prods
                with Not_found -> 
                  Fmt.pr "%a" T.Var.pp var;
                  assert false))
@@ -753,6 +760,7 @@ let enhanced_productions ea =
   |> Seq.filter (fun (_, _, lts) -> Enhanced_lits.is_delegate lts)
   |> Seq.flat_map (fun (s, q, _) -> enhanced_production s q ea)
   |> Seq.append (enhanced_production (PA.start ea) (PA.start ea) ea)
+  |> Seq.memoize
 
 module Bool_set = struct
   type t = bool
@@ -946,7 +954,8 @@ module Lookahead = struct
       lexical_lookahead: Enhanced_lits.t;
     }
 
-  let compute analysis lookback lexical longest_match number s q =
+let compute analysis lookback lexical longest_match =
+  let run number s q =
     let lhss = Lookback.find number s q lookback in
     let right_nulled =
       lhss
@@ -982,6 +991,15 @@ module Lookahead = struct
                                     (Lits.extract_eof lts))
     in
     {right_nulled; shift_lookahead; reduce_lookahead; lexical_lookahead; code_lookahead}
+  in
+  let table = ref Numbered_state_pair_to.empty in
+  fun number s q ->
+    match Numbered_state_pair_to.find_opt (number, s, q) !table with
+    | Some x -> x
+    | None ->
+      let x = run number s q in
+      table := Numbered_state_pair_to.add (number, s, q) x !table;
+      x
 end
 
 let nullable analysis lts = 

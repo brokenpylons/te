@@ -214,6 +214,7 @@ module Var: sig
   val dummy: t
 
   val make: supply:(pre Supply.t) -> (string, 'a) Vector.t -> (t, 'a) Vector.t 
+  val make': pre Supply.t -> string -> (t * pre Supply.t)
 end
 
 module Vars: sig
