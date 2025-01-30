@@ -3,15 +3,15 @@ open! Prelude
 
 module Abstract = struct
   type 'ls t =
-    | Nothing
-    | Null
-    | Any
     | Lits of 'ls
+    | Any
+    | Null
+    | Nothing
     | Concat of bool * bool * 'ls t * 'ls t
-    | Union of bool * bool * 'ls t * 'ls t
     | Repeat of bool * bool * 'ls t * int
     | Star of 'ls t
     | Comp of bool * bool * 'ls t
+    | Union of bool * bool * 'ls t * 'ls t
   [@@deriving eq, ord]
 
   let pp pp_lits =
@@ -126,7 +126,7 @@ module Abstract = struct
     let rec go = function
       | Nothing -> false
       | Null -> false
-      | Any -> true
+      | Any -> false
       | Lits _ -> false
       | Concat (_, _, x, y) -> go x || go y
       | Union (_, _, x, y) -> go x || go y
@@ -341,53 +341,72 @@ module Concrete(Lits: LITS):
   let first = 
     first' is_nullable
 
-  let rec simplify = function
-    | Union (_, _, x, Union (_, _, y, z)) -> simplify (union (simplify (union x y)) (simplify z))
-    | Union (m, h, x, y) ->
-      (match simplify x, simplify y with
-       | Nothing, x -> x
-       | x, Nothing -> x
-       | Comp (_, _, Nothing), _ -> comp_nothing
-       | _, Comp (_, _, Nothing) -> comp_nothing
-       | x, y when equal x y -> x
-       | x, y when compare x y > 0 -> Union (m, h, y, x)
-       | x, y -> Union (m, h, x, y))
+  let simplify' =
+    let rec go = function
+      | Union (m, h, x, y) ->
+        (match go x, go y with
+         | Nothing, x -> x
+         | x, Nothing -> x
+         | Comp (_, _, Nothing), _ -> comp_nothing
+         | _, Comp (_, _, Nothing) -> comp_nothing
+         | x, y -> Union (m, h, x, y))
 
-    | Concat (_, _, x, Concat (_, _, y, z)) -> simplify (concat (simplify (concat x y)) (simplify z))
-    | Concat (m, h, x, y) ->
-      (match simplify x, simplify y with
-       | Nothing, _ -> nothing
-       | _, Nothing -> nothing
-       | Null, x -> x
-       | x, Null -> x
-       | Comp (_, _, Nothing), Comp (_, _, Nothing) -> comp_nothing
-       | Comp (_, _, Null), Comp (_, _, Null) -> comp_null
-       | x, y -> Concat (m, h, x, y))
+      | Concat (m, h, x, y) ->
+        (match go x, go y with
+         | Nothing, _ -> nothing
+         | _, Nothing -> nothing
+         | Null, x -> x
+         | x, Null -> x
+         | Comp (_, _, Nothing), Comp (_, _, Nothing) -> comp_nothing
+         | Comp (_, _, Null), Comp (_, _, Null) -> comp_null
+         | x, y -> Concat (m, h, x, y))
 
-    | Repeat (_, _, _, 0) -> null
-    | Repeat (m, h, x, i) ->
-      (match simplify x with
-       | Nothing -> nothing
-       | Null -> nothing
-       | Comp (_, _, Nothing) -> comp_nothing
-       | Comp (_, _, Null) -> comp_null
-       | x -> Repeat (m, h, x, i))
+      | Repeat (_, _, _, 0) -> null
+      | Repeat (m, h, x, i) ->
+        (match go x with
+         | Nothing -> nothing
+         | Null -> nothing
+         | Comp (_, _, Nothing) -> comp_nothing
+         | Comp (_, _, Null) -> comp_null
+         | x -> Repeat (m, h, x, i))
 
-    | Star x ->
-      (match simplify x with
-       | Null -> null
-       | Nothing -> null
-       | Comp (_, _, Nothing) -> comp_nothing
-       | Comp (_, _, Null) -> comp_nothing
-       | Star x -> x
-       | x -> Star x)
+      | Star x ->
+        (match go x with
+         | Null -> null
+         | Nothing -> null
+         | Comp (_, _, Nothing) -> comp_nothing
+         | Comp (_, _, Null) -> comp_nothing
+         | Star x -> x
+         | x -> Star x)
 
-    | Comp (m, h, x) ->
-      (match simplify x with
-       | Comp (_, _, x) -> x
-       | x -> Comp (m, h, x))
+      | Comp (m, h, x) ->
+        (match go x with
+         | Comp (_, _, x) -> x
+         | x -> Comp (m, h, x))
 
-    | x -> x
+      | x -> x
+    in
+    go
+
+  let rec collect =
+    let rec go = function
+      | Union (_, _, x, y) ->
+        Seq.deduplicate compare (Seq.sorted_merge compare (go x) (go y))
+      | Concat (m, h, x, y) ->
+        Seq.return (Concat (m, h, simplify x, simplify y))
+      | Repeat (m, h, x, i) ->
+        Seq.return (Repeat (m, h, simplify x, i))
+      | Star x ->
+        Seq.return (Star (simplify x))
+      | Comp (m, h, x) ->
+        Seq.return (Comp (m, h, simplify x))
+      | x -> Seq.return x
+    in
+    go
+  and simplify x =
+    collect x
+    |> Seq.fold_left union nothing
+    |> simplify'
 
   let rec derivative s = function
     | Nothing -> nothing

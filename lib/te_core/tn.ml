@@ -620,6 +620,7 @@ let index_productions ~supply ps =
 let construct ?(overexpand = false)  ~supply start lexical prods =
   let module Gen = A.Gen(T.State_index(Preitem_to)) in
   Gen.unfold ~supply ~merge:Lits.union (fun q {number; lhs; rhs; is_kernel; is_reduce; distance} ->
+      (*Fmt.pr "%a %a %a@." T.State.pp q Rhs.pp rhs Size.pp distance;*)
       let fs = refine @@ Rhs.first rhs in
       let kernel = Seq.filter_map (fun lts ->
           let rhs' = Rhs.simplify @@ Rhs.derivative lts rhs in
@@ -1193,9 +1194,12 @@ let print_productions prods =
 let build syntactic lexical longest_match start prods  =
   assert (T.Vars.disjoint syntactic lexical);
 
-  print_endline "CONSTRUCT";
   let iprods = index_productions ~supply:(T.State.fresh_supply ()) prods in
-  let c = erase_scan @@ construct ~supply:(T.State.fresh_supply ()) start lexical iprods in
+  print_endline "CONSTRUCT";
+  let c = construct ~supply:(T.State.fresh_supply ()) start lexical iprods in
+
+  print_endline "ES";
+  let c = erase_scan c in
 
   print_endline "LR";
   let lr_supply1, lr_supply2 = Supply.split2 @@ T.State.fresh_supply () in
