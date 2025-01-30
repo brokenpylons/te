@@ -393,20 +393,22 @@ module Concrete(Lits: LITS):
       | Union (_, _, x, y) ->
         Seq.deduplicate compare (Seq.sorted_merge compare (go x) (go y))
       | Concat (m, h, x, y) ->
-        Seq.return (Concat (m, h, simplify x, simplify y))
+        Seq.return (Concat (m, h, normalize x, normalize y))
       | Repeat (m, h, x, i) ->
-        Seq.return (Repeat (m, h, simplify x, i))
+        Seq.return (Repeat (m, h, normalize x, i))
       | Star x ->
-        Seq.return (Star (simplify x))
+        Seq.return (Star (normalize x))
       | Comp (m, h, x) ->
-        Seq.return (Comp (m, h, simplify x))
+        Seq.return (Comp (m, h, normalize x))
       | x -> Seq.return x
     in
     go
-  and simplify x =
+  and normalize x =
     collect x
     |> Seq.fold_left union nothing
-    |> simplify'
+
+  let simplify x =
+    simplify' @@ normalize x
 
   let rec derivative s = function
     | Nothing -> nothing
