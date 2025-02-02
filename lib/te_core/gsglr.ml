@@ -63,7 +63,8 @@ module type TABLES = sig
   val actions: t -> state -> symbol -> actions
   val goto: t -> state -> symbol -> states
   val orders: t -> state -> T.Vars.t
-  val back: t -> state_pair -> state -> state_pairs
+  val back: t -> state_pair -> state -> symbol -> state_pairs
+  val accept: t -> state -> bool
 
   val shift: actions -> bool
   val load: actions -> bool
@@ -127,21 +128,26 @@ module Make(Tables: TABLES) = struct
             Paths.union @@ self#successors v' ns' (Gss.adjacent v' ns' stack) (pred d))
             Paths.empty paths
 
-      method private scan_back v ns paths p =
-        (*Fmt.pr "SB %a %a@," T.Vertex.pp v (Fmt.parens Paths.pp) paths;*)
-        if Paths.is_empty paths
-        then Paths.singleton (v, ns)
-        else Paths.fold (fun (v', ns') ->
-            let ps = Tables.back t p (T.Vertex.states v') in
-            Paths.union @@
-            if T.State_pairs.is_empty ps then
-              Paths.singleton (v, ns)
-            else
-              T.State_pairs.fold (fun p' ->
-                  Paths.union @@
-                  self#scan_back v' ns' (Gss.adjacent v' ns' stack) p')
-                Paths.empty ps)
-            Paths.empty paths
+      method private scan_back ~history v ns paths p =
+        (*Fmt.pr "SB %a %a %a@," T.Vertex.pp v T.Vertices.pp history (Fmt.parens Paths.pp) paths;*)
+        if T.Vertices.mem v history then
+          Paths.empty
+        else
+          let history = T.Vertices.add v history in
+          if Paths.is_empty paths
+          then Paths.singleton (v, ns)
+          else Paths.fold (fun (v', ns') ->
+              let n = match ns' with n :: _ -> n | [] -> assert false in
+              let ps = Tables.back t p (T.Vertex.states v') (T.Node.symbol n) in
+              Paths.union @@
+              if T.State_pairs.is_empty ps then
+                Paths.singleton (v, ns)
+              else
+                T.State_pairs.fold (fun p' ->
+                    Paths.union @@
+                    self#scan_back ~history v' ns' (Gss.adjacent v' ns' stack) p')
+                  Paths.empty ps)
+              Paths.empty paths
 
       method private enumerate pos (xss: T.Reduction.Reminder.t) =
         match xss with
@@ -166,10 +172,10 @@ module Make(Tables: TABLES) = struct
         in
         Paths.to_seq @@ match strategy with
         | Fixed d -> self#successors v [] init d
-        | Scan p -> self#scan_back v [] init p
+        | Scan p -> self#scan_back ~history:T.Vertices.empty v [] init p
         | Null -> Paths.singleton (v, [])
 
-      method private actor ~null ?filter v l xs = 
+      method private actor ~null ?filter v l xs =
         (*Fmt.pr "actor %b %a %a %a@," null T.Vertex.pp v T.Vertices.pp l (Fmt.list T.Symbol.pp) xs;*)
         let a = List.fold_left (fun acc x ->
             T.Actions.union (Tables.actions t (T.Vertex.states v) x) acc)
@@ -354,6 +360,11 @@ module Make(Tables: TABLES) = struct
 
       method trace =
         List.rev trace
+
+      method accept =
+        Seq.exists (fun (w, _) ->
+            Tables.accept t (T.Vertex.states w))
+          (Segments.to_seq_multiple shift1)
 
       method to_dot =
         let subgraphs = Subclasses.fold_multiple (fun position subclass subgraphs ->

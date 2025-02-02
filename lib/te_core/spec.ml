@@ -135,13 +135,15 @@ module Build(Spec: SPEC') = struct
         rhs = Re.Abstract.map Tn.Lits.of_symbols (Context.Production.rhs p);
       })
 
-  let driver () =
+  let tables () =
     let syntactic = T.Vars.of_list Spec'.syntactic in
     let lexical = T.Vars.of_list Spec'.lexical in
     let longest_match = T.Vars.of_list Spec'.longest_match in
 
     let (lookahead', nullable', g, b) = Tn.build syntactic lexical longest_match Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
-    let t = Tables.Unoptimized.make lexical lookahead' nullable' g b in
+    Tables.Unoptimized.make Spec'.start lexical lookahead' nullable' g b
+
+  let driver t =
     new X.driver t
 
   module Run = struct
@@ -177,7 +179,7 @@ module Test(Spec: SPEC) = struct
     let syntactic = T.Vars.of_list Spec'.syntactic in
 
     let (lookahead', nullable', g, b) = Tn.build syntactic lexical T.Vars.empty Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
-    let t = Tables.Unoptimized.make lexical lookahead' nullable' g b in
+    let t = Tables.Unoptimized.make Spec'.start lexical lookahead' nullable' g b in
     new X.driver t
 end
 

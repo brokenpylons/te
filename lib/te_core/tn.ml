@@ -620,7 +620,6 @@ let index_productions ~supply ps =
 let construct ?(overexpand = false)  ~supply start lexical prods =
   let module Gen = A.Gen(T.State_index(Preitem_to)) in
   Gen.unfold ~supply ~merge:Lits.union (fun q {number; lhs; rhs; is_kernel; is_reduce; distance} ->
-      (*Fmt.pr "%a %a %a@." T.State.pp q Rhs.pp rhs Size.pp distance;*)
       let fs = refine @@ Rhs.first rhs in
       let kernel = Seq.filter_map (fun lts ->
           let rhs' = Rhs.simplify @@ Rhs.derivative lts rhs in
@@ -1034,7 +1033,7 @@ let noncanonical lexical lookahead' a =
       Seq.return (s, t, Lits.scan'))
     a
 
-let return lexical eprods =
+let back lexical eprods =
   eprods
   |> Seq.filter_map (fun Enhanced_production.{lhs = (_, var); rhs; _} ->
       if T.Vars.mem var lexical
@@ -1145,6 +1144,13 @@ let reduce lexical lookahead' nullable' s' a =
                              then Lists (resolve_tail nullable' rhs)
                              else Complete))))
 
+let accept start s' a =
+  let (let*) = Seq.bind in
+  Seq.exists Fun.id @@
+  let* (_, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
+  let* {lhs = (_, var); is_reduce; _} = Items.to_seq its in
+  Seq.return @@ (T.Var.equal var start && is_reduce)
+
 let actions lexical lookahead' nullable s a =
   let fs = List.to_seq @@ [shift; load; matches; predictions; null; shift_null; reduce] in
   Seq.flat_map (fun f -> f lexical lookahead' nullable s a) fs
@@ -1186,6 +1192,8 @@ let to_dot''' a = PA.to_dot ~string_of_labels:(Fmt.to_to_string Items.pp) ~strin
 
 let to_dot''''' a = A.to_dot ~string_of_labels:(Fmt.to_to_string (Fmt.seq @@ Fmt.parens (Fmt.pair ~sep:(Fmt.const Fmt.string ": ") T.Labeled_var.pp Enhanced_lits.pp))) ~string_of_lits:(Fmt.to_to_string Lits.pp) a
 
+let to_dote a = PA.to_dot ~string_of_labels:(Fmt.to_to_string Items.pp) ~string_of_lits:(Fmt.to_to_string Enhanced_lits.pp) a
+
 let print_productions prods =
   Seq.iter (fun prod ->
       Fmt.pr "@[@[%a@] ::= @[%s@]@]@." Enhanced_var.pp prod.Enhanced_production.lhs (Dot.string_of_graph @@ to_dot''' (prod.Enhanced_production.rhs)))
@@ -1226,9 +1234,11 @@ let build syntactic lexical longest_match start prods  =
     |> noncanonical_subset ~supply:lr_supply2
   in
 
-  let back = return lexical eprods1 in
+  let back = back lexical eprods1 in
 
   print_endline "END";
+
+  (*Fmt.pr "E %s@,"  (Dot.string_of_graph (to_dote back));*)
 
   (*Fmt.pr "C %s@,"  (Dot.string_of_graph (to_dot'' c));
   Fmt.pr "E %s@,"  (Dot.string_of_graph (to_dot''' e));*)
@@ -1243,6 +1253,7 @@ let build syntactic lexical longest_match start prods  =
 
   Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot (with_actions lexical lookahead' nc)));*)
 
+  (*Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot (with_actions lexical lookahead' nullable' nc)));*)
 
   (lookahead', nullable', nc, back)
 

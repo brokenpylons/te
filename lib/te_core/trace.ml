@@ -18,7 +18,7 @@ module Entry = struct
     | Load (x, v, u) -> Fmt.pf ppf "@[[LOAD '%a': %a <- %a]@]" T.Symbol.pp x T.Vertex.pp v T.Vertex.pp u
     | Expand (v, u) -> Fmt.pf ppf "@[[EXPAND (%a <- %a)]@]" T.Vertex.pp v T.Vertex.pp u
     | Order (v, x) -> Fmt.pf ppf "@[[ORDER %a ~ %a]@]" T.Vertex.pp v T.Var.pp x
-    | Predict (v, w, xs) -> Fmt.pf ppf "@[[PREDICT %a -> %a ~ %a]@]" T.Vertex.pp v T.Vertex.pp w (Fmt.list T.Var.pp) xs
+    | Predict (v, w, xs) -> Fmt.pf ppf "@[[PREDICT %a -> %a ~ %a]@]" T.Vertex.pp v T.Vertex.pp w (Fmt.list ~sep:(Fmt.const Fmt.string " ") T.Var.pp) xs
 end
 
 type t = Entry.t list

@@ -1,4 +1,4 @@
-open Te_bot
+open! Te_bot
 open! Prelude 
 module T = Types
 open Tn
@@ -8,8 +8,8 @@ module Goto_partial_map = struct
   let pp = pp T.States.pp
 end
 module Back_map = struct
-  include Multimap.Make1(T.State_to)(T.State_pairs)
-  let pp = T.State_to.pp T.State_pairs.pp
+  include Enhanced_lits_multimap(T.State_pairs)
+  let pp = pp T.State_pairs.pp
 end
 
 let actions lexical lookahead' nullable' a =
@@ -41,9 +41,16 @@ let back b =
   PA.to_segments b
   |> Seq.map (fun ((s, _), adj) ->
       (s, adj
-          |> Seq.map (fun (((s, _) as p), _) -> (s, T.State_pairs.singleton p))
+          |> Seq.map (fun (p, lts) -> (lts, T.State_pairs.singleton p))
           |> Back_map.of_seq_multiple))
   |> T.State_pair_to.of_seq
+
+let accept start a =
+  A.states a
+  |> T.States.to_seq
+  |> Seq.map (fun s -> 
+      (s, Tn.accept start s a))
+  |> T.State_to.of_seq
 
 
 module Unoptimized = struct
@@ -55,16 +62,18 @@ module Unoptimized = struct
       orders: T.Vars.t T.State_to.t;
       actions: Actions_multimap.t T.State_to.t;
       back: Back_map.t T.State_pair_to.t;
+      accept: bool T.State_to.t;
     }
   [@@deriving show]
 
-  let make lexical lookahead' nullable' g b =
+  let make start lexical lookahead' nullable' g b =
     {
       start = A.start g;
       goto = goto g;
       orders = orders lexical g;
       actions = actions lexical lookahead' nullable' g;
       back = back b;
+      accept = accept start g;
     }
 
   let lits_of_symbol = function
@@ -76,24 +85,28 @@ module Unoptimized = struct
   let start t =
     t.start
 
-  let actions t s x =
+  let actions t s sym =
     t.actions
     |> T.State_to.find s
-    |> Actions_multimap.find_multiple_or_empty (lits_of_symbol x)
+    |> Actions_multimap.find_multiple_or_empty (lits_of_symbol sym)
 
-  let goto t s x =
+  let goto t s sym =
     t.goto
     |> T.State_to.find s
-    |> Goto_partial_map.find_multiple_or_empty (lits_of_symbol x)
+    |> Goto_partial_map.find_multiple_or_empty (lits_of_symbol sym)
 
   let orders t s =
     t.orders
     |> T.State_to.find s
 
-  let back t p s =
+  let back t p s sym =
     t.back
     |> T.State_pair_to.find p
-    |> Back_map.find_multiple_or ~default:T.State_pairs.empty s
+    |> Back_map.find_multiple_or_empty (Enhanced_lits.make s (lits_of_symbol sym))
+
+  let accept t s =
+    t.accept
+    |> T.State_to.find s
 
   let shift a =
     a.T.Actions.shift

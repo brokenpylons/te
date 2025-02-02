@@ -251,11 +251,11 @@ module Make(State: STATE)(States: STATES with type elt = State.t)(G: Graph.S wit
           ])
     in
     let nodes = Seq.map (fun (q, lbls) ->
-        (node q (string_of_labels lbls)))
+        (node q (Dot.escape_string @@ string_of_labels lbls)))
         (G.labeled_vertices a.graph)
     in
     let edges = Seq.map (fun (s, q, syms) ->
-        edge s q (string_of_lits syms))
+        edge s q (Dot.escape_string @@ string_of_lits syms))
         (G.labeled_edges a.graph)
     in
     Dot.(Digraph, "g", List.of_seq @@ Seq.(nodes @ edges @ start_node @ start_edges))
