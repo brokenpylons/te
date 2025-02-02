@@ -1,4 +1,4 @@
-open Te_bot
+open! Te_bot
 open Te_core
 module T = Types
 
@@ -93,15 +93,15 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   let (lte, s) = variable s "lte"
   let (lshift, s) = variable s "lshift"
   let (rshift, s) = variable s "rshift"
-  let (times, s) = variable s "times"
-  let (div, s) = variable s "div"
+  let (ast, s) = variable s "ast"
+  let (slash, s) = variable s "slash"
   let (rem, s) = variable s "rem"
   let (plusplus, s) = variable s "plusplus"
   let (minusminus, s) = variable s "minusminus"
   let (dot, s) = variable s "dot"
   let (arrow, s) = variable s "arrow"
-  let (timesassign, s) = variable s "timesassign"
-  let (divassign, s) = variable s "divassign"
+  let (astassign, s) = variable s "timesassign"
+  let (slashassign, s) = variable s "divassign"
   let (remassign, s) = variable s "remassign"
   let (plusassign, s) = variable s "plusassign"
   let (minusassign, s) = variable s "minusassign"
@@ -435,6 +435,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     exp17;
     unary_operator;
     assignment_op;
+    pointer;
   ]
   let lexical = [
     ident;
@@ -492,7 +493,6 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     ternary_else;
     address;
     indirection;
-    pointer;
     bitcomp;
     lneg;
     semi;
@@ -521,15 +521,15 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     lte;
     lshift;
     rshift;
-    times;
-    div;
+    ast;
+    slash;
     rem;
     plusplus;
     minusminus;
     dot;
     arrow;
-    timesassign;
-    divassign;
+    astassign;
+    slashassign;
     remassign;
     plusassign;
     minusassign;
@@ -553,7 +553,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     with_ws (T.Vars.of_list lexical) (var ws) Production.[
       make (u, start) R.(var program * plus eof);
 
-      make (progr', program) (var list_external_declaration);
+      make (progr', program) R.(var ws * var list_external_declaration);
 
       make (u, list_external_declaration) (var external_declaration);
       make (u, list_external_declaration) R.(var external_declaration * var list_external_declaration);
@@ -656,10 +656,10 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (oldfuncdef', direct_declarator) R.(var direct_declarator * var lparen * var list_ident * var rparen);
       make (oldfuncdec', direct_declarator) R.(var direct_declarator * var lparen * var rparen);
 
-      make (point', pointer) (var pointer);
-      make (pointqual', pointer) R.(var pointer * var list_type_qualifier);
-      make (pointpoint', pointer) R.(var pointer * var pointer);
-      make (pointqualpoint', pointer) R.(var pointer * var list_type_qualifier * var pointer);
+      make (point', pointer) (var ast);
+      make (pointqual', pointer) R.(var ast * var list_type_qualifier);
+      make (pointpoint', pointer) R.(var ast * var pointer);
+      make (pointqualpoint', pointer) R.(var ast * var list_type_qualifier * var pointer);
 
       make (u, list_type_qualifier) (var type_qualifier);
       make (u, list_type_qualifier) R.(var type_qualifier * var list_type_qualifier);
@@ -756,8 +756,8 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (eright', exp11) R.(var exp11 * var rshift * var exp12);
       make (eplus', exp12) R.(var exp12 * var plus_ * var exp13);
       make (eminus', exp12) R.(var exp12 * var minus * var exp13);
-      make (etimes', exp13) R.(var exp13 * var times * var exp14);
-      make (ediv', exp13) R.(var exp13 * var div * var exp14);
+      make (etimes', exp13) R.(var exp13 * var ast * var exp14);
+      make (ediv', exp13) R.(var exp13 * var slash * var exp14);
       make (emod', exp13) R.(var exp13 * var rem * var exp14);
       make (etypeconv', exp14) R.(var lparen * var type_name * var rparen * var exp14);
       make (epreinc', exp15) R.(var plusplus * var exp15);
@@ -824,8 +824,8 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (logicalneg', unary_operator) (var lneg);
 
       make (assign', assignment_op) (var assign);
-      make (assignmul', assignment_op) (var timesassign);
-      make (assigndiv', assignment_op) (var divassign);
+      make (assignmul', assignment_op) (var astassign);
+      make (assigndiv', assignment_op) (var slashassign);
       make (assignmod', assignment_op) (var remassign);
       make (assignadd', assignment_op) (var plusassign);
       make (assignsub', assignment_op) (var minusassign);
@@ -849,8 +849,8 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     let double_ = R.(((star digit * codes "." * plus digit) + (plus digit * codes ".")) * (opt (codes "eE" * opt (codes "+-") * plus digit)) + plus digit * codes "eE" * opt (codes "+-") * plus digit) in
     Production.[
       make (u, ident) ident_;
-      make (u, string) R.(codes "\"" * (not_codes "\"\\" + codes "\\" * any) * codes "\"");
-      make (u, char) R.(codes "'" * (not_codes "'\\" + codes "\\" * any) * codes "'");
+      make (u, string) R.(codes "\"" * star (not_codes "\"\\" + codes "\\" * any) * codes "\"");
+      make (u, char) R.(codes "'" * star (not_codes "'\\" + codes "\\" * any) * codes "'");
       make (u, integer) integer_;
       make (u, unsigned) R.(integer_ * codes "uU");
       make (u, long) R.(integer_ * codes "lL");
@@ -906,7 +906,6 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (u, ternary_else) (codes ":");
       make (u, address) (codes "&");
       make (u, indirection) (codes "*");
-      make (u, pointer) (codes "*");
       make (u, bitcomp) (codes "~");
       make (u, lneg) (codes "!");
 
@@ -936,15 +935,15 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (u, lte) (text "<=");
       make (u, lshift) (text "<<");
       make (u, rshift) (text ">>");
-      make (u, times) (text "*");
-      make (u, div) (text "/");
+      make (u, ast) (text "*");
+      make (u, slash) (text "/");
       make (u, rem) (text "%");
       make (u, plusplus) (text "++");
       make (u, minusminus) (text "--");
       make (u, dot) (text ".");
       make (u, arrow) (text "->");
-      make (u, timesassign) (text "*=");
-      make (u, divassign) (text "/=");
+      make (u, astassign) (text "*=");
+      make (u, slashassign) (text "/=");
       make (u, remassign) (text "%=");
       make (u, plusassign) (text "+=");
       make (u, minusassign) (text "-=");
@@ -960,7 +959,16 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
 end)
 
 let _ =
-  let d = X.driver () in
+  (*let d = X.driver (X.tables ()) in
   X.Run.file (fun c -> d#read c) "test.c";
-  Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);
-  Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))
+  Fmt.pr "@[%a@]" Trace.pp d#trace*)
+  (*Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);
+  Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))*)
+
+  let t = X.tables () in
+  Array.iter (fun file ->
+      let d = X.driver t in
+      let t = Sys.time() in
+      X.Run.file (fun c -> d#read c) ("linear/" ^ file);
+      Fmt.pr "%s %b %f@." file d#accept (Sys.time() -. t))
+    (Sys.readdir "linear")
