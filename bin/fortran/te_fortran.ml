@@ -1,4 +1,4 @@
-open Te_bot
+open! Te_bot
 open Te_core
 module T = Types
 
@@ -8,6 +8,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   let s = T.Var.supply
   let (start, s) = variable s "start"
   let (ws, s) = variable s "ws"
+  let (newline, s) = variable s "newline"
   let (eos, s) = variable s "eos"
 
   let (executable_program, s) = variable s "executable_program"
@@ -525,6 +526,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
 
   let syntactic = [
     start;
+    eos;
     executable_program;
     program_unit;
     main_program;
@@ -853,7 +855,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   ]
   let lexical = [
     ws;
-    eos;
+    newline;
     ident;
     sign;
     letter;
@@ -1052,7 +1054,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     with_ws (T.Vars.of_list lexical) (var ws) Production.[
       make (u, start) R.(var executable_program * plus eof);
 
-      make (u, executable_program) R.(plus (var program_unit));
+      make (u, executable_program) R.(var ws * plus (var program_unit));
 
       make (u, program_unit) R.(var main_program + var function_subprogram + var subroutine_subprogram + var module_ + var block_data_subprogram);
 
@@ -1619,7 +1621,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
 
       make (u, label_do_stmt) R.(var lbl_def * var do_kw * var lbl_ref * opt (var comma) * var loop_control * var eos);
 
-      make (u, if_construct) R.(var if_then_stmt * star (var execution_part_construct) * star (var else_if_stmt * star (var execution_part_construct)) * opt (var else_stmt * star (var execution_part_construct) * var end_if_stmt));
+      make (u, if_construct) R.(var if_then_stmt * star (var execution_part_construct) * star (var else_if_stmt * star (var execution_part_construct)) * opt (var else_stmt * star (var execution_part_construct)) * var end_if_stmt);
 
       make (u, if_then_stmt) R.(var lbl_def * opt (var if_construct_name * var colon) * var if_kw * var lparen * var scalar_logical_expr * var rparen * var then_kw * var eos);
 
@@ -1702,6 +1704,8 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (u, block_data_body_construct) (var specification_part_construct);
 
       make (u, end_block_data_stmt) R.(var lbl_def * var end_kw * var block_kw * var data_kw * opt (var end_name) * var eos + var lbl_def * var end_kw * var eos);
+
+      make (u, eos) R.(plus (var newline));
     ]
 
   let scanner =
@@ -1917,12 +1921,21 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (u, z_kw) (text "Z");
 
       make (u, ws) R.(star (codes " \t"));
-      make (u, eos) R.(plus (codes "\n"));
+      make (u, newline) (codes "\n");
     ]
 end)
 
 let _ =
-  let d = X.driver () in
-  X.Run.file (fun c -> d#read c) "test.f90";
-  Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);
-  Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))
+  (*let d = X.driver (X.tables ()) in
+  X.Run.file (fun c -> d#read c) "seed.f90";
+  Fmt.pr "@[%a@]" Trace.pp d#trace;*)
+  (*Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);
+  Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))*)
+
+  let t = X.tables () in
+  Array.iter (fun file ->
+      let d = X.driver t in
+      let t = Sys.time() in
+      X.Run.file (fun c -> d#read c) ("linear/" ^ file);
+      Fmt.pr "%s %b %f@." file d#accept (Sys.time() -. t))
+    (Sys.readdir "linear")
