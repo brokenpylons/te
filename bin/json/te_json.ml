@@ -127,7 +127,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     let integer = R.(opt (codes "-") * (digit + range "1" "9" * digits)) in
 
     let hex = R.(digit + range "A" "F" + range "a" "f") in
-    let escape = R.(codes "\\/bfnrt" + codes "u" * hex * hex * hex * hex) in
+    let escape = R.(codes "\"\\/bfnrt" + codes "u" * hex * hex * hex * hex) in
     let characters = R.(diff (not_range "\u{0000}" "\u{0019}") (codes "\"\\") + codes "\\" * escape ) in
     Production.[
       make (u, number) R.(integer * opt fraction * opt exponent);
@@ -147,7 +147,19 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
 end)
 
 let _ =
-  let d = X.driver () in
-  X.Run.file (fun c -> d#read c) "test.json";
-  Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);
-  Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))
+  let d = X.driver (X.tables ()) in
+  let t = Sys.time() in
+  X.Run.file (fun c -> d#read c) "linear/sample998998.json";
+  Printf.printf "Execution time: %fs\n" (Sys.time() -. t);
+  Fmt.pr "%b@." d#accept;
+  Fmt.pr "@[%a@]" Trace.pp d#trace;
+  (*Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);*)
+  (*Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))*)
+
+  (*let t = X.tables () in
+  Array.iter (fun file ->
+      let d = X.driver t in
+      let t = Sys.time() in
+      X.Run.file (fun c -> d#read c) ("linear/" ^ file);
+      Fmt.pr "%s %b %f@." file d#accept (Sys.time() -. t))
+    (Sys.readdir "linear")*)
