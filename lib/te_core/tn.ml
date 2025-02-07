@@ -161,7 +161,7 @@ end = struct
 
   let comp x =
     {
-      eof = true;
+      eof = not x.eof;
       call = T.Vars.empty;
       return = T.Vars.empty;
       scan = T.Vars.empty;
@@ -573,13 +573,11 @@ module Var_state_to = struct
   let pp pp_p = pp Var_state.pp pp_p
 end
 
-(* Group by state *)
 module Noncanonical_items = struct
   include Multimap.Make3(T.State_to)(Items)
 
   let join nits =
     fold_multiple (fun _ its acc -> Items.union its acc) Items.empty nits
-
 end
 
 module A = struct
@@ -1240,8 +1238,8 @@ let build syntactic lexical longest_match start prods  =
 
   (*Fmt.pr "E %s@,"  (Dot.string_of_graph (to_dote back));*)
 
-  (*Fmt.pr "C %s@,"  (Dot.string_of_graph (to_dot'' c));
-  Fmt.pr "E %s@,"  (Dot.string_of_graph (to_dot''' e));*)
+  (*Fmt.pr "C %s@,"  (Dot.string_of_graph (to_dot'' c));*)
+  (*Fmt.pr "E %s@,"  (Dot.string_of_graph (to_dot''' e));*)
 
   (*print_productions eprods1;*)
 

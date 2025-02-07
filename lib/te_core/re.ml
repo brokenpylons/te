@@ -10,7 +10,7 @@ module Abstract = struct
     | Concat of bool * bool * 'ls t * 'ls t
     | Repeat of bool * bool * 'ls t * int
     | Star of 'ls t
-    | Comp of bool * bool * 'ls t
+    | Comp of bool * 'ls t
     | Union of bool * bool * 'ls t * 'ls t
   [@@deriving eq, ord]
 
@@ -24,7 +24,7 @@ module Abstract = struct
       | Union (_, _, x, y) -> Fmt.pf ppf "@[(@[%a@]@,|@,@[%a@])@]" go x go y
       | Repeat (_, _, x, i) -> Fmt.pf ppf "@[%a@,@[{%i}@]@]" go x i
       | Star x -> Fmt.pf ppf "@[(@[%a@]){*}@]" go x
-      | Comp (_, _, x) -> Fmt.pf ppf "@[¬(@[%a@])@]" go x
+      | Comp (_, x) -> Fmt.pf ppf "@[¬(@[%a@])@]" go x
     in go
 
   let map f =
@@ -37,7 +37,7 @@ module Abstract = struct
       | Union (m, h, x, y) -> Union (m, h, go x, go y)
       | Repeat (m, h, x, i) -> Repeat (m, h, go x, i)
       | Star x -> Star (go x)
-      | Comp (m, h, x) -> Comp (m, h, go x)
+      | Comp (m, x) -> Comp (m, go x)
     in go
 
   let flat_map f =
@@ -50,7 +50,7 @@ module Abstract = struct
       | Union (m, h, x, y) -> Union (m, h, go x, go y)
       | Repeat (m, h, x, i) -> Repeat (m, h, go x, i)
       | Star x -> Star (go x)
-      | Comp (m, h, x) -> Comp (m, h, go x)
+      | Comp (m, x) -> Comp (m, go x)
     in go
 
   module Is_nullable = struct
@@ -82,9 +82,6 @@ module Abstract = struct
       | 0 -> false
       | i when i > 0 -> x
       | _ -> assert false
-
-    let comp x =
-      not x
   end
 
   let is_nullable = function
@@ -96,7 +93,7 @@ module Abstract = struct
     | Union (m, _, _, _) -> m
     | Repeat (m, _, _, _) -> m
     | Star _ -> true
-    | Comp (m, _, _) -> m
+    | Comp (m, _) -> m
 
   let is_nullable' n =
     let rec go = function
@@ -108,7 +105,7 @@ module Abstract = struct
       | Union (_, _, x, y) -> Is_nullable.union (go x) (go y)
       | Repeat (_, _, x, i) -> Is_nullable.repeat (go x) i
       | Star _ -> true
-      | Comp (_, _, x) -> Is_nullable.comp (go x)
+      | Comp (_, x) -> Is_nullable.comp (go x)
     in go
 
   let is_nothing = function
@@ -120,7 +117,7 @@ module Abstract = struct
     | Union (_, h, _, _) -> h
     | Repeat (_, h, _, _) -> h
     | Star _ -> false
-    | Comp (_, h, _) -> h
+    | Comp (_, _) -> false
 
   let is_infinite =
     let rec go = function
@@ -132,7 +129,7 @@ module Abstract = struct
       | Union (_, _, x, y) -> go x || go y
       | Repeat (_, _, x, _) -> go x
       | Star _ -> true
-      | Comp (_, _, x) -> not (go x)
+      | Comp (_, _) -> true (* not (go x)*)
     in go
 
   let rec reverse = function
@@ -140,7 +137,7 @@ module Abstract = struct
     | Union (m, h, x, y) -> Union (m, h, reverse x, reverse y)
     | Repeat (m, h, x, i) -> Repeat (m, h, reverse x, i)
     | Star x -> Star (reverse x)
-    | Comp (m, h, x) -> Comp (m, h, reverse x)
+    | Comp (m, x) -> Comp (m, reverse x)
     | x -> x
 
   let nothing =
@@ -162,22 +159,22 @@ module Abstract = struct
     Union (Is_nullable.union (is_nullable x) (is_nullable y), Is_nothing.union (is_nothing x) (is_nothing y), x, y)
 
   let repeat x i =
-    Repeat (Is_nullable.repeat (is_nullable x) i, Is_nothing.repeat (is_nullable x) i, x, i)
+    Repeat (Is_nullable.repeat (is_nullable x) i, Is_nothing.repeat (is_nothing x) i, x, i)
 
   let star x =
     Star x
 
   let comp x =
-    Comp (Is_nullable.comp (is_nullable x), Is_nothing.comp (is_nothing x), x)
+    Comp (Is_nullable.comp (is_nullable x), x)
 
   let comp_nothing =
-    Comp (true, false, Nothing)
+    Comp (true, Nothing)
 
   let comp_null =
-    Comp (false, false, Null)
+    Comp (false, Null)
 
   let comp_any =
-    Comp (true, false, Any)
+    Comp (true, Any)
 
   module To_seq = struct
     let nothing =
@@ -234,7 +231,7 @@ module Abstract = struct
       | Union (_, _, x, y) -> To_seq.union cmp (go x) (go y)
       | Repeat (_, _, x, i) -> To_seq.repeat cmp (go x) i
       | Star x -> To_seq.star cmp (go x)
-      | Comp (_, _, x) ->  To_seq.comp cmp (try_any ()) (go x)
+      | Comp (_, x) ->  To_seq.comp cmp (try_any ()) (go x)
     in go
 
   let comp_lits x =
@@ -252,7 +249,7 @@ module Abstract = struct
     comp (repeat (comp x) i)
 
   let comp_star x =
-    comp x
+    comp (star (comp x))
 
   let opt x =
     union null x
@@ -335,7 +332,7 @@ module Concrete(Lits: LITS):
       | Union (_, _, x, y) -> Seq.append (go x) (go y)
       | Repeat (_, _, x, _) -> go x
       | Star x -> go x
-      | Comp (_, _, x) -> go x
+      | Comp (_, x) -> go x
     in go
 
   let first = 
@@ -347,8 +344,8 @@ module Concrete(Lits: LITS):
         (match go x, go y with
          | Nothing, x -> x
          | x, Nothing -> x
-         | Comp (_, _, Nothing), _ -> comp_nothing
-         | _, Comp (_, _, Nothing) -> comp_nothing
+         | Comp (_, Nothing), _ -> comp_nothing
+         | _, Comp (_, Nothing) -> comp_nothing
          | x, y -> Union (m, h, x, y))
 
       | Concat (m, h, x, y) ->
@@ -357,8 +354,8 @@ module Concrete(Lits: LITS):
          | _, Nothing -> nothing
          | Null, x -> x
          | x, Null -> x
-         | Comp (_, _, Nothing), Comp (_, _, Nothing) -> comp_nothing
-         | Comp (_, _, Null), Comp (_, _, Null) -> comp_null
+         | Comp (_, Nothing), Comp (_, Nothing) -> comp_nothing
+         | Comp (_, Null), Comp (_, Null) -> comp_null
          | x, y -> Concat (m, h, x, y))
 
       | Repeat (_, _, _, 0) -> null
@@ -366,27 +363,26 @@ module Concrete(Lits: LITS):
         (match go x with
          | Nothing -> nothing
          | Null -> nothing
-         | Comp (_, _, Nothing) -> comp_nothing
-         | Comp (_, _, Null) -> comp_null
+         | Comp (_, Nothing) -> comp_nothing
+         | Comp (_, Null) -> comp_null
          | x -> Repeat (m, h, x, i))
 
       | Star x ->
         (match go x with
          | Null -> null
          | Nothing -> null
-         | Comp (_, _, Nothing) -> comp_nothing
-         | Comp (_, _, Null) -> comp_nothing
+         | Comp (_, Nothing) -> comp_nothing
+         | Comp (_, Null) -> comp_nothing
          | Star x -> x
          | x -> Star x)
 
-      | Comp (m, h, x) ->
+      | Comp (m, x) ->
         (match go x with
-         | Comp (_, _, x) -> x
-         | x -> Comp (m, h, x))
+         | Comp (_, x) -> x
+         | x -> Comp (m, x))
 
       | x -> x
-    in
-    go
+    in go
 
   let rec collect =
     let rec go = function
@@ -398,11 +394,10 @@ module Concrete(Lits: LITS):
         Seq.return (Repeat (m, h, normalize x, i))
       | Star x ->
         Seq.return (Star (normalize x))
-      | Comp (m, h, x) ->
-        Seq.return (Comp (m, h, normalize x))
+      | Comp (m, x) ->
+        Seq.return (Comp (m, normalize x))
       | x -> Seq.return x
-    in
-    go
+    in go
   and normalize x =
     collect x
     |> Seq.fold_left union nothing
@@ -427,7 +422,7 @@ module Concrete(Lits: LITS):
        | i -> concat (derivative s x) (repeat x (pred i)))
     | Star x ->
       concat (derivative s x) (star x)
-    | Comp (_, _, x) ->
+    | Comp (_, x) ->
       comp (derivative s x)
 end
 
