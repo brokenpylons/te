@@ -1236,6 +1236,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       cobol_word;
       level_number;
       numeric;
+      integer;
       picture_string;
     ]
 
@@ -2139,17 +2140,19 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   end)
 
 let _ =
-  let d = X.driver (X.tables ()) in
-  X.Run.file (fun c -> d#read c) "linear/sample5005.cbl";
+  (*let d = X.driver (X.tables ()) in*)
+  (*X.Run.file (fun c -> d#read c) "linear/sample108108.cbl";*)
   (*Fmt.pr "@[%b@]" d#accept;*)
   (*Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);*)
-  Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))
+  (*Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))*)
   (*Fmt.pr "@[%a@]" Trace.pp d#trace;*)
 
-  (*let t = X.tables () in
+  let t = X.tables () in
+  let fs = Sys.readdir "linear" in
+  Array.sort String.compare fs;
   Array.iter (fun file ->
       let d = X.driver t in
       let t = Sys.time() in
       X.Run.file (fun c -> d#read c) ("linear/" ^ file);
       Fmt.pr "%s %b %f@." file d#accept (Sys.time() -. t))
-    (Sys.readdir "linear")*)
+    fs
