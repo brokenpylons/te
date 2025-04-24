@@ -235,11 +235,12 @@ module Abstract = struct
       | Comp (_, x) ->  To_seq.comp cmp (try_any ()) (go x)
     in go
 
-  let dehance gen map_l map_r =
+  let dehance supply gen f =
     let (let*) (x, xp) f =
       let (y, yp) = f x in
       (y, xp @ yp)
     in
+    let supply = ref supply in
     let return x = (x, []) in
     let rec go = function
       | Nothing -> return Nothing
@@ -258,9 +259,10 @@ module Abstract = struct
         let* x = go x in
         return (Repeat (m, h, x, i))
       | Star x ->
-        let var = gen () in
+        let var, supply' = gen !supply in
+        supply := supply';
         let* x = go x in
-        lits (map_r var), [(map_l var, union (concat (lits (map_r var)) x) null)]
+        lits (f var), [(var, union (concat (lits (f var)) x) null)]
       | Comp (m, x) ->
         let* x = go x in
         return (Comp (m, x))

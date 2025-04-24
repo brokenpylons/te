@@ -123,19 +123,11 @@ module Context: CONTEXT = struct
         Production.make (Production.lhs prod) (with_ws_re lexical ws (Production.rhs prod)))
 
   let dehance_re supply lbl r =
-    let l = ref supply in
-    let gen () =
-      let (var, l') = T.Var.synthetic !l in
-      l := l';
-      var
-    in
-    let r, loop_prods = R.dehance
-        gen
-        (fun var -> (lbl, var))
+    let r, loop_prods = R.dehance supply T.Var.synthetic
         (fun var -> T.Symbols.singleton (T.Symbol.Var var))
         r
     in
-    r, List.map (uncurry Production.make) loop_prods
+    r, List.map (fun (var, rhs) -> Production.make (lbl, var) rhs) loop_prods
 
   let dehance supply lbl prods =
     let prods, loop_prodss =
