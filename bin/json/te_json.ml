@@ -1,73 +1,42 @@
-open Te_bot
+open! Te_bot
 open Te_core
 module T = Types
 
 module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   open Context
 
-  let Vector.[
-      start;
-      json;
-      value;
-      object_;
-      array;
-      string;
-      number;
-      true_;
-      false_;
-      null_;
-      members;
-      member;
-      elements;
-      element;
-      lbrac;
-      rbrac;
-      lbrak;
-      rbrak;
-      comma;
-      colon;
-      ws;
+  let s = T.Var.supply
+  let (start, s) = variable s "start"
+  let (json, s) = variable s "json"
+  let (value, s) = variable s "value"
+  let (object_, s) = variable s "object_"
+  let (array, s) = variable s "array"
+  let (string, s) = variable s "string"
+  let (number, s) = variable s "number"
+  let (true_, s) = variable s "true_"
+  let (false_, s) = variable s "false_"
+  let (null_, s) = variable s "null_"
+  let (members, s) = variable s "members"
+  let (member, s) = variable s "member"
+  let (elements, s) = variable s "elements"
+  let (element, s) = variable s "element"
+  let (lbrac, s) = variable s "lbrac"
+  let (rbrac, s) = variable s "rbrac"
+  let (lbrak, s) = variable s "lbrak"
+  let (rbrak, s) = variable s "rbrak"
+  let (comma, s) = variable s "comma"
+  let (colon, s) = variable s "colon"
+  let (ws, s) = variable s "ws"
 
-      u;
-      object';
-      array';
-      string';
-      number';
-      true';
-      false';
-      null';
-    ] = variables Vector.[
-      "start";
-      "json";
-      "value";
-      "object";
-      "array";
-      "string";
-      "number";
-      "true";
-      "false";
-      "null";
-      "members";
-      "member";
-      "elements";
-      "element";
-      "lbrac";
-      "rbrac";
-      "lbrak";
-      "rbrak";
-      "comma";
-      "colon";
-      "ws";
+  let (u, s) = variable s "u"
+  let (object', s) = variable s "object'"
+  let (array', s) = variable s "array'"
+  let (string', s) = variable s "string'"
+  let (number', s) = variable s "number'"
+  let (true', s) = variable s "true'"
+  let (false', s) = variable s "false'"
+  let (null', _) = variable s "null'"
 
-      "_";
-      "Object";
-      "Array";
-      "String";
-      "Number";
-      "True";
-      "False";
-      "Null";
-    ]
   let syntactic = [
     json;
     value;
@@ -97,9 +66,9 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   let start = start
 
   let parser =
-    with_ws (T.Vars.of_list lexical) (var ws) Production.[
+    with_ws (T.Vars.of_list lexical) (var ws)  (Production.[
       make (u, start) R.(var json * plus eof);
-
+    ] @ dehance s u Production.[
       make (u, json) R.(var ws * var value);
 
       make (object', value) (var object_);
@@ -117,7 +86,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (u, array) R.(var lbrak * opt (var elements) * var rbrak);
       make (u, elements) R.(star (var element * var comma) * var element);
       make (u, element) (var value);
-    ]
+    ])
 
   let scanner =
     let digit = range "0" "9" in
@@ -147,19 +116,25 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
 end)
 
 let _ =
-  let d = X.driver (X.tables ()) in
+  (*let d = X.driver (X.tables ()) in
   let t = Sys.time() in
-  X.Run.file (fun c -> d#read c) "linear/sample998998.json";
+  X.Run.file (fun c -> d#read c) "test.json";
   Printf.printf "Execution time: %fs\n" (Sys.time() -. t);
-  Fmt.pr "%b@." d#accept;
-  Fmt.pr "@[%a@]" Trace.pp d#trace;
+  Fmt.pr "%b@." d#accept;*)
+  (*Fmt.pr "@[%a@]" Trace.pp d#trace;*)
   (*Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);*)
   (*Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))*)
 
-  (*let t = X.tables () in
+  let t = X.tables () in
+  let fs = Sys.readdir "linear" in
+  Array.sort (fun x y ->
+      let c = Int.compare (String.length x) (String.length y) in
+      if c <> 0 then c else
+      String.compare x y)
+    fs;
   Array.iter (fun file ->
       let d = X.driver t in
       let t = Sys.time() in
       X.Run.file (fun c -> d#read c) ("linear/" ^ file);
       Fmt.pr "%s %b %f@." file d#accept (Sys.time() -. t))
-    (Sys.readdir "linear")*)
+    fs

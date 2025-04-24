@@ -224,6 +224,10 @@ module Var = struct
         (supply, (x, Some label)))
       supply labels
 
+  let synthetic supply =
+    let (x, supply) = Supply.get supply in
+    (x, None), supply
+
   let make' supply label =
     let (x, supply) = Supply.get supply in
     (x, Some label), supply
@@ -232,10 +236,10 @@ module Var = struct
 
   let value_pp ppf = function
     | Some label -> Fmt.string ppf label
-    | None -> Fmt.string ppf "?"
+    | None -> Fmt.pf ppf "?"
 
-  let pp ppf (_, label) =
-    Fmt.pf ppf "@[%a@]" value_pp label
+  let pp ppf (x, label) =
+    Fmt.pf ppf "@[%a(%i)@]" value_pp label x
 end
 module Vars = struct
   include Balanced_binary_tree.Set.Size(Var)

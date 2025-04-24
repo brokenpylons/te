@@ -11,6 +11,7 @@ module Abstract: sig
 
   val map: ('a -> 'b) -> 'a t -> 'b t
   val flat_map: ('a -> 'b t) -> 'a t -> 'b t
+  val dehance: (unit -> 'a) -> ('a -> 'b) -> ('a -> 'c)  -> 'c t -> 'c t * ('b * 'c t) list
 
   val is_nullable: _ t -> bool
   val is_nothing: _ t -> bool

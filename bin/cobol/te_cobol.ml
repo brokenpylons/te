@@ -1243,8 +1243,9 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     let start = start
 
     let parser =
-      with_ws (T.Vars.of_list lexical) (var ws) Production.[
+      with_ws (T.Vars.of_list lexical) (var ws) @@ (Production.[
           make (u, start) R.(var cobol_source_program * plus eof);
+        ] @ (*dehance s u*) Production.[
 
           make (u, mode) (var cobol_word);
 
@@ -1759,7 +1760,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
           make (u, figurative_constant) R.(var zero_kw + var zeros_kw + var zeroes_kw + var space_kw + var spaces_kw + var high_value_kw + var high_values_kw + var low_value_kw + var low_values_kw + var quote_kw + var quotes_kw + var all_kw * var literal + var null_kw + var nulls_kw);
 
           make (u, usage_keyword) R.(var binary_kw + var comp_kw + var comp_1_kw + var comp_2_kw + var comp_3_kw + var comp_4_kw + var comp_5_kw + var computational_kw + var computational_1_kw + var computational_2_kw + var computational_3_kw + var computational_4_kw + var computational_5_kw + var display_kw + var display_1_kw + var index_kw + var packed_decimal_kw + var pointer_kw);
-        ]
+        ])
 
     let scanner =
       let digit = range "0" "9" in
@@ -2140,19 +2141,26 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   end)
 
 let _ =
-  (*let d = X.driver (X.tables ()) in*)
-  (*X.Run.file (fun c -> d#read c) "linear/sample108108.cbl";*)
-  (*Fmt.pr "@[%b@]" d#accept;*)
+  let d = X.driver (X.tables ()) in
+  let t = Sys.time() in
+  Fmt.pr "GO@.";
+  X.Run.file (fun c -> d#read c) "linear/sample72072.cbl";
+  Fmt.pr "%b %f@." d#accept (Sys.time() -. t)
   (*Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);*)
   (*Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))*)
   (*Fmt.pr "@[%a@]" Trace.pp d#trace;*)
 
-  let t = X.tables () in
+  (*let t = X.tables () in
   let fs = Sys.readdir "linear" in
-  Array.sort String.compare fs;
+  Array.sort (fun x y ->
+      let c = Int.compare (String.length x) (String.length y) in
+      if c <> 0 then c else
+      String.compare x y)
+    fs;
   Array.iter (fun file ->
       let d = X.driver t in
       let t = Sys.time() in
+      Fmt.pr "%s@." file;
       X.Run.file (fun c -> d#read c) ("linear/" ^ file);
       Fmt.pr "%s %b %f@." file d#accept (Sys.time() -. t))
-    fs
+    fs*)

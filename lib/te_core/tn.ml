@@ -1194,11 +1194,18 @@ let to_dote a = PA.to_dot ~string_of_labels:(Fmt.to_to_string Items.pp) ~string_
 
 let print_productions prods =
   Seq.iter (fun prod ->
+      Fmt.pr "@[%a@]@." Production.pp prod)
+    prods
+
+let print_productions' prods =
+  Seq.iter (fun prod ->
       Fmt.pr "@[@[%a@] ::= @[%s@]@]@." Enhanced_var.pp prod.Enhanced_production.lhs (Dot.string_of_graph @@ to_dot''' (prod.Enhanced_production.rhs)))
     prods
 
 let build syntactic lexical longest_match start prods  =
   assert (T.Vars.disjoint syntactic lexical);
+
+  print_productions prods;
 
   let iprods = index_productions ~supply:(T.State.fresh_supply ()) prods in
   print_endline "CONSTRUCT";

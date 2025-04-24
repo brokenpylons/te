@@ -1,5 +1,6 @@
 open Te_bot
-open! Prelude 
+open! Prelude
+module T = Types
 
 module Abstract = struct
   type 'ls t =
@@ -232,6 +233,37 @@ module Abstract = struct
       | Repeat (_, _, x, i) -> To_seq.repeat cmp (go x) i
       | Star x -> To_seq.star cmp (go x)
       | Comp (_, x) ->  To_seq.comp cmp (try_any ()) (go x)
+    in go
+
+  let dehance gen map_l map_r =
+    let (let*) (x, xp) f =
+      let (y, yp) = f x in
+      (y, xp @ yp)
+    in
+    let return x = (x, []) in
+    let rec go = function
+      | Nothing -> return Nothing
+      | Null ->  return Null
+      | Any -> return Any
+      | Lits ls -> return (Lits ls)
+      | Concat (m, h, x, y) ->
+        let* x = go x in
+        let* y = go y in
+        return (Concat (m, h, x, y))
+      | Union (m, h, x, y) ->
+        let* x = go x in
+        let* y = go y in
+        return (Union (m, h, x, y))
+      | Repeat (m, h, x, i) ->
+        let* x = go x in
+        return (Repeat (m, h, x, i))
+      | Star x ->
+        let var = gen () in
+        let* x = go x in
+        lits (map_r var), [(map_l var, union (concat (lits (map_r var)) x) null)]
+      | Comp (m, x) ->
+        let* x = go x in
+        return (Comp (m, x))
     in go
 
   let comp_lits x =
