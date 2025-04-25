@@ -1216,21 +1216,19 @@ let build syntactic lexical longest_match start prods  =
 
   print_endline "LR";
   let lr_supply1, lr_supply2 = Supply.split2 @@ T.State.fresh_supply () in
-  let p =
-    lr ~supply:lr_supply1 c
-  in
+  let p = lr ~supply:lr_supply1 c in
 
   print_endline "ENHANCE";
   let e = enhance p c in
-  let eprods1 = enhanced_productions e in
+  let eprods = enhanced_productions e in
 
   print_endline "ANA";
-  let analysis = Analysis.compute eprods1 in
+  let analysis = Analysis.compute eprods in
 
   print_endline "LOOK";
 
-  let ieprods1 = index_enhanced_productions eprods1 in
-  let lookahead' = Lookahead.compute analysis ieprods1 lexical longest_match in
+  let ieprods = index_enhanced_productions eprods in
+  let lookahead' = Lookahead.compute analysis ieprods lexical longest_match in
   let nullable' = nullable analysis in
 
   print_endline "NC";
@@ -1239,7 +1237,7 @@ let build syntactic lexical longest_match start prods  =
     |> noncanonical_subset ~supply:lr_supply2
   in
 
-  let back = back lexical eprods1 in
+  let back = back lexical eprods in
 
   print_endline "END";
 
