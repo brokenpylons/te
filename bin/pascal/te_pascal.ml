@@ -452,9 +452,8 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   let start = start
 
   let parser =
-    with_ws (T.Vars.of_list lexical) (var ws) Production.[
+    with_ws (T.Vars.of_list lexical) (var ws) @@ unextend s u Production.[
       make (u, start) R.(var program * plus eof);
-    ] @ dehance s u Production.[
 
       make (block', block) R.(opt (var label_declaration_part) * opt (var constant_definition_part) * opt (var type_definition_part) * opt (var variable_declaration_part) * star (var procedure_and_function_declaration_part) * var statement_part);
 

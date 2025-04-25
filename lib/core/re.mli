@@ -11,7 +11,7 @@ module Abstract: sig
 
   val map: ('a -> 'b) -> 'a t -> 'b t
   val flat_map: ('a -> 'b t) -> 'a t -> 'b t
-  val dehance: 'supply -> ('supply -> 'a * 'supply) -> ('a -> 'ls)  -> 'ls t -> 'ls t * ('a * 'ls t) list
+  val unextend: 'supply -> ('supply -> 'a * 'supply) -> ('a -> 'ls)  -> 'ls t -> 'ls t * ('a * 'ls t) list
 
   val is_nullable: _ t -> bool
   val is_nothing: _ t -> bool

@@ -41,7 +41,7 @@ module type CONTEXT = sig
   val range: string -> string -> T.Symbols.t R.t
   val not_range: string -> string -> T.Symbols.t R.t
   val with_ws: T.Vars.t -> T.Symbols.t R.t -> Production.t list -> Production.t list
-  val dehance: T.Var.pre Supply.t -> T.Var.t -> Production.t list -> Production.t list
+  val unextend: T.Var.pre Supply.t -> T.Var.t -> Production.t list -> Production.t list
 end
 
 module type SPEC' = functor (Context: CONTEXT) -> sig
@@ -122,19 +122,19 @@ module Context: CONTEXT = struct
     List.map (fun prod ->
         Production.make (Production.lhs prod) (with_ws_re lexical ws (Production.rhs prod)))
 
-  let dehance_re supply lbl r =
-    let r, loop_prods = R.dehance supply T.Var.synthetic
+  let unextend_re supply lbl r =
+    let r, loop_prods = R.unextend supply T.Var.synthetic
         (fun var -> T.Symbols.singleton (T.Symbol.Var var))
         r
     in
     r, List.map (fun (var, rhs) -> Production.make (lbl, var) rhs) loop_prods
 
-  let dehance supply lbl prods =
+  let unextend supply lbl prods =
     let prods, loop_prodss =
       prods
       |> List.fold_left_map (fun supply prod ->
           let supply, supply' = Supply.split2 supply in
-          let rhs', loop_prods = dehance_re supply' lbl (Production.rhs prod) in
+          let rhs', loop_prods = unextend_re supply' lbl (Production.rhs prod) in
           (supply, (Production.make (Production.lhs prod) rhs', loop_prods)))
         supply
       |> List.split % snd

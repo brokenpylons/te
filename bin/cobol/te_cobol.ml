@@ -1245,7 +1245,6 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     let parser =
       with_ws (T.Vars.of_list lexical) (var ws) @@ (Production.[
           make (u, start) R.(var cobol_source_program * plus eof);
-        ] @ (*dehance s u*) Production.[
 
           make (u, mode) (var cobol_word);
 

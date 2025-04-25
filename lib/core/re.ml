@@ -235,7 +235,7 @@ module Abstract = struct
       | Comp (_, x) ->  To_seq.comp cmp (try_any ()) (go x)
     in go
 
-  let dehance supply gen f =
+  let unextend supply gen f =
     let (let*) (x, xp) f =
       let (y, yp) = f x in
       (y, xp @ yp)
