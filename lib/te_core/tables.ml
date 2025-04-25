@@ -45,11 +45,11 @@ let back b =
           |> Back_map.of_seq_multiple))
   |> T.State_pair_to.of_seq
 
-let accept start a =
+let accept start lookahead' a =
   A.states a
   |> T.States.to_seq
   |> Seq.map (fun s -> 
-      (s, Tn.accept start s a))
+      (s, Tn.accept start lookahead' s a))
   |> T.State_to.of_seq
 
 
@@ -73,7 +73,7 @@ module Unoptimized = struct
       orders = orders lexical g;
       actions = actions lexical lookahead' nullable' g;
       back = back b;
-      accept = accept start g;
+      accept = accept start lookahead' g;
     }
 
   let lits_of_symbol = function

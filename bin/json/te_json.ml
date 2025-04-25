@@ -66,9 +66,8 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   let start = start
 
   let parser =
-    with_ws (T.Vars.of_list lexical) (var ws)  (Production.[
+    with_ws (T.Vars.of_list lexical) (var ws) @@ dehance s u (Production.[
       make (u, start) R.(var json * plus eof);
-    ] @ dehance s u Production.[
       make (u, json) R.(var ws * var value);
 
       make (object', value) (var object_);

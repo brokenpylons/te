@@ -1142,12 +1142,13 @@ let reduce lexical lookahead' nullable' s' a =
                              then Lists (resolve_tail nullable' rhs)
                              else Complete))))
 
-let accept start s' a =
+let accept start lookahead' s' a =
   let (let*) = Seq.bind in
   Seq.exists Fun.id @@
-  let* (_, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
-  let* {lhs = (_, var); is_reduce; _} = Items.to_seq its in
-  Seq.return @@ (T.Var.equal var start && is_reduce)
+  let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
+  let* {number; lhs = (_, var); state; _} = Items.to_seq its in
+  let right_nulled = (lookahead' number s state).Lookahead.right_nulled in
+  Seq.return @@ (T.Var.equal var start && right_nulled)
 
 let actions lexical lookahead' nullable s a =
   let fs = List.to_seq @@ [shift; load; matches; predictions; null; shift_null; reduce] in

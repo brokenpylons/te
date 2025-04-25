@@ -16,6 +16,7 @@ let test_case driver Spec.{name; input; trace} =
       let d = driver () in
       List.iter d#read input;
       extra_info d;
+      Alcotest.check Alcotest.bool "accept" true d#accept;
       Alcotest.check (module Trace) "trace" trace d#trace)
 
 let test_cases driver tests =
@@ -33,6 +34,36 @@ module Noop = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let parser =
       Production.[
         make (u, s') R.(plus eof);
+      ]
+
+    let scanner = []
+
+    let tests =
+      [
+        Test.{
+          name = "base";
+          input = [eof];
+          trace = Trace.[
+              load eof (vertex 0 0) (vertex 1 1)
+            ]
+        }
+      ]
+  end)
+
+
+module Noop2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
+    open Context
+
+    let Vector.[s'; s; u] = variables Vector.["S'"; "S"; "_"]
+    let syntactic = [s'; s]
+    let lexical = []
+
+    let start = s'
+
+    let parser =
+      Production.[
+        make (u, s') R.(eof * var s);
+        make (u, s) R.(var s * eof + null);
       ]
 
     let scanner = []
@@ -1827,6 +1858,8 @@ module Lookahead2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     ]
   end)
 
+
+
 (*module Example = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     open Context
 
@@ -1917,6 +1950,7 @@ module Lookahead2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
 let () =
   Alcotest.run "parser" [
     "noop", test_cases Noop.driver Noop.tests;
+    "noop2", test_cases Noop2.driver Noop2.tests;
     "null", test_cases Null.driver Null.tests;
     "null_reduce", test_cases Null_reduce.driver Null_reduce.tests;
     "null_shift", test_cases Null_shift.driver Null_shift.tests;
