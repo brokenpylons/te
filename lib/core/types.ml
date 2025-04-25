@@ -343,10 +343,10 @@ module Symbols = struct
     {t with delegate = true}
 
   let add_vars x t =
-    {t with vars = x}
+    {t with vars = Vars.union x t.vars}
 
   let add_codes x t =
-    {t with codes = x}
+    {t with codes = Codes.union x t.codes}
 
   let is_eof x= x.eof
   let is_delegate x= x.delegate
