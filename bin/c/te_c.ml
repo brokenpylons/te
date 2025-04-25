@@ -5,7 +5,7 @@ module T = Types
 module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   open Context
 
-  let s = T.Var.supply
+  let s = variable_supply
   let (start, s) = variable s "start"
   let (ws, s) = variable s "ws"
 

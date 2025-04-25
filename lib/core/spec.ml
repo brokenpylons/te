@@ -31,6 +31,7 @@ module type CONTEXT = sig
   end
   val variables: (string, 'a) Vector.t -> (T.Var.t, 'a) Vector.t
   val variable: T.Var.pre Supply.t -> string -> (T.Var.t * T.Var.pre Supply.t)
+  val variable_supply: T.Var.pre Supply.t
   val var: T.Var.t -> T.Symbols.t R.t
   val codes: string -> T.Symbols.t R.t
   val eof: T.Symbols.t R.t
@@ -88,6 +89,7 @@ module Context: CONTEXT = struct
   end
   let variables vs = T.Var.make ~supply:T.Var.supply vs
   let variable supply v = T.Var.make' supply v
+  let variable_supply = T.Var.supply
   let var x = R.lits (T.Symbols.of_vars (T.Vars.singleton x))
   let codes x = R.lits (T.Symbols.of_codes (T.Codes.of_string x))
   let eof = R.lits T.Symbols.eof
