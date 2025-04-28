@@ -9,33 +9,13 @@ type test =
     trace: Trace.t;
   }
 
-module Element = struct
-  module R = Re.Abstract
-
-  type t =
-    | Symbols of T.Symbols.t
-    | Text of string
-
-  let of_symbols x = 
-    Symbols x
-
-  let of_text x =
-    Text x
-
-  let expand = function
-    | Symbols x -> R.lits x
-    | Text s ->
-      List.fold_right (fun c acc -> R.(lits (T.Symbols.of_codes @@ T.Codes.of_int c) * acc))
-        (T.explode s) R.null
-end
-
 module type CONTEXT = sig
   module R = Re.Abstract
   module Production: sig
     type t
     val lhs: t -> T.Labeled_var.t
-    val rhs: t -> Element.t R.t
-    val make: T.Labeled_var.t -> Element.t R.t -> t
+    val rhs: t -> T.Symbols.t R.t
+    val make: T.Labeled_var.t -> T.Symbols.t R.t -> t
   end
 
   module Test: sig
@@ -52,16 +32,16 @@ module type CONTEXT = sig
   val variables: (string, 'a) Vector.t -> (T.Var.t, 'a) Vector.t
   val variable: T.Var.pre Supply.t -> string -> (T.Var.t * T.Var.pre Supply.t)
   val variable_supply: T.Var.pre Supply.t
-  val var: T.Var.t -> Element.t R.t
-  val codes: string -> Element.t R.t
-  val eof: Element.t R.t
+  val var: T.Var.t -> T.Symbols.t R.t
+  val codes: string -> T.Symbols.t R.t
+  val eof: T.Symbols.t R.t
 
   (* Extended *)
-  val not_codes: string -> Element.t R.t
-  val text: string -> Element.t R.t
-  val range: string -> string -> Element.t R.t
-  val not_range: string -> string -> Element.t R.t
-  val with_ws: T.Vars.t -> Element.t R.t -> Production.t list -> Production.t list
+  val not_codes: string -> T.Symbols.t R.t
+  val text: string -> T.Symbols.t R.t
+  val range: string -> string -> T.Symbols.t R.t
+  val not_range: string -> string -> T.Symbols.t R.t
+  val with_ws: T.Vars.t -> T.Symbols.t R.t -> Production.t list -> Production.t list
   val unextend: T.Var.pre Supply.t -> T.Var.t -> Production.t list -> Production.t list
 end
 
@@ -90,7 +70,7 @@ end
 module Context: CONTEXT = struct
   module R = Re.Abstract
   module Production = struct
-    type t = T.Labeled_var.t * Element.t R.t
+    type t = T.Labeled_var.t * T.Symbols.t R.t
     let make lhs rhs = (lhs, rhs)
     let lhs = fst
     let rhs = snd
@@ -110,15 +90,16 @@ module Context: CONTEXT = struct
   let variables vs = T.Var.make ~supply:T.Var.supply vs
   let variable supply v = T.Var.make' supply v
   let variable_supply = T.Var.supply
-
-  let var x = R.lits (Element.of_symbols @@ T.Symbols.of_vars @@ T.Vars.singleton x)
-  let codes x = R.lits (Element.of_symbols @@ T.Symbols.of_codes @@ T.Codes.of_string x)
-  let eof = R.lits (Element.of_symbols @@ T.Symbols.eof)
-  let not_codes x = R.lits (Element.of_symbols @@ T.Symbols.of_codes (T.Codes.comp @@ T.Codes.of_string x))
+  let var x = R.lits (T.Symbols.of_vars (T.Vars.singleton x))
+  let codes x = R.lits (T.Symbols.of_codes (T.Codes.of_string x))
+  let eof = R.lits T.Symbols.eof
 
   (* Extended *)
+  let not_codes x = R.lits (T.Symbols.of_codes (T.Codes.comp @@ T.Codes.of_string x))
+
   let text s =
-    R.lits (Element.of_text s)
+    List.fold_right (fun c acc -> R.(lits (T.Symbols.of_codes @@ T.Codes.of_int c) * acc))
+      (T.explode s) R.null
 
   let range_codes from to_ =
     let lf = List.the @@ T.explode from
@@ -126,21 +107,15 @@ module Context: CONTEXT = struct
     T.Codes.of_int_list @@ List.range lf lt
 
   let range from to_ =
-    R.lits (Element.of_symbols @@ T.Symbols.of_codes @@ range_codes from to_)
+    R.lits (T.Symbols.of_codes (range_codes from to_))
 
   let not_range from to_ =
-    R.lits (Element.of_symbols @@ T.Symbols.of_codes (T.Codes.comp (range_codes from to_)))
+    R.lits (T.Symbols.of_codes (T.Codes.comp (range_codes from to_)))
 
   let with_ws_re lexical ws r =
     R.flat_map (fun x ->
-        let cond =
-          match x with
-          | Element.Symbols x ->
-            let vars = T.Symbols.to_vars x in
-            not (T.Vars.disjoint lexical vars)
-          | Text _ -> true
-        in
-        if cond 
+        let vars = T.Symbols.to_vars x in
+        if not (T.Vars.disjoint lexical vars)
         then R.concat (R.lits x) ws
         else R.lits x)
       r
@@ -151,7 +126,7 @@ module Context: CONTEXT = struct
 
   let unextend_re supply lbl r =
     let r, loop_prods = R.unextend supply T.Var.synthetic
-        (fun var -> Element.of_symbols @@ T.Symbols.singleton (T.Symbol.Var var))
+        (fun var -> T.Symbols.singleton (T.Symbol.Var var))
         r
     in
     r, List.map (fun (var, rhs) -> Production.make (lbl, var) rhs) loop_prods
@@ -177,10 +152,7 @@ module Build(Spec: SPEC') = struct
     List.to_seq x
     |> Seq.map (fun p -> Tn.Production.{
         lhs = Context.Production.lhs p;
-        rhs =
-          Context.Production.rhs p
-          |> Re.Abstract.flat_map Element.expand
-          |> Re.Abstract.map Tn.Lits.of_symbols 
+        rhs = Re.Abstract.map Tn.Lits.of_symbols (Context.Production.rhs p);
       })
 
   let tables () =
@@ -219,10 +191,7 @@ module Test(Spec: SPEC) = struct
     List.to_seq x
     |> Seq.map (fun p -> Tn.Production.{
         lhs = Context.Production.lhs p;
-        rhs =
-          Context.Production.rhs p
-          |> Re.Abstract.flat_map Element.expand
-          |> Re.Abstract.map Tn.Lits.of_symbols 
+        rhs = Re.Abstract.map Tn.Lits.of_symbols (Context.Production.rhs p);
       })
 
   let driver () =
