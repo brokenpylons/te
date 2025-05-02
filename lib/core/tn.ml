@@ -713,7 +713,7 @@ let call_closure a qs =
 
 let scan_closure a qs =
   let module C = Closure.Make(T.States) in
-  T.States.diff (C.closure (fun q -> A.goto q Lits.is_scan a) qs) qs
+  C.closure (fun q -> A.goto q Lits.is_scan a) qs
 
 let lr ~supply a =
   let module Gen = A.Gen(T.State_index(T.States_to)) in
@@ -736,7 +736,7 @@ let noncanonical_subset ~supply a =
   let module Gen = A.Gen(T.Preserve_state_index) in
   Gen.unfold ~supply ~merge:Lits.union (fun _ from ->
       let module R = Refine.Map(Lits)(T.States) in
-      let cl = scan_closure a from in
+      let cl = T.States.diff (scan_closure a from) from in
       let next =
         A.adjacent_multiple from a
         |> Seq.map (fun (s, lts) ->
