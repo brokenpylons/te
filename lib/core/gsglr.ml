@@ -131,7 +131,7 @@ module Make(Tables: TABLES) = struct
       method private scan_back ~history v ns paths p =
         (*Fmt.pr "SB %a %a %a@," T.Vertex.pp v T.Vertices.pp history (Fmt.parens Paths.pp) paths;*)
         if T.Vertices.mem v history then
-          Paths.empty
+          assert false
         else
           let history = T.Vertices.add v history in
           if Paths.is_empty paths

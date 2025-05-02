@@ -56,6 +56,7 @@ module Lits: sig
   val extract_codes: t -> t
 
   val of_symbols: T.Symbols.t -> t
+  (*val to_symbols: t -> T.Symbols.t*)
 
   val is_delegate: t -> bool
   val delegate: t -> T.Vars.t
@@ -502,7 +503,15 @@ module Rhs = struct
 end
 
 module Preitem = struct
-  type t = {number: int; lhs: T.Labeled_var.t; rhs: Rhs.t; is_kernel: bool; is_reduce: bool; distance: Size.t}
+  type t =
+    {
+      number: int;
+      lhs: T.Labeled_var.t;
+      rhs: Rhs.t;
+      is_kernel: bool;
+      is_reduce: bool;
+      distance: Size.t
+    }
   [@@deriving eq, ord]
 
   let pp ppf {number; lhs; rhs; is_kernel; is_reduce; distance} =
@@ -517,7 +526,16 @@ end
 module Preitem_to = Balanced_binary_tree.Map.Size(Preitem)
 
 module Item = struct
-  type t = {number: int; state: T.State.t; lhs: T.Labeled_var.t; rhs: Rhs.t; is_kernel: bool; is_reduce: bool; distance: Size.t}
+  type t =
+    {
+      number: int;
+      state: T.State.t;
+      lhs: T.Labeled_var.t;
+      rhs: Rhs.t;
+      is_kernel: bool;
+      is_reduce: bool;
+      distance: Size.t
+    }
   [@@deriving eq, ord]
 
   let pp ppf {number; state; lhs; rhs; is_kernel; is_reduce; distance} =
@@ -537,6 +555,13 @@ module Items = struct
 
   let is_reduce its =
     exists (fun it -> it.is_reduce) its
+
+  let output its =
+    fold (fun it acc ->
+        if it.is_reduce 
+        then T.Labeled_vars.add it.lhs acc
+        else acc)
+      T.Labeled_vars.empty its
 end
 
 module Production = struct
@@ -589,7 +614,12 @@ module PA = struct
 end
 
 module Enhanced_production = struct
-  type t = {number: int; lhs: Enhanced_var.t; rhs: (PA.Start.single, Items.t, Enhanced_lits.t) PA.t}
+  type t =
+    {
+      number: int;
+      lhs: Enhanced_var.t;
+      rhs: (PA.Start.single, Items.t, Enhanced_lits.t) PA.t
+    }
 end
 
 module Actions_multimap = struct
@@ -604,18 +634,18 @@ let refine xs =
 
 let index_productions ~supply ps =
   let supply = ref supply in
-  Seq.fold_left (fun idx p ->
+  Seq.fold_left (fun idx prod ->
       let (number, supply') = Supply.get !supply in
       supply := supply';
-      Production_index.add (T.Labeled_var.var p.Production.lhs) Numbered_production.{
+      Production_index.add (T.Labeled_var.var prod.Production.lhs) Numbered_production.{
           number;
-          lhs = p.lhs;
-          rhs = p.rhs;
+          lhs = prod.lhs;
+          rhs = prod.rhs;
         } idx)
     Production_index.empty
     ps
 
-let construct ?(overexpand = false)  ~supply start lexical prods =
+let construct overexpand ~supply start lexical prods =
   let module Gen = A.Gen(T.State_index(Preitem_to)) in
   Gen.unfold ~supply ~merge:Lits.union (fun q {number; lhs; rhs; is_kernel; is_reduce; distance} ->
       let fs = refine @@ Rhs.first rhs in
@@ -635,31 +665,27 @@ let construct ?(overexpand = false)  ~supply start lexical prods =
       in
       let vars = Lits.to_vars @@ Seq.fold_left Lits.union Lits.empty fs in
       let vars =
-        if overexpand then
-          if not @@ T.Vars.disjoint vars lexical
-          then T.Vars.union vars lexical
-          else vars
+        if overexpand && not @@ T.Vars.disjoint vars lexical
+        then T.Vars.union vars lexical
         else vars
       in
       let nonkernel =
         Seq.flat_map (fun var ->
             Seq.map (fun Numbered_production.{number; lhs; rhs} ->
-                ((if T.Vars.mem var lexical then Lits.scan else Lits.call) (T.Vars.singleton var), Preitem.{
+                (if T.Vars.mem var lexical then Lits.scan else Lits.call) (T.Vars.singleton var), Preitem.{
                      number;
                      lhs;
                      rhs;
                      distance = Size.zero;
                      is_kernel = false;
                      is_reduce = Rhs.is_nullable rhs;
-                   }))
-              (Numbered_productions.to_seq @@ 
-               try Production_index.find_multiple var prods
-               with Not_found -> 
-                 Fmt.pr "%a" T.Var.pp var;
-                 assert false))
+                   })
+              (Numbered_productions.to_seq @@ Production_index.find_multiple var prods))
           (T.Vars.to_seq @@ vars)
       in
-      Items.singleton @@ Item.{number; state = q; lhs; rhs; is_kernel; is_reduce; distance}, Seq.(kernel @ nonkernel))
+      Items.singleton @@
+      Item.{number; state = q; lhs; rhs; is_kernel; is_reduce; distance},
+      Seq.(kernel @ nonkernel))
     (let Numbered_production.{number; lhs; rhs} =
        Numbered_productions.the @@ Production_index.find_multiple start prods in
      Preitem.{
@@ -681,36 +707,92 @@ let noncanonical_items qs a =
   |> Seq.map (fun q -> (q, A.labels q a))
   |> Noncanonical_items.of_seq_multiple
 
-let closure a qs =
+let call_closure a qs =
   let module C = Closure.Make(T.States) in
   C.closure (fun q -> A.goto q Lits.is_call a) qs
+
+let scan_closure a qs =
+  let module C = Closure.Make(T.States) in
+  T.States.diff (C.closure (fun q -> A.goto q Lits.is_scan a) qs) qs
 
 let lr ~supply a =
   let module Gen = A.Gen(T.State_index(T.States_to)) in
   Gen.unfold ~supply ~merge:Lits.union (fun _ from ->
       let module R = Refine.Map(Lits)(T.States) in
-      let from = closure a from in
+      let cl = call_closure a from in
       let next =
-        A.adjacent_multiple from a
-        |> Seq.filter_map (fun (s, lts) -> if Lits.is_call lts then None else Some (lts, T.States.singleton s))
+        A.adjacent_multiple cl a
+        |> Seq.map (fun (s, lts) ->
+            (lts, if Lits.is_call lts
+             then from
+             else T.States.singleton s))
         |> R.refine
         |> R.partitions
       in
-      (lr_items from a, next))
-    (closure a @@ A.start_multiple a)
+      (lr_items cl a, next))
+    (call_closure a @@ A.start_multiple a)
 
 let noncanonical_subset ~supply a =
   let module Gen = A.Gen(T.Preserve_state_index) in
   Gen.unfold ~supply ~merge:Lits.union (fun _ from ->
       let module R = Refine.Map(Lits)(T.States) in
+      let cl = scan_closure a from in
       let next =
         A.adjacent_multiple from a
-        |> Seq.filter_map (fun (s, lts) -> if Lits.is_call lts then None else Some (lts, T.States.singleton s))
+        |> Seq.map (fun (s, lts) ->
+            (lts, if Lits.is_scan lts
+             then cl
+             else T.States.singleton s))
         |> R.refine
         |> R.partitions
       in
       (noncanonical_items from a, next))
-    (closure a @@ A.start_multiple a)
+    (A.start_multiple a)
+
+let preimage t =
+  let module R' = Refine.Map(Lits)(T.States) in
+  let r = A.rev t in fun from ->
+    A.adjacent_multiple from r
+    |> Seq.map (fun (s, ls) -> (ls, T.States.singleton s))
+    |> R'.refine
+    |> R'.partitions
+
+let group_states_by_output t =
+  let module R' = Refine.Map(T.Labeled_vars)(T.States) in
+  A.states_labels t
+  |> Seq.map (fun (s, its) -> (Items.output its, T.States.singleton s))
+  |> R'.refine
+  |> R'.partitions
+
+let partition t =
+  let module H = Refine.Hopcroft(T.States) in
+
+  let initial =
+    Seq.cons (A.states t) (Seq.map snd @@ group_states_by_output t)
+    |> Seq.fold_left (Fun.flip H.add) H.empty
+  in
+  let preimage = preimage t in
+  let rec go h = 
+    match H.pivot h with
+    | Some (from, h) -> 
+      go (Seq.fold_left (Fun.flip H.add) h (Seq.map snd @@ preimage from))
+    | None -> h
+  in
+  H.partitions (go initial)
+
+let find_partition q prs =
+  List.find (T.States.mem q) prs
+
+let minimize ~supply t =
+  let module Gen = A.Gen(T.State_index(T.States_to)) in
+  let prs = List.of_seq @@ partition t in
+  let start' = find_partition (A.start t) prs in
+  Gen.unfold ~supply ~merge:Lits.union (fun _ from ->
+      let next = Seq.map (fun (q', c) -> (c, find_partition q' prs))
+          (A.adjacent_multiple from t)
+      in
+      (lr_items from t, next))
+    start'
 
 let enhance sa a =
   let start = (A.start sa, A.start a) in
@@ -722,14 +804,7 @@ let enhance sa a =
                      then None
                      else Some (Enhanced_lits.make sa_from c, (sa_to, a_to), (sa_to, a_to)))
       in
-      let next' =
-        A.adjacent a_from a
-        |> Seq.filter_map (fun (s, lts) ->
-            if Lits.is_call lts
-            then Some (Enhanced_lits.make sa_from lts, (sa_from, s), (sa_from, s))
-            else None)
-      in
-      A.labels a_from a, Seq.(next @ next'))
+      A.labels a_from a, next)
     start start
 
 let extract a =
@@ -1027,8 +1102,8 @@ let noncanonical lexical lookahead' a =
       in
       let* (t, lts') = A.adjacent q a in
 
-      let* () = Seq.guard (Lits.is_scan' lts') in
-      Seq.return (s, t, Lits.scan'))
+      let* () = Seq.guard (Lits.is_scan lts') in
+      Seq.return (s, t, lts'))
     a
 
 let back lexical eprods =
@@ -1203,17 +1278,13 @@ let print_productions' prods =
       Fmt.pr "@[@[%a@] ::= @[%s@]@]@." Enhanced_var.pp prod.Enhanced_production.lhs (Dot.string_of_graph @@ to_dot''' (prod.Enhanced_production.rhs)))
     prods
 
-let build syntactic lexical longest_match start prods  =
+let build overexpand syntactic lexical longest_match start prods  =
   assert (T.Vars.disjoint syntactic lexical);
 
-  print_productions prods;
-
   let iprods = index_productions ~supply:(T.State.fresh_supply ()) prods in
-  print_endline "CONSTRUCT";
-  let c = construct ~supply:(T.State.fresh_supply ()) start lexical iprods in
 
-  print_endline "ES";
-  let c = erase_scan c in
+  print_endline "CONSTRUCT";
+  let c = construct ~supply:(T.State.fresh_supply ()) overexpand start lexical iprods in
 
   print_endline "LR";
   let lr_supply1, lr_supply2 = Supply.split2 @@ T.State.fresh_supply () in
@@ -1236,11 +1307,20 @@ let build syntactic lexical longest_match start prods  =
   let nc =
     noncanonical lexical lookahead' p
     |> noncanonical_subset ~supply:lr_supply2
+    |> erase_scan
   in
 
   let back = back lexical eprods in
+  Fmt.pr "%i@." (T.State_pairs.cardinal (PA.states back));
 
   print_endline "END";
+
+  (*Fmt.pr "%s@," (Dot.string_of_graph (to_dot (with_actions lexical lookahead' nullable' nc)));*)
+
+  (*Fmt.pr "P %s@,"  (Dot.string_of_graph (to_dot'' c));
+  Fmt.pr "P %s@,"  (Dot.string_of_graph (to_dot'' p));*)
+
+  (*Fmt.pr "P %s@,"  (Dot.string_of_graph (to_dot'' p));*)
 
   (*Fmt.pr "E %s@,"  (Dot.string_of_graph (to_dote back));*)
 

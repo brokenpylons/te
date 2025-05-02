@@ -250,7 +250,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   let (componentvariable', s) = variable s "componentvariable'"
   let (fielddesignator', s) = variable s "fielddesignator'"
   let (buffervariable', s) = variable s "buffervariable'"
-  let (filevariable', s) = variable s "filevariable'"
+  let (filevariable', _) = variable s "filevariable'"
 
   let syntactic = [
     start;
@@ -452,7 +452,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   let start = start
 
   let parser =
-    with_ws (T.Vars.of_list lexical) (var ws) @@ unextend s u Production.[
+    with_ws (T.Vars.of_list lexical) (var ws) (*@@ unextend s u*) Production.[
       make (u, start) R.(var program * plus eof);
 
       make (block', block) R.(opt (var label_declaration_part) * opt (var constant_definition_part) * opt (var type_definition_part) * opt (var variable_declaration_part) * star (var procedure_and_function_declaration_part) * var statement_part);

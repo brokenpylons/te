@@ -2143,11 +2143,11 @@ let _ =
   let d = X.driver (X.tables ()) in
   let t = Sys.time() in
   Fmt.pr "GO@.";
-  X.Run.file (fun c -> d#read c) "linear/sample72072.cbl";
-  Fmt.pr "%b %f@." d#accept (Sys.time() -. t)
+  X.Run.file (fun c -> d#read c) "seed.cbl";
+  Fmt.pr "%b %f@." d#accept (Sys.time() -. t);
   (*Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);*)
   (*Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))*)
-  (*Fmt.pr "@[%a@]" Trace.pp d#trace;*)
+  Fmt.pr "@[%a@]" Trace.pp d#trace;
 
   (*let t = X.tables () in
   let fs = Sys.readdir "linear" in

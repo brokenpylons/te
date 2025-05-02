@@ -105,6 +105,7 @@ module State_pairs: sig
   include Set.BINARY with type elt := elt and type t := t
   include Set.SEQUENTIAL with type elt := elt and type t := t
   val pp: t Fmt.t
+  val cardinal: t -> int
 end
 
 module State_pair_to: sig
