@@ -1243,7 +1243,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     let start = start
 
     let parser =
-      with_ws (T.Vars.of_list lexical) (var ws) @@ (Production.[
+      with_ws (T.Vars.of_list lexical) (var ws) @@ unextend s u @@ (Production.[
           make (u, start) R.(var cobol_source_program * plus eof);
 
           make (u, mode) (var cobol_word);
@@ -2140,16 +2140,17 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   end)
 
 let _ =
-  let d = X.driver (X.tables ()) in
+  (*let d = X.driver (X.tables ()) in
   let t = Sys.time() in
-  Fmt.pr "GO@.";
-  X.Run.file (fun c -> d#read c) "seed.cbl";
-  Fmt.pr "%b %f@." d#accept (Sys.time() -. t);
+  X.Run.file (fun c -> d#read c) "linear/sample72072.cbl";
+  Fmt.pr "%b %f@." d#accept (Sys.time() -. t)*)
   (*Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);*)
   (*Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))*)
-  Fmt.pr "@[%a@]" Trace.pp d#trace;
+  (*Fmt.pr "@[%a@]" Trace.pp d#trace;*)
 
-  (*let t = X.tables () in
+  let t = X.tables () in
+  Gc.compact ();
+
   let fs = Sys.readdir "linear" in
   Array.sort (fun x y ->
       let c = Int.compare (String.length x) (String.length y) in
@@ -2162,4 +2163,4 @@ let _ =
       Fmt.pr "%s@." file;
       X.Run.file (fun c -> d#read c) ("linear/" ^ file);
       Fmt.pr "%s %b %f@." file d#accept (Sys.time() -. t))
-    fs*)
+    fs

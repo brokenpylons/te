@@ -1933,9 +1933,17 @@ let _ =
   Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))*)
 
   let t = X.tables () in
+  Gc.compact ();
+  let fs = Sys.readdir "linear" in
+  Array.sort (fun x y ->
+      let c = Int.compare (String.length x) (String.length y) in
+      if c <> 0 then c else
+      String.compare x y)
+    fs;
   Array.iter (fun file ->
       let d = X.driver t in
       let t = Sys.time() in
+      Fmt.pr "%s@." file;
       X.Run.file (fun c -> d#read c) ("linear/" ^ file);
       Fmt.pr "%s %b %f@." file d#accept (Sys.time() -. t))
-    (Sys.readdir "linear")
+    fs

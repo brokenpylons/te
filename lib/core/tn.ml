@@ -939,9 +939,12 @@ module Analysis = struct
       Fixedpoint.run ~eq:EM.equal (update prods nullable_per_state first_per_state) self
   end
 
-  let first_seed lts =
+  let first_seed lexical lts =
+    let lexical_lts = Lits.of_vars lexical in
     let (<|>) = Enhanced_lits.union in
-    Enhanced_lits.extract_eof lts <|> Enhanced_lits.extract_vars lts <|> Enhanced_lits.extract_codes lts
+    Enhanced_lits.extract_eof lts <|>
+    Enhanced_lits.extract_codes lts <|>
+    Enhanced_lits.restrict (fun _ -> Lits.inter lexical_lts) lts
 
   let wrap ~default x number q  =
     try Numbered_enhanced_var_to.find number x q with Not_found -> default
@@ -960,7 +963,7 @@ module Analysis = struct
       follow_per_state: Numbered_enhanced_var.t -> PA.state -> Enhanced_lits.t;
     }
 
-  let compute (prods: Enhanced_production.t Seq.t) =
+  let compute lexical (prods: Enhanced_production.t Seq.t) =
     print_endline "NULLABLE";
     let nullable_per_lits = Nullable.per_lits prods NM.empty in
 
@@ -970,12 +973,12 @@ module Analysis = struct
     print_endline "FIRST";
     let first_per_lits = First.per_lits prods
         (fun lts -> NM.find_multiple_or_empty lts nullable_per_lits)
-        first_seed EM.empty
+        (first_seed lexical) EM.empty
     in
     print_endline "FIRST_PER_STATE";
     let first_per_state = wrap ~default:Enhanced_lits.empty @@ First.per_state prods
         (fun lts -> NM.find_multiple_or_empty lts nullable_per_lits)
-        first_seed first_per_lits
+        (first_seed lexical) first_per_lits
     in
     print_endline "FOLLOW";
     let follow_per_lits = Follow.per_lits prods
@@ -994,7 +997,7 @@ module Analysis = struct
       nullable_per_lits_stripped = (fun lts -> SM.find_multiple_or_empty lts nullable_per_lits_stripped);
       nullable_per_lits = (fun lts -> NM.find_multiple_or_empty lts nullable_per_lits);
       nullable_per_state = nullable_per_state;
-      first_per_lits = combine Enhanced_lits.union first_seed (fun lts -> EM.find_multiple_or_empty lts first_per_lits);
+      first_per_lits = combine Enhanced_lits.union (first_seed lexical) (fun lts -> EM.find_multiple_or_empty lts first_per_lits);
       first_per_state = first_per_state;
       follow_per_lits = (fun lts -> EM.find_multiple_or_empty lts follow_per_lits);
       follow_per_state = follow_per_state;
@@ -1053,9 +1056,9 @@ let compute analysis lookback lexical longest_match =
       |> List.fold_left Enhanced_lits.union Enhanced_lits.empty
     in
     let lexical_lookahead =
-      let lexical_lits = Lits.of_vars lexical in
+      let lexical_lts = Lits.of_vars lexical in
       shift_lookahead
-      |> Enhanced_lits.restrict (fun _ -> Lits.inter lexical_lits)
+      |> Enhanced_lits.restrict (fun _ -> Lits.inter lexical_lts)
     in
     let code_lookahead =
       Enhanced_lits.diff shift_lookahead (analysis.Analysis.first_per_lits lexical_lookahead)
@@ -1106,12 +1109,19 @@ let noncanonical lexical lookahead' a =
       Seq.return (s, t, lts'))
     a
 
+let unbounded a =
+  let (let*) = Seq.bind in
+  let* (s, its) = PA.states_labels a in
+  let* {distance; _} = Items.to_seq its in
+  let* () = Seq.guard (Size.is_infinite distance) in
+  Seq.return s
+
 let back lexical eprods =
   eprods
   |> Seq.filter_map (fun Enhanced_production.{lhs = (_, var); rhs; _} ->
-      if T.Vars.mem var lexical
+      if T.Vars.mem var lexical || Seq.is_empty @@ unbounded rhs
       then None
-      else Some rhs)
+      else Some ( rhs))
   |> Seq.fold_left (PA.merge ~merge_labels:Items.union ~merge_lits:Enhanced_lits.union) PA.empty
   |> PA.rev
 
@@ -1286,16 +1296,22 @@ let build overexpand syntactic lexical longest_match start prods  =
   print_endline "CONSTRUCT";
   let c = construct ~supply:(T.State.fresh_supply ()) overexpand start lexical iprods in
 
+  Fmt.pr "%i@." (T.States.cardinal (A.states c));
+
   print_endline "LR";
   let lr_supply1, lr_supply2 = Supply.split2 @@ T.State.fresh_supply () in
   let p = lr ~supply:lr_supply1 c in
+
+  Fmt.pr "%i@." (T.States.cardinal (A.states p));
 
   print_endline "ENHANCE";
   let e = enhance p c in
   let eprods = enhanced_productions e in
 
+  Fmt.pr "%i@." (T.State_pairs.cardinal (PA.states e));
+
   print_endline "ANA";
-  let analysis = Analysis.compute eprods in
+  let analysis = Analysis.compute lexical eprods in
 
   print_endline "LOOK";
 
@@ -1311,7 +1327,11 @@ let build overexpand syntactic lexical longest_match start prods  =
   in
 
   let back = back lexical eprods in
+
+  Fmt.pr "%i@." (T.States.cardinal (A.states nc));
   Fmt.pr "%i@." (T.State_pairs.cardinal (PA.states back));
+
+  (*Fmt.pr "E %s@,"  (Dot.string_of_graph (to_dot''' back));*)
 
   print_endline "END";
 
@@ -1340,4 +1360,3 @@ let build overexpand syntactic lexical longest_match start prods  =
   (*Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot (with_actions lexical lookahead' nullable' nc)));*)
 
   (lookahead', nullable', nc, back)
-

@@ -48,10 +48,9 @@ let back b =
 let accept start lookahead' a =
   A.states a
   |> T.States.to_seq
-  |> Seq.map (fun s -> 
+  |> Seq.map (fun s ->
       (s, Tn.accept start lookahead' s a))
   |> T.State_to.of_seq
-
 
 module Unoptimized = struct
   type actions = T.Actions.t
