@@ -115,16 +115,16 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
 end)
 
 let _ =
-  (*let d = X.driver (X.tables ()) in
+  let d = X.driver (X.tables ()) in
   let t = Sys.time() in
-  X.Run.file (fun c -> d#read c) "test.json";
+  X.Run.file (fun c -> d#read c) "linear/sample998998.json";
   Printf.printf "Execution time: %fs\n" (Sys.time() -. t);
-  Fmt.pr "%b@." d#accept;*)
+  Fmt.pr "%b@." d#accept;
   (*Fmt.pr "@[%a@]" Trace.pp d#trace;*)
   (*Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);*)
   (*Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))*)
 
-  let t = X.tables () in
+  (*let t = X.tables () in
   let fs = Sys.readdir "linear" in
   Array.sort (fun x y ->
       let c = Int.compare (String.length x) (String.length y) in
@@ -136,4 +136,4 @@ let _ =
       let t = Sys.time() in
       X.Run.file (fun c -> d#read c) ("linear/" ^ file);
       Fmt.pr "%s %b %f@." file d#accept (Sys.time() -. t))
-    fs
+    fs*)

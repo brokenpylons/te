@@ -523,6 +523,7 @@ module Map = struct
     val find_opt: elt -> 'a t -> 'a option
     val mem: elt -> _ t -> bool
     val to_seq: 'a t -> (elt * 'a) Seq.t
+    val to_list: 'a t -> (elt * 'a) list
     val of_seq: (elt * 'a) Seq.t -> 'a t
 
     val add_with: (elt -> elt -> elt) -> ('a -> 'a -> 'a) -> elt -> 'a -> 'a t -> 'a t
@@ -1016,6 +1017,14 @@ module Map = struct
         to_seq' l (fun () -> Seq.Cons ((x, xp), to_seq' r tl))
 
     let to_seq t = to_seq' t Seq.empty
+
+    let rec to_list' t tl =
+      match t with
+      | Empty -> tl
+      | Node (_, x, xp, l, r) ->
+        to_list' l ((x, xp) :: to_list' r tl)
+
+    let to_list t = to_list' t []
 
     let rec find x = function
       | Empty -> raise Not_found

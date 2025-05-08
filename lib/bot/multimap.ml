@@ -18,6 +18,7 @@ module type SET2 = sig
   val inter: t -> t -> t
   val diff: t -> t -> t
   val is_empty: t -> bool
+  val empty: t
 end
 
 module type SET3 = sig
@@ -68,6 +69,7 @@ module type S0 = sig
   val find_multiple_or: default:values -> key -> t -> values
 
   val filter_multiple: (key -> values -> bool) -> t -> t
+  val remove_multiple: key -> t -> t
 end
 
 module Make0(M: MAP)(S: SET0) = struct
@@ -96,6 +98,8 @@ module Make0(M: MAP)(S: SET0) = struct
   let find_multiple_or ~default x t =
     try find_multiple x t
     with Not_found -> default
+
+  let remove_multiple = M.remove
 end
 
 module type S1 = sig
@@ -130,6 +134,7 @@ module type S2 = sig
 
   val inter: t -> t -> t
   val diff: t -> t -> t
+  val find_multiple_or_empty: key -> t -> values
 end
 
 module Make2(M: MAP)(S: SET2) = struct
@@ -143,6 +148,10 @@ module Make2(M: MAP)(S: SET2) = struct
 
   let diff t1 t2 =
     M.diff (fun _ -> if_empty %% S.diff) t1 t2
+
+  let find_multiple_or_empty x t =
+    try find_multiple x t
+    with Not_found -> S.empty
 end
 
 module type S3 = sig

@@ -205,11 +205,11 @@ module Make
     Vertex_map.modify v (fun (vl, adj) -> (vl, Edge_map.remove u adj)) g
 
   let connect v u el g =
-    assert (Vertex_map.mem u g);
+    (*assert (Vertex_map.mem u g);*)
     Vertex_map.modify v (fun (vl, adj) -> (vl, Edge_map.add u el adj)) g
 
   let connect_with f v u el g =
-    assert (Vertex_map.mem u g);
+    (*assert (Vertex_map.mem u g);*)
     Vertex_map.modify v (fun (vl, adj) -> (vl, Edge_map.add_with Fun.const f u el adj)) g
 
   let link vs us el g =

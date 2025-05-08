@@ -452,7 +452,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   let start = start
 
   let parser =
-    with_ws (T.Vars.of_list lexical) (var ws) (*@@ unextend s u*) Production.[
+    with_ws (T.Vars.of_list lexical) (var ws) @@ unextend s u Production.[
       make (u, start) R.(var program * plus eof);
 
       make (block', block) R.(opt (var label_declaration_part) * opt (var constant_definition_part) * opt (var type_definition_part) * opt (var variable_declaration_part) * star (var procedure_and_function_declaration_part) * var statement_part);
@@ -795,14 +795,18 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
 end)
 
 let _ =
-  (*let t = X.tables () in
+  let t = X.tables () in
   let d = X.driver t in
-  X.Run.file (fun c -> d#read c) "seed.pas";
-  Fmt.pr "@[%a@]" Trace.pp d#trace;*)
+  let t = Sys.time() in
+  Fmt.pr "GO@.";
+  X.Run.file (fun c -> d#read c) "linear/sample999999.pas";
+  Fmt.pr "%b %f@." d#accept (Sys.time() -. t);
+  d#status
+  (*Fmt.pr "@[%a@]" Trace.pp d#trace;*)
   (*Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);
   Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))*)
 
-  let t = X.tables () in
+  (*let t = X.tables () in
   let fs = Sys.readdir "linear" in
   Array.sort (fun x y ->
       let c = Int.compare (String.length x) (String.length y) in
@@ -814,4 +818,4 @@ let _ =
       let t = Sys.time() in
       X.Run.file (fun c -> d#read c) ("linear/" ^ file);
       Fmt.pr "%s %b %f@." file d#accept (Sys.time() -. t))
-    fs
+    fs*)

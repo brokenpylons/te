@@ -8,6 +8,7 @@ module T = Types
 
 
 let extra_info d =
+  (*Fmt.pr "@[%a@]" Trace.pp d#trace;*)
   Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);
   Fmt.pr "@[%s@]" (Dot.string_of_graph (Types.Node_packed_forest.to_dot d#forest))
 
@@ -617,7 +618,7 @@ module Right_nulled2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
           eof
         ];
         trace = Trace.[
-            load (code "x") (vertex 0 1) (vertex 1 1);
+            load (code "x") (vertex 0 0) (vertex 1 1);
             reduce (u, s) (vertex 1 1) (vertex 0 0) (vertex 3 1);
             load eof (vertex 3 1) (vertex 4 2);
             reduce (u, a) (vertex 1 1) (vertex 1 1) (vertex 2 1);

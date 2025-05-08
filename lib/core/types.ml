@@ -40,6 +40,11 @@ module Codes = struct
     of_list (explode s)
 end
 
+module Code_to = struct
+  include Balanced_binary_tree.Map.Height(Code)
+  let pp pp_p = pp Code.pp pp_p
+end
+
 module State = struct
   include Int
   let to_id x = Dot.(Int x)
@@ -55,7 +60,7 @@ module States = struct
   let to_id x = Dot.(String (Fmt.str "%a" pp x))
 end
 module State_to = struct
-  include Balanced_binary_tree.Map.Size(State)
+  include Balanced_binary_tree.Map.Height(State)
   let pp pp_p = pp State.pp pp_p
 end
 module State_graph = Graph.Make(State)(State_to)(State_to)
@@ -110,27 +115,27 @@ module Preserve_state_index = struct
 end
 
 module Vertex = struct
-  type t = State.t * int
+  type t = int * State.t
   [@@deriving eq, ord]
 
-  let make state position = (state, position)
+  let make state position = (position, state)
 
-  let states = fst
+  let position = fst
 
-  let position = snd
+  let states = snd
 
-  let pp ppf (state, position) =
+  let pp ppf (position, state) =
     Fmt.pf ppf "%a:%i" State.pp state position
 
   let to_id x = Dot.(String (Fmt.str "%a" pp x))
 end
 
 module Vertices = struct
-  include Balanced_binary_tree.Set.Size(Vertex)
-  let pp = pp Vertex.pp 
+  include Balanced_binary_tree.Set.Height(Vertex)
+  let pp = pp Vertex.pp
 end
 module Vertex_to = struct
-  include Balanced_binary_tree.Map.Size(Vertex)
+  include Balanced_binary_tree.Map.Height(Vertex)
   let pp pp_p = pp Vertex.pp pp_p
 end
 module Vertex_graph = Graph.Make(Vertex)(Vertex_to)(Vertex_to)
@@ -176,6 +181,10 @@ module Partial = struct
     | None, None -> None
 
   let empty = None
+
+  let is_empty = function
+    | None -> true
+    | Some _ -> false
 end
 
 module State_partial = struct
@@ -246,7 +255,7 @@ module Vars = struct
   let pp = pp Var.pp
 end
 module Var_to = struct
-  include Balanced_binary_tree.Map.Size(Var)
+  include Balanced_binary_tree.Map.Height(Var)
   let pp pp_p = pp Var.pp pp_p
 end
 
@@ -314,7 +323,7 @@ module Symbol = struct
 end
 
 module Symbol_to = struct
-  include Balanced_binary_tree.Map.Size(Symbol)
+  include Balanced_binary_tree.Map.Height(Symbol)
   let pp pp_p = pp Symbol.pp pp_p
 end
 
@@ -481,13 +490,13 @@ module Symbols_multimap(Values: SYMBOL_MULTIMAP_VALUES) = struct
 end
 
 module Node = struct
-  type t = Symbol.t * int * int
+  type t = int * int * Symbol.t
   [@@deriving eq, ord]
 
-  let make state start stop = (state, start, stop)
-  let symbol (v, _, _) = v
+  let make v start stop = (stop, start, v)
+  let symbol (_, _, v) = v
 
-  let pp ppf (v, start, stop) =
+  let pp ppf (stop, start, v) =
     Fmt.pf ppf "%a:%i:%i" Symbol.pp v start stop
 
   let to_id x = Dot.(String (Fmt.str "%a" pp x))
@@ -496,7 +505,7 @@ module Nodes = struct
   include Balanced_binary_tree.Set.Size(Node)
   let pp = pp Node.pp
 end
-module Node_to = Balanced_binary_tree.Map.Size(Node)
+module Node_to = Balanced_binary_tree.Map.Height(Node)
 module Node_packed_forest = Packed_forest.Make(Node)(Vars)(Node_to)
 
 module Actions = struct

@@ -146,7 +146,7 @@ end
 
 module Build(Spec: SPEC') = struct
   module Spec' = Spec(Context)
-  module X = Gsglr.Make(Tables.Unoptimized)
+  module X = Gsglr.Make(Tables.Optimized)
 
   let convert x =
     List.to_seq x
@@ -161,7 +161,7 @@ module Build(Spec: SPEC') = struct
     let longest_match = T.Vars.of_list Spec'.longest_match in
 
     let (lookahead', nullable', g, b) = Tn.build overexpand syntactic lexical longest_match Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
-    Tables.Unoptimized.make Spec'.start lexical lookahead' nullable' g b
+    Tables.Optimized.make Spec'.start lexical lookahead' nullable' g b
 
   let driver t =
     new X.driver t

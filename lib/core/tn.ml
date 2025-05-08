@@ -819,20 +819,24 @@ let extract a =
       (PA.labels from a, next))
     (PA.start a) (PA.start a)
 
-let enhanced_production (s, _) q ea =
-  Seq.map (fun Item.{number; lhs = (_, var); _}  ->
-      Enhanced_production.{
-        number;
-        lhs = (s, var);
-        rhs = extract @@ PA.tail q ea;
-      })
+let enhanced_production start s q ea =
+  Seq.filter_map (fun Item.{number; lhs = (_, var); _}  ->
+      if T.Var.equal var start || Seq.exists (fun (_, lts) ->
+          T.Vars.mem var @@ Lits.to_vars @@ Enhanced_lits.strip lts)
+          (PA.adjacent s ea)
+      then Some Enhanced_production.{
+          number;
+          lhs = (fst s, var);
+          rhs = extract @@ PA.tail q ea;
+        }
+      else None)
     (Items.to_seq @@ PA.labels q ea)
 
-let enhanced_productions ea =
+let enhanced_productions start ea =
   PA.transitions ea
   |> Seq.filter (fun (_, _, lts) -> Enhanced_lits.is_delegate lts)
-  |> Seq.flat_map (fun (s, q, _) -> enhanced_production s q ea)
-  |> Seq.append (enhanced_production (PA.start ea) (PA.start ea) ea)
+  |> Seq.flat_map (fun (s, q, _) -> enhanced_production start s q ea)
+  |> Seq.append (enhanced_production start (PA.start ea) (PA.start ea) ea)
   |> Seq.memoize
 
 module Bool_set = struct
@@ -1112,7 +1116,7 @@ let noncanonical lexical lookahead' a =
 let unbounded a =
   let (let*) = Seq.bind in
   let* (s, its) = PA.states_labels a in
-  let* {distance; _} = Items.to_seq its in
+  let Item.{distance; _} = Items.the its in
   let* () = Seq.guard (Size.is_infinite distance) in
   Seq.return s
 
@@ -1121,7 +1125,7 @@ let back lexical eprods =
   |> Seq.filter_map (fun Enhanced_production.{lhs = (_, var); rhs; _} ->
       if T.Vars.mem var lexical || Seq.is_empty @@ unbounded rhs
       then None
-      else Some ( rhs))
+      else Some rhs)
   |> Seq.fold_left (PA.merge ~merge_labels:Items.union ~merge_lits:Enhanced_lits.union) PA.empty
   |> PA.rev
 
@@ -1288,13 +1292,13 @@ let print_productions' prods =
       Fmt.pr "@[@[%a@] ::= @[%s@]@]@." Enhanced_var.pp prod.Enhanced_production.lhs (Dot.string_of_graph @@ to_dot''' (prod.Enhanced_production.rhs)))
     prods
 
-let build overexpand syntactic lexical longest_match start prods  =
+let build _overexpand syntactic lexical longest_match start prods  =
   assert (T.Vars.disjoint syntactic lexical);
 
   let iprods = index_productions ~supply:(T.State.fresh_supply ()) prods in
 
   print_endline "CONSTRUCT";
-  let c = construct ~supply:(T.State.fresh_supply ()) overexpand start lexical iprods in
+  let c = construct ~supply:(T.State.fresh_supply ()) true start lexical iprods in
 
   Fmt.pr "%i@." (T.States.cardinal (A.states c));
 
@@ -1306,7 +1310,7 @@ let build overexpand syntactic lexical longest_match start prods  =
 
   print_endline "ENHANCE";
   let e = enhance p c in
-  let eprods = enhanced_productions e in
+  let eprods = enhanced_productions start e in
 
   Fmt.pr "%i@." (T.State_pairs.cardinal (PA.states e));
 
