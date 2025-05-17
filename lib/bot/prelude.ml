@@ -44,6 +44,13 @@ module Bool = struct
     x && not y
 end
 
+module Option = struct
+  include Option
+
+  let guard p =
+    if p then Some () else None
+end
+
 module List = struct
   include List
 

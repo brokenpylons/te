@@ -13,11 +13,11 @@ module Back_map = struct
   let pp = pp T.State_pair_partial.pp
 end
 
-let actions lexical lookahead' nullable' a =
+let actions lexical lookahead' nullable' f a =
   A.states a
   |> T.States.to_seq
   |> Seq.map (fun s ->
-      (s, Tn.actions lexical lookahead' nullable' s a
+      (s, f lexical lookahead' nullable' s a
           |> Seq.map (fun (lts, x) -> Actions_multimap.singleton_multiple lts x)
           |> Seq.fold_left Actions_multimap.union Actions_multimap.empty))
   |> T.State_to.of_seq
@@ -35,6 +35,31 @@ let orders lexical a =
   |> Seq.map (fun ((s, _), adj) ->
       (s, adj
           |> Seq.map (fun (_, lts) -> T.Vars.inter lexical (Lits.to_vars lts))
+          |> Seq.fold_left T.Vars.union T.Vars.empty))
+  |> T.State_to.of_seq
+
+let matches lexical a =
+  A.states a
+  |> T.States.to_seq
+  |> Seq.map (fun s ->
+      (s, Tn.matches_per_state lexical s a
+          |> Seq.fold_left T.Labeled_vars.union T.Labeled_vars.empty))
+  |> T.State_to.of_seq
+
+let predictions lexical a =
+  A.states a
+  |> T.States.to_seq
+  |> Seq.map (fun s ->
+      (s, Tn.predictions_per_state lexical s a
+          |> Seq.fold_left T.Vars.union T.Vars.empty))
+  |> T.State_to.of_seq
+
+let valid_lookahead lexical lookahead' nullable' f a =
+  A.states a
+  |> T.States.to_seq
+  |> Seq.map (fun s ->
+      (s, f lexical lookahead' nullable' s a
+          |> Seq.map (fun (lts, _) -> Lits.to_vars lts)
           |> Seq.fold_left T.Vars.union T.Vars.empty))
   |> T.State_to.of_seq
 
@@ -79,7 +104,7 @@ module Unoptimized = struct
       start = A.start g;
       goto = goto g;
       orders = orders lexical g;
-      actions = actions lexical lookahead' nullable' g;
+      actions = actions lexical lookahead' nullable' Tn.actions g;
       stop = stop b;
       back = back b;
       accept = accept start lookahead' g;
@@ -138,6 +163,81 @@ module Unoptimized = struct
 
   let predictions a =
     a.T.Actions.predictions
+end
+
+module Unoptimized_classic = struct
+  type actions = T.Actions.t
+  type t =
+    {
+      start_parser: T.State.t;
+      start_scanner: T.State.t;
+      goto: Goto_partial_map.t T.State_to.t;
+      actions: Actions_multimap.t T.State_to.t;
+      matches: T.Labeled_vars.t T.State_to.t;
+      predictions: T.Vars.t T.State_to.t;
+      accept: bool T.State_to.t;
+      valid_lookahead: T.Vars.t T.State_to.t;
+    }
+  [@@deriving show]
+
+  let make start lexical lookahead' nullable' gp gs  =
+    {
+      start_parser = A.start gp;
+      start_scanner = A.start gs;
+      goto = T.State_to.union (fun _ -> Goto_partial_map.union) (goto gp) (goto gs);
+      actions = actions lexical lookahead' nullable' Tn.actions_classic gp;
+      matches = matches lexical gs;
+      predictions = predictions lexical gs;
+      accept = accept start lookahead' gp;
+      valid_lookahead = valid_lookahead lexical lookahead' nullable' Tn.actions_classic gp;
+    }
+
+  let lits_of_symbol = function
+    | T.Symbol.Eof -> Lits.eof
+    | T.Symbol.Code x -> Lits.of_codes (T.Codes.singleton x)
+    | T.Symbol.Var x -> Lits.of_vars (T.Vars.singleton x)
+    | T.Symbol.Delegate -> Lits.scan'
+
+  let start_parser t =
+    t.start_parser
+
+  let start_scanner t =
+    t.start_scanner
+
+  let actions t s sym =
+    t.actions
+    |> T.State_to.find s
+    |> Actions_multimap.find_multiple_or_empty (lits_of_symbol sym)
+
+  let goto t s sym =
+    t.goto
+    |> T.State_to.find s
+    |> Goto_partial_map.find_multiple_or_empty (lits_of_symbol sym)
+
+  let valid_lookahead t s =
+    t.valid_lookahead
+    |> T.State_to.find s
+
+  let accept t s =
+    t.accept
+    |> T.State_to.find s
+
+  let shift a =
+    a.T.Actions.shift
+
+  let reduce a =
+    a.T.Actions.reduce
+
+  let null a =
+    a.T.Actions.null
+
+  let matches t s =
+    t.matches
+    |> T.State_to.find s
+
+  let predictions t s =
+    t.predictions
+    |> T.State_to.find s
 end
 
 module Symbol_multimap(Values: SET) = struct

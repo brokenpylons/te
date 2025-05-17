@@ -672,15 +672,16 @@ let construct overexpand ~supply start lexical prods =
       let nonkernel =
         Seq.flat_map (fun var ->
             Seq.map (fun Numbered_production.{number; lhs; rhs} ->
-                (if T.Vars.mem var lexical then Lits.scan else Lits.call) (T.Vars.singleton var), Preitem.{
-                     number;
-                     lhs;
-                     rhs;
-                     distance = Size.zero;
-                     is_kernel = false;
-                     is_reduce = Rhs.is_nullable rhs;
-                   })
-              (Numbered_productions.to_seq @@ Production_index.find_multiple var prods))
+                (if T.Vars.mem var lexical then Lits.scan else Lits.call) (T.Vars.singleton var),
+                Preitem.{
+                  number;
+                  lhs;
+                  rhs;
+                  distance = Size.zero;
+                  is_kernel = false;
+                  is_reduce = Rhs.is_nullable rhs;
+                })
+              (Numbered_productions.to_seq @@ Production_index.find_multiple_or_empty var prods))
           (T.Vars.to_seq @@ vars)
       in
       Items.singleton @@
@@ -696,6 +697,42 @@ let construct overexpand ~supply start lexical prods =
        is_kernel = false;
        is_reduce = Rhs.is_nullable rhs;
      })
+
+let scanner ~supply lexical prods =
+  let module Gen = A.Gen(T.State_index(Preitem_to)) in
+  Gen.unfold_multiple ~supply ~merge:Lits.union (fun q {number; lhs; rhs; is_kernel; is_reduce; distance} ->
+      let fs = refine @@ Rhs.first rhs in
+      let kernel = Seq.filter_map (fun lts ->
+          let rhs' = Rhs.simplify @@ Rhs.derivative lts rhs in
+          if Rhs.is_nothing rhs'
+          then None
+          else Some (lts, Preitem.{
+              number;
+              lhs;
+              rhs = rhs';
+              distance = if Rhs.is_infinite rhs' then Size.top else Size.succ distance;
+              is_kernel = true;
+              is_reduce = Rhs.is_nullable rhs';
+            }))
+          fs
+      in
+      Items.singleton @@
+      Item.{number; state = q; lhs; rhs; is_kernel; is_reduce; distance},
+      kernel)
+    (List.of_seq @@
+     Seq.flat_map (fun var ->
+         Seq.map (fun Numbered_production.{number; lhs; rhs} ->
+             Preitem.{
+               number;
+               lhs;
+               rhs;
+               distance = Size.zero;
+               is_kernel = false;
+               is_reduce = Rhs.is_nullable rhs;
+             })
+           (Numbered_productions.to_seq @@
+            Production_index.find_multiple var prods))
+       (T.Vars.to_seq lexical))
 
 let lr_items qs a =
   T.States.to_seq qs
@@ -1239,8 +1276,28 @@ let accept start lookahead' s' a =
   let right_nulled = (lookahead' number s state).Lookahead.right_nulled in
   Seq.return @@ (T.Var.equal var start && right_nulled)
 
+let matches_per_state lexical s' a =
+  let (let*) = Seq.bind in
+  let its = A.labels s' a in
+  let* {lhs = (label, var); is_kernel; is_reduce; _} = Items.to_seq its in
+  let* () = Seq.guard (T.Vars.mem var lexical && is_kernel && is_reduce) in
+  Seq.return
+     (T.Labeled_vars.singleton (label, var))
+
+let predictions_per_state lexical s' a =
+  let (let*) = Seq.bind in
+  let its = A.labels s' a in
+  let* {lhs = (_, var); _} = Items.to_seq its in
+  let* () = Seq.guard (T.Vars.mem var lexical) in
+  Seq.return
+    (T.Vars.singleton var)
+
 let actions lexical lookahead' nullable s a =
   let fs = List.to_seq @@ [shift; load; matches; predictions; null; shift_null; reduce] in
+  Seq.flat_map (fun f -> f lexical lookahead' nullable s a) fs
+
+let actions_classic lexical lookahead' nullable s a =
+  let fs = List.to_seq @@ [shift; null; reduce] in
   Seq.flat_map (fun f -> f lexical lookahead' nullable s a) fs
 
 (* FOR DEBUGGING *)
@@ -1292,14 +1349,13 @@ let print_productions' prods =
       Fmt.pr "@[@[%a@] ::= @[%s@]@]@." Enhanced_var.pp prod.Enhanced_production.lhs (Dot.string_of_graph @@ to_dot''' (prod.Enhanced_production.rhs)))
     prods
 
-let build _overexpand syntactic lexical longest_match start prods  =
+let build overexpand syntactic lexical longest_match start prods =
   assert (T.Vars.disjoint syntactic lexical);
 
   let iprods = index_productions ~supply:(T.State.fresh_supply ()) prods in
 
   print_endline "CONSTRUCT";
-  let c = construct ~supply:(T.State.fresh_supply ()) true start lexical iprods in
-
+  let c = construct ~supply:(T.State.fresh_supply ()) overexpand start lexical iprods in
   Fmt.pr "%i@." (T.States.cardinal (A.states c));
 
   print_endline "LR";
@@ -1337,8 +1393,6 @@ let build _overexpand syntactic lexical longest_match start prods  =
 
   (*Fmt.pr "E %s@,"  (Dot.string_of_graph (to_dot''' back));*)
 
-  print_endline "END";
-
   (*Fmt.pr "%s@," (Dot.string_of_graph (to_dot (with_actions lexical lookahead' nullable' nc)));*)
 
   (*Fmt.pr "P %s@,"  (Dot.string_of_graph (to_dot'' c));
@@ -1364,3 +1418,34 @@ let build _overexpand syntactic lexical longest_match start prods  =
   (*Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot (with_actions lexical lookahead' nullable' nc)));*)
 
   (lookahead', nullable', nc, back)
+
+let build_classic syntactic lexical start parser_prods scanner_prods =
+  assert (T.Vars.disjoint syntactic lexical);
+
+  let isupply1, isupply2 = Supply.split2 @@ T.State.fresh_supply () in
+  let parser_iprods = index_productions ~supply:isupply1 parser_prods in
+  let scanner_iprods = index_productions ~supply:isupply2 scanner_prods in
+
+  let c = construct ~supply:(T.State.fresh_supply ()) false start lexical parser_iprods in
+
+  let lr_supply1, lr_supply2, lr_supply3 = Supply.split3 @@ T.State.fresh_supply () in
+  let p = lr ~supply:lr_supply1 c in
+
+  let e = enhance p c in
+  let eprods = enhanced_productions start e in
+  let analysis = Analysis.compute lexical eprods in
+
+  let ieprods = index_enhanced_productions eprods in
+  let lookahead' = Lookahead.compute analysis ieprods lexical T.Vars.empty in
+  let nullable' = nullable analysis in
+
+  let nc = noncanonical_subset ~supply:lr_supply3 p in
+
+  let s = scanner ~supply:lr_supply2 lexical scanner_iprods in
+  let s' = lr ~supply:(T.State.fresh_supply ()) s in
+
+  Fmt.pr "%i@." (T.States.cardinal (A.states p));
+
+  (*Fmt.pr "P %s@,"  (Dot.string_of_graph (to_dot'' p));
+  Fmt.pr "P %s@,"  (Dot.string_of_graph (to_dot'' s'));*)
+  (lookahead', nullable', nc, s')

@@ -113,8 +113,8 @@ module Make(Tables: TABLES) = struct
         self#order bottom;
         self#expand bottom
 
-      method private log _action = ()
-        (*trace <- action :: trace*)
+      method private log action =
+        trace <- action :: trace
 
       method private successors v ns paths d =
         if Int.equal d 0
@@ -210,7 +210,7 @@ module Make(Tables: TABLES) = struct
 
           if not (Gss.contains u stack) then begin
             stack <- Gss.add u stack;
-            (*subclasses <- Subclasses.add pos u subclasses;*)
+            subclasses <- Subclasses.add pos u subclasses;
             self#order u;
             self#expand u
           end;
@@ -232,7 +232,7 @@ module Make(Tables: TABLES) = struct
               self#log (Trace.shift output v w v' u);
               if not (Gss.contains u stack) then begin
                 stack <- Gss.add u stack;
-                (*subclasses <- Subclasses.add pos u subclasses;*)
+                subclasses <- Subclasses.add pos u subclasses;
                 self#order u;
                 self#expand u
               end;
@@ -275,7 +275,7 @@ module Make(Tables: TABLES) = struct
 
               if not (Gss.contains u stack) then begin
                 stack <- Gss.add u stack;
-                (*subclasses <- Subclasses.add pos u subclasses;*)
+                subclasses <- Subclasses.add pos u subclasses;
                 self#order u;
                 match r.strategy with
                 | Null -> self#parse_actor ~null:true u (T.Vertices.singleton w) xs
@@ -314,12 +314,12 @@ module Make(Tables: TABLES) = struct
            read1 <- Segments.add u v read1
            (*if not (Gss.contains u stack) then begin
              stack <- Gss.add u stack;
-             (*subclasses <- Subclasses.add pos u subclasses;*)
-             end;
-             if not (Gss.contains_edge u v stack) then begin
+             subclasses <- Subclasses.add pos u subclasses;
+           end;
+           if not (Gss.contains_edge u v stack) then begin
              stack <- Gss.connect u v T.Nodes.empty stack;
              read1 <- Segments.add u v read1
-             end*))
+           end*))
         | None -> ()
 
       method read x = begin
@@ -351,15 +351,15 @@ module Make(Tables: TABLES) = struct
                   let pos = succ @@ T.Vertex.position w in
                   let u = T.Vertex.make s pos in
                   self#log (Trace.read x v w u );
-                  read1 <- Segments.add u v read1
+                  read1 <- Segments.add u v read1;
                   (*if not (Gss.contains u stack) then begin
                     stack <- Gss.add u stack;
-                    (*subclasses <- Subclasses.add pos u subclasses;*)
-                    end;
-                    if not (Gss.contains_edge u v stack) then begin
+                    subclasses <- Subclasses.add pos u subclasses;
+                  end;
+                  if not (Gss.contains_edge u v stack) then begin
                     stack <- Gss.connect u v T.Nodes.empty stack;
                     read1 <- Segments.add u v read1
-                    end*)
+                  end*)
                 | None -> ())
               l)
           (Segments.to_seq_multiple read0);

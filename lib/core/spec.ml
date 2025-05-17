@@ -160,7 +160,7 @@ module Build(Spec: SPEC') = struct
     let lexical = T.Vars.of_list Spec'.lexical in
     let longest_match = T.Vars.of_list Spec'.longest_match in
 
-    let (lookahead', nullable', g, b) = Tn.build overexpand syntactic lexical longest_match Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
+    let (lookahead', nullable', g, b) = Tn.build overexpand syntactic lexical longest_match Spec'.start (Seq.append (convert Spec'.parser) (convert Spec'.scanner)) in
     Tables.Optimized.make Spec'.start lexical lookahead' nullable' g b
 
   let driver t =
@@ -180,6 +180,45 @@ module Build(Spec: SPEC') = struct
       in loop ()
   end
 end
+
+module Classic(Spec: SPEC') = struct
+  module Spec' = Spec(Context)
+  module X = Glr.Make(Tables.Unoptimized_classic)
+
+  let convert x =
+    List.to_seq x
+    |> Seq.map (fun p -> Tn.Production.{
+        lhs = Context.Production.lhs p;
+        rhs = Re.Abstract.map Tn.Lits.of_symbols (Context.Production.rhs p);
+      })
+
+  let tables () =
+    let lexical = T.Vars.of_list Spec'.lexical in
+    let syntactic = T.Vars.of_list Spec'.syntactic in
+
+    let (lookahead', nullable', gp, gs) = Tn.build_classic syntactic lexical Spec'.start (convert Spec'.parser) (convert Spec'.scanner) in
+    Tables.Unoptimized_classic.make Spec'.start lexical lookahead' nullable' gp gs
+
+  let driver t =
+    new X.driver t
+
+  module Run = struct
+    let code s = T.Symbol.Code (T.Codes.the @@ T.Codes.of_string s)
+    let eof = T.Symbol.Eof
+
+    let file f path =
+      let d = Uutf.decoder (`Channel (open_in path)) in
+      let rec loop () =
+        match Uutf.decode d with
+        | `Uchar u -> f (T.Symbol.Code (T.Code.of_int (Uchar.to_int u))); loop ()
+        | `End -> 
+          f T.Symbol.Eof;
+          f T.Symbol.Eof
+        | _ -> assert false
+      in loop ()
+  end
+end
+
 
 module Test(Spec: SPEC) = struct
   module Spec' = Spec(Context)
