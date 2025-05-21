@@ -20,6 +20,9 @@ module Code = struct
   let to_id x = Dot.(Int x)
   let of_int = Fun.id
 
+  let of_string s =
+    List.hd (explode s)
+
   let to_string x =
     let b = Buffer.create 4 in
     Buffer.add_utf_8_uchar b (Uchar.of_int x);
@@ -272,6 +275,8 @@ end
 module Labeled_vars = struct
   include Balanced_binary_tree.Set.Size(Labeled_var)
   let pp = pp Labeled_var.pp
+  let vars =
+    fold (fun (_, var) -> Vars.add var) Vars.empty
 end
 module Labeled_var_to = struct
   include Balanced_binary_tree.Map.Size(Labeled_var)

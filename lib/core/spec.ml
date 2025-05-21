@@ -43,7 +43,25 @@ module type CONTEXT = sig
   val not_range: string -> string -> T.Symbols.t R.t
   val with_ws: T.Vars.t -> T.Symbols.t R.t -> Production.t list -> Production.t list
   val unextend: T.Var.pre Supply.t -> T.Var.t -> Production.t list -> Production.t list
+
+  module Early_stop: sig
+    val code: string -> T.Code.t
+    val (=): T.Code.t -> T.Code.t -> bool
+    val (<=): T.Code.t -> T.Code.t -> bool
+  end
 end
+
+module type SPEC'' = functor (Context: CONTEXT) -> sig
+  open Context
+
+  val start: T.Var.t
+  val syntactic: T.Var.t list
+  val lexical: T.Var.t list
+  val early_stop: (T.Var.t * (T.Symbol.t -> T.Symbol.t -> T.Symbol.t -> T.Symbol.t -> bool)) list
+  val parser: Production.t list
+  val scanner: Production.t list
+end
+
 
 module type SPEC' = functor (Context: CONTEXT) -> sig
   open Context
@@ -142,6 +160,12 @@ module Context: CONTEXT = struct
       |> List.split % snd
     in
     prods @ (List.flatten loop_prodss)
+
+  module Early_stop = struct
+    let code = T.Code.of_string
+    let (=) = T.Code.equal
+    let (<=) x y = T.Code.compare x y <=0
+  end
 end
 
 module Build(Spec: SPEC') = struct
@@ -181,7 +205,7 @@ module Build(Spec: SPEC') = struct
   end
 end
 
-module Classic(Spec: SPEC') = struct
+module Classic(Spec: SPEC'') = struct
   module Spec' = Spec(Context)
   module X = Glr.Make(Tables.Unoptimized_classic)
 
@@ -197,7 +221,7 @@ module Classic(Spec: SPEC') = struct
     let syntactic = T.Vars.of_list Spec'.syntactic in
 
     let (lookahead', nullable', gp, gs) = Tn.build_classic syntactic lexical Spec'.start (convert Spec'.parser) (convert Spec'.scanner) in
-    Tables.Unoptimized_classic.make Spec'.start lexical lookahead' nullable' gp gs
+    Tables.Unoptimized_classic.make Spec'.start lexical lookahead' nullable' Spec'.early_stop gp gs
 
   let driver t =
     new X.driver t
@@ -212,6 +236,9 @@ module Classic(Spec: SPEC') = struct
         match Uutf.decode d with
         | `Uchar u -> f (T.Symbol.Code (T.Code.of_int (Uchar.to_int u))); loop ()
         | `End -> 
+          f T.Symbol.Eof;
+          f T.Symbol.Eof;
+          f T.Symbol.Eof;
           f T.Symbol.Eof;
           f T.Symbol.Eof
         | _ -> assert false

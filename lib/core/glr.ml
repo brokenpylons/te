@@ -44,6 +44,7 @@ end
 module Scanner = struct
   type t =
     {
+      pos: int;
       state: T.State.t;
       vars: T.Vars.t;
     }
@@ -70,6 +71,8 @@ module type TABLES = sig
   val shift: actions -> bool
   val null: actions -> T.Reductions.t
   val reduce: actions -> T.Reductions.t
+
+  val early_stop: t -> T.Var.t -> (T.Symbol.t -> T.Symbol.t -> T.Symbol.t -> T.Symbol.t -> bool)
 end
 
 module Subclasses = Multimap.Make3(Balanced_binary_tree.Map.Size(Int))(T.Vertices)
@@ -86,9 +89,11 @@ module Make(Tables: TABLES) = struct
       val mutable shift0 = Segments.empty
       val mutable shift1 = Segments.singleton bottom bottom
       val mutable scanner = Scanner.{
+          pos = 0;
           state = Tables.start_scanner t;
           vars = Tables.valid_lookahead t (Tables.start_parser t);
         }
+      val mutable buffer = [|None; None; None|]
       val mutable trace: Trace.t = []
 
       method private log action =
@@ -127,26 +132,29 @@ module Make(Tables: TABLES) = struct
         | Scan _ -> failwith "Not supported"
         | Null -> Paths.singleton (v, [])
 
-      method private parse_actor ~null ?filter v l xs =
+      method private parse_actor ~null ?filter v l pos matches =
+        let xs = List.map (fun x -> T.Symbol.Var x)
+            (T.Vars.to_list @@ T.Labeled_vars.vars matches) 
+        in
         let a = List.fold_left (fun acc x ->
             T.Actions.union (Tables.actions t (T.Vertex.states v) x) acc)
             T.Actions.empty xs
         in
         if not null then
           T.Reductions.iter (fun r ->
-              self#reduce ?filter v l r xs)
+              self#reduce ?filter v l r pos matches)
             (Tables.reduce a);
         T.Reductions.iter (fun r ->
-            self#reduce v T.Vertices.empty r xs)
+            self#reduce v T.Vertices.empty r pos matches)
           (Tables.null a);
-        List.iter (fun x ->
-            self#load v x)
-          xs
+        T.Labeled_vars.iter (fun match_ ->
+            self#load v pos match_)
+          matches
 
-      method private load v x =
+      method private load v pos match_ =
+        let x = T.Symbol.Var (T.Labeled_var.var match_) in
         match Tables.goto t (T.Vertex.states v) x with
         | Some s ->
-          let pos = succ @@ T.Vertex.position v in
           let u = T.Vertex.make s pos in
           let n = T.Node.make x (T.Vertex.position v) pos in
           self#log (Trace.load x v u);
@@ -159,11 +167,12 @@ module Make(Tables: TABLES) = struct
             stack <- Gss.connect u v (T.Nodes.singleton n) stack;
             shift1 <- Segments.add u v shift1;
             forest <- Forest.add n forest;
-          end
+          end;
+          forest <- Forest.pack n (T.Vars.singleton @@ T.Labeled_var.label match_) [] forest
         | None -> ()
 
 
-      method private reduce ?filter v l r xs =
+      method private reduce ?filter v l r pos' matches =
         List.iter (fun (w, ns) ->
             match Tables.goto t (T.Vertex.states w) (Var (T.Labeled_var.var r.output)) with
             | Some s ->
@@ -176,7 +185,7 @@ module Make(Tables: TABLES) = struct
                 stack <- Gss.add u stack;
                 subclasses <- Subclasses.add pos u subclasses;
                 match r.strategy with
-                | Null -> self#parse_actor ~null:true u (T.Vertices.singleton w) xs
+                | Null -> self#parse_actor ~null:true u (T.Vertices.singleton w) pos' matches
                 | _ -> ()
               end;
               if not (Gss.contains_edge u w stack) then begin
@@ -184,16 +193,16 @@ module Make(Tables: TABLES) = struct
                 forest <- Forest.add n forest;
                 match r.strategy with
                 | Null -> ()
-                | _ -> self#parse_actor ~null:false u (T.Vertices.singleton w) xs
+                | _ -> self#parse_actor ~null:false u (T.Vertices.singleton w) pos' matches
               end else if not (Forest.mem n forest) then begin
                 stack <- Gss.connect u w (T.Nodes.add n @@ Gss.node u w stack) stack;
                 forest <- Forest.add n forest;
                 match r.strategy with
                 | Null -> ()
-                | _ -> self#parse_actor ~null:false ~filter:n u (T.Vertices.singleton w) xs
+                | _ -> self#parse_actor ~null:false ~filter:n u (T.Vertices.singleton w) pos' matches
               end;
               List.iter (fun ns' ->
-                  forest <- Forest.pack 
+                  forest <- Forest.pack
                       n
                       (T.Vars.singleton @@ T.Labeled_var.label r.output)
                       (ns @ ns')
@@ -203,33 +212,54 @@ module Make(Tables: TABLES) = struct
           (self#find_paths ?filter v l r.strategy)
 
       method read x = begin
-        let move scanner =
-          match Tables.goto t scanner.Scanner.state x with
-          | Some s ->
-            let vars = T.Vars.inter (Tables.predictions t s) scanner.vars in
-            if T.Vars.is_empty vars
-            then None
-            else Some Scanner.{state = s; vars}
-          | None -> None
-        in
-        scanner <- match move scanner with
-          | Some scanner ->
-            scanner
-          | None ->
-            shift0 <- shift1;
-            shift1 <- Segments.empty;
-            let xs = List.map (fun x -> T.Symbol.Var x) (T.Vars.to_list scanner.vars) in
-            Seq.iter (fun (w, l) ->
-                self#parse_actor ~null:false w l xs)
-              (Segments.to_seq_multiple shift0);
+        let x' = buffer.(0) in
+        buffer.(0) <- buffer.(1);
+        buffer.(1) <- buffer.(2);
+        buffer.(2) <- Some x;
 
-            let vars =
-              shift1
-              |> Segments.to_seq_multiple
-              |> Seq.map (fun (v, _) -> Tables.valid_lookahead t (T.Vertex.states v))
-              |> Seq.fold_left T.Vars.union T.Vars.empty
-            in
-            !!(move Scanner.{state = Tables.start_scanner t; vars})
+        match x' with
+        | Some x' -> begin
+          let move scanner =
+            match Tables.goto t scanner.Scanner.state x' with
+            | Some s ->
+              let vars = T.Vars.inter (Tables.predictions t s) scanner.vars in
+              let early_stop = T.Vars.exists (fun v ->
+                  Tables.early_stop t v x' !!(buffer.(0)) !!(buffer.(1)) !!(buffer.(2)))
+                  (Tables.matches t scanner.state
+                  |> T.Labeled_vars.vars
+                  |> T.Vars.inter scanner.vars)
+              in
+              if T.Vars.is_empty vars || early_stop
+              then None
+              else Some Scanner.{pos = succ scanner.pos; state = s; vars}
+            | None -> None
+          in
+          match move scanner with
+            | Some scanner' ->
+              scanner <- scanner'
+            | None ->
+              shift0 <- shift1;
+              shift1 <- Segments.empty;
+              let matches =
+                Tables.matches t scanner.state 
+                |> T.Labeled_vars.filter (fun (_, var) -> T.Vars.mem var scanner.vars)
+              in
+              Seq.iter (fun (w, l) ->
+                  self#parse_actor ~null:false w l scanner.pos matches)
+                (Segments.to_seq_multiple shift0);
+
+              let vars =
+                shift1
+                |> Segments.to_seq_multiple
+                |> Seq.map (fun (v, _) -> Tables.valid_lookahead t (T.Vertex.states v))
+                |> Seq.fold_left T.Vars.union T.Vars.empty
+              in
+              match move Scanner.{pos = scanner.pos; state = Tables.start_scanner t; vars} with
+              | Some scanner' -> 
+                scanner <- scanner'
+              | None -> ()
+        end
+        | None -> ()
       end
 
       method forest =

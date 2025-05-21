@@ -12,6 +12,7 @@ module Code: sig
   val to_id: t -> Dot.id
   val pp: t Fmt.t
   val to_string: t -> string
+  val of_string: string -> t
 
   val of_int: int -> t
 end
@@ -256,6 +257,7 @@ module Var_to: sig
   val diff: (elt -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
   val filter: (elt -> 'a -> bool) -> 'a t -> 'a t
   val of_seq: (elt * 'a) Seq.t -> 'a t
+  val of_list: (elt * 'a) list -> 'a t
 end
 
 module Labeled_var: sig
@@ -278,6 +280,8 @@ module Labeled_vars: sig
   val disjoint: t -> t -> bool
   val subset: t -> t -> bool
   val iter: (elt -> unit) -> t -> unit
+  val filter: (elt -> bool) -> t -> t
+  val vars: t -> Vars.t
 end
 
 module Labeled_var_to: sig

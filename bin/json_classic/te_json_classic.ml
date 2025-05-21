@@ -66,13 +66,12 @@ module X = Spec.Classic(functor(Context: Spec.CONTEXT) -> struct
     colon;
   ]
 
-  let longest_match = []
+  let early_stop = []
 
   let start = start
 
   let parser =
     unextend s u @@ with_ws (T.Vars.of_list lexical) R.(opt (var ws)) (Production.[
-      (*make (u, start) R.(var json * plus eof);*)
       make (u, start) R.(var json * var e * var e');
       make (u, e') R.(var e * var e' + null);
       make (u, json) R.(var ws * var value);

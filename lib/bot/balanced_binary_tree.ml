@@ -525,6 +525,7 @@ module Map = struct
     val to_seq: 'a t -> (elt * 'a) Seq.t
     val to_list: 'a t -> (elt * 'a) list
     val of_seq: (elt * 'a) Seq.t -> 'a t
+    val of_list: (elt * 'a) list -> 'a t
 
     val add_with: (elt -> elt -> elt) -> ('a -> 'a -> 'a) -> elt -> 'a -> 'a t -> 'a t
 
@@ -1009,6 +1010,12 @@ module Map = struct
 
     let of_seq s =
       add_seq s empty
+
+    let add_list s t =
+      List.fold_left (fun t (x, xp) -> add x xp t) t s
+
+    let of_list s =
+      add_list s empty
 
     let rec to_seq' t tl =
       match t with

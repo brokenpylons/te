@@ -2,7 +2,7 @@ open! Te_bot
 open Te_core
 module T = Types
 
-module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
+module X = Spec.Classic(functor(Context: Spec.CONTEXT) -> struct
   open Context
 
   let s = variable_supply
@@ -195,6 +195,8 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   let (kw_to, s) = variable s "kw_to"
 
   let (u, s) = variable s "u"
+  let (e, s) = variable s "e"
+  let (e', s) = variable s "e'"
   let (block', s) = variable s "block'"
   let (constantdefinition', s) = variable s "constantdefinition'"
   let (typedefinition', s) = variable s "typedefinition'"
@@ -253,6 +255,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   let (filevariable', _) = variable s "filevariable'"
 
   let syntactic = [
+    e';
     start;
     block;
     label_declaration_part;
@@ -389,6 +392,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   ]
 
   let lexical = [
+    e;
     ws;
     identifier;
     directive;
@@ -443,285 +447,297 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     kw_to;
   ]
 
-  let longest_match = [
-    ws;
-    identifier;
-    directive;
-  ]
+  let early_stop =
+    let f l0 l1 l2 l3 =
+      let open Early_stop in
+      match l0, l1, l2, l3 with
+      | T.Symbol.Code c0, T.Symbol.Code c1, T.Symbol.Code c2, T.Symbol.Code c3 ->
+        c0 = code "." &&
+        not ((code "0" <= c1 && c1 <= code "9") ||
+             ((c1 = code "e" || c1 = code "E") &&
+              ((code "0" <= c2 && c2 <= code "9") ||
+               ((c2 = code "+" || c2 = code "-") &&
+                (code "0" <= c3 && c3 <= code "9")))))
+      | _ -> false
+    in
+    [
+      (unsigned_number, f)
+    ]
 
   let start = start
 
   let parser =
-    with_ws (T.Vars.of_list lexical) (var ws) @@ unextend s u Production.[
-      make (u, start) R.(var program * plus eof);
+    unextend s u @@ with_ws (T.Vars.of_list lexical) R.(opt (var ws)) @@ Production.[
+        make (u, start) R.(var program * var e * var e');
+        make (u, e') R.(var e * var e' + null);
 
-      make (block', block) R.(opt (var label_declaration_part) * opt (var constant_definition_part) * opt (var type_definition_part) * opt (var variable_declaration_part) * star (var procedure_and_function_declaration_part) * var statement_part);
+        make (block', block) R.(opt (var label_declaration_part) * opt (var constant_definition_part) * opt (var type_definition_part) * opt (var variable_declaration_part) * star (var procedure_and_function_declaration_part) * var statement_part);
 
-      make (u, label_declaration_part) R.(var kw_label * var label * star (var comma * var label) * var semi);
+        make (u, label_declaration_part) R.(var kw_label * var label * star (var comma * var label) * var semi);
 
-      make (u, constant_definition_part) R.(var kw_const * var constant_definition * var semi * star (var constant_definition * var semi));
+        make (u, constant_definition_part) R.(var kw_const * var constant_definition * var semi * star (var constant_definition * var semi));
 
-      make (u, type_definition_part) R.(var kw_type * var type_definition * var semi * star (var type_definition * var semi));
+        make (u, type_definition_part) R.(var kw_type * var type_definition * var semi * star (var type_definition * var semi));
 
-      make (u, variable_declaration_part) R.(var kw_var * var variable_declaration * var semi * star (var variable_declaration * var semi));
+        make (u, variable_declaration_part) R.(var kw_var * var variable_declaration * var semi * star (var variable_declaration * var semi));
 
-      make (u, procedure_and_function_declaration_part) R.(star ((var procedure_declaration + var function_declaration) * var semi));
+        make (u, procedure_and_function_declaration_part) R.(star ((var procedure_declaration + var function_declaration) * var semi));
 
-      make (u, statement_part) (var compound_statement);
+        make (u, statement_part) (var compound_statement);
 
-      make (constantdefinition', constant_definition) R.(var identifier * var eq * var constant);
+        make (constantdefinition', constant_definition) R.(var identifier * var eq * var constant);
 
-      make (u, constant) R.(opt (var sign) * (var unsigned_number + var constant_identifier) + var character_string);
+        make (u, constant) R.(opt (var sign) * (var unsigned_number + var constant_identifier) + var character_string);
 
-      make (u, constant_identifier) (var identifier);
+        make (u, constant_identifier) (var identifier);
 
-      make (typedefinition', type_definition) R.(var identifier * var eq * var type_denoter);
+        make (typedefinition', type_definition) R.(var identifier * var eq * var type_denoter);
 
-      make (u, type_denoter) R.(var type_identifier + var new_type);
+        make (u, type_denoter) R.(var type_identifier + var new_type);
 
-      make (u, new_type) R.(var new_ordinal_type + var new_structured_type + var new_pointer_type);
+        make (u, new_type) R.(var new_ordinal_type + var new_structured_type + var new_pointer_type);
 
-      make (u, simple_type_identifier) (var type_identifier);
+        make (u, simple_type_identifier) (var type_identifier);
 
-      make (u, structured_type_identifier) (var type_identifier);
+        make (u, structured_type_identifier) (var type_identifier);
 
-      make (u, pointer_type_identifier) (var type_identifier);
+        make (u, pointer_type_identifier) (var type_identifier);
 
-      make (u, type_identifier) (var identifier);
+        make (u, type_identifier) (var identifier);
 
-      make (simpletype', simple_type) R.(var ordinal_type + var real_type_identifier);
+        make (simpletype', simple_type) R.(var ordinal_type + var real_type_identifier);
 
-      make (u, ordinal_type) R.(var new_ordinal_type + var ordinal_type_identifier);
+        make (u, ordinal_type) R.(var new_ordinal_type + var ordinal_type_identifier);
 
-      make (u, new_ordinal_type) R.(var enumerated_type + var subrange_type);
+        make (u, new_ordinal_type) R.(var enumerated_type + var subrange_type);
 
-      make (u, ordinal_type_identifier) (var type_identifier);
+        make (u, ordinal_type_identifier) (var type_identifier);
 
-      make (u, real_type_identifier) (var type_identifier);
+        make (u, real_type_identifier) (var type_identifier);
 
-      make (enumeratedtype', enumerated_type) R.(var lparen * var identifier_list * var rparen);
+        make (enumeratedtype', enumerated_type) R.(var lparen * var identifier_list * var rparen);
 
-      make (u, identifier_list) R.(var identifier * star (var comma * var identifier));
+        make (u, identifier_list) R.(var identifier * star (var comma * var identifier));
 
-      make (subrangetype', subrange_type) R.(var constant * var dotdot * var constant);
+        make (subrangetype', subrange_type) R.(var constant * var dotdot * var constant);
 
-      make (structuredtype', structured_type) R.(var new_structured_type + var structured_type_identifier);
+        make (structuredtype', structured_type) R.(var new_structured_type + var structured_type_identifier);
 
-      make (u, new_structured_type) R.(opt (var kw_packed) * var unpacked_structured_type);
+        make (u, new_structured_type) R.(opt (var kw_packed) * var unpacked_structured_type);
 
-      make (u, unpacked_structured_type) R.(var array_type + var record_type + var set_type + var file_type);
+        make (u, unpacked_structured_type) R.(var array_type + var record_type + var set_type + var file_type);
 
-      make (arraytype', array_type) R.(var kw_array * var lbrak * var index_type * star (var comma * var index_type) * var rbrak * var kw_of * var component_type);
+        make (arraytype', array_type) R.(var kw_array * var lbrak * var index_type * star (var comma * var index_type) * var rbrak * var kw_of * var component_type);
 
-      make (u, index_type) (var ordinal_type);
+        make (u, index_type) (var ordinal_type);
 
-      make (u, component_type) (var type_denoter);
+        make (u, component_type) (var type_denoter);
 
-      make (recordtype', record_type) R.(var kw_record * opt (var field_list) * var kw_end);
+        make (recordtype', record_type) R.(var kw_record * opt (var field_list) * var kw_end);
 
-      make (u, field_list) R.((var fixed_part * opt (var semi * var variant_part) + var variant_part) * opt (var semi));
+        make (u, field_list) R.((var fixed_part * opt (var semi * var variant_part) + var variant_part) * opt (var semi));
 
-      make (u, fixed_part) R.(var record_section * star (var semi * var record_section));
+        make (u, fixed_part) R.(var record_section * star (var semi * var record_section));
 
-      make (u, record_section) R.(var identifier_list * var colon * var type_denoter);
+        make (u, record_section) R.(var identifier_list * var colon * var type_denoter);
 
-      make (u, field_identifier) (var identifier);
+        make (u, field_identifier) (var identifier);
 
-      make (u, variant_part) R.(var kw_case * var variant_selector * var kw_of * var variant * star (var semi * var variant));
+        make (u, variant_part) R.(var kw_case * var variant_selector * var kw_of * var variant * star (var semi * var variant));
 
-      make (u, variant_selector) R.(opt (var tag_field * var colon) * var tag_type);
+        make (u, variant_selector) R.(opt (var tag_field * var colon) * var tag_type);
 
-      make (u, tag_field) (var identifier);
+        make (u, tag_field) (var identifier);
 
-      make (variant', variant) R.(var case_constant_list * var colon * var lparen * var field_list * var rparen);
+        make (variant', variant) R.(var case_constant_list * var colon * var lparen * var field_list * var rparen);
 
-      make (u, tag_type) (var ordinal_type_identifier);
+        make (u, tag_type) (var ordinal_type_identifier);
 
-      make (u, case_constant_list) R.(var case_constant * star (var comma * var case_constant));
+        make (u, case_constant_list) R.(var case_constant * star (var comma * var case_constant));
 
-      make (u, case_constant) (var constant);
+        make (u, case_constant) (var constant);
 
-      make (settype', set_type) R.(var kw_set * var kw_of * var base_type);
+        make (settype', set_type) R.(var kw_set * var kw_of * var base_type);
 
-      make (u, base_type) (var ordinal_type);
+        make (u, base_type) (var ordinal_type);
 
-      make (filetype', file_type) R.(var kw_file * var kw_of * var component_type);
+        make (filetype', file_type) R.(var kw_file * var kw_of * var component_type);
 
-      make (pointertype', pointer_type) R.(var new_pointer_type + var pointer_type_identifier);
+        make (pointertype', pointer_type) R.(var new_pointer_type + var pointer_type_identifier);
 
-      make (u, new_pointer_type) R.(var ptr * var domain_type);
+        make (u, new_pointer_type) R.(var ptr * var domain_type);
 
-      make (u, domain_type) (var type_identifier);
+        make (u, domain_type) (var type_identifier);
 
-      make (variabledeclaration', variable_declaration) R.(var identifier_list * var colon * var type_denoter);
+        make (variabledeclaration', variable_declaration) R.(var identifier_list * var colon * var type_denoter);
 
-      make (variableaccess', variable_access) R.(var entire_variable + var component_variable + var identified_variable + var buffer_variable);
+        make (variableaccess', variable_access) R.(var entire_variable + var component_variable + var identified_variable + var buffer_variable);
 
-      make (entirevariable', entire_variable) (var variable_identifier);
+        make (entirevariable', entire_variable) (var variable_identifier);
 
-      make (identifiedvariable', identified_variable) R.(var pointer_variable * var ptr);
+        make (identifiedvariable', identified_variable) R.(var pointer_variable * var ptr);
 
-      make (pointervariable', pointer_variable) (var variable_access);
+        make (pointervariable', pointer_variable) (var variable_access);
 
-      make (u, variable_identifier) (var identifier);
+        make (u, variable_identifier) (var identifier);
 
-      make (componentvariable', component_variable) R.(var indexed_variable + var field_designator);
+        make (componentvariable', component_variable) R.(var indexed_variable + var field_designator);
 
-      make (indexedvariable', indexed_variable) R.(var array_variable * var lbrak * var index_expression * star (var comma * var index_expression) * var rbrak);
+        make (indexedvariable', indexed_variable) R.(var array_variable * var lbrak * var index_expression * star (var comma * var index_expression) * var rbrak);
 
-      make (arrayvariable', array_variable) (var variable_access);
+        make (arrayvariable', array_variable) (var variable_access);
 
-      make (u, index_expression) (var expression);
+        make (u, index_expression) (var expression);
 
-      make (fielddesignator', field_designator) R.(var record_variable * var dot * var field_specifier + var field_designator_identifier);
+        make (fielddesignator', field_designator) R.(var record_variable * var dot * var field_specifier + var field_designator_identifier);
 
-      make (recordvariable', record_variable) (var variable_access);
+        make (recordvariable', record_variable) (var variable_access);
 
-      make (u, field_specifier) (var field_identifier);
+        make (u, field_specifier) (var field_identifier);
 
-      make (buffervariable', buffer_variable) R.(var file_variable * var ptr);
+        make (buffervariable', buffer_variable) R.(var file_variable * var ptr);
 
-      make (filevariable', file_variable) (var variable_access);
+        make (filevariable', file_variable) (var variable_access);
 
 
-      make (proceduredeclaration', procedure_declaration) R.(var procedure_heading * var semi * var directive + var procedure_identification * var semi * var procedure_block + var procedure_heading * var semi * var procedure_block);
+        make (proceduredeclaration', procedure_declaration) R.(var procedure_heading * var semi * var directive + var procedure_identification * var semi * var procedure_block + var procedure_heading * var semi * var procedure_block);
 
-      make (u, procedure_heading) R.(var kw_procedure * var identifier * var formal_parameter_list);
+        make (u, procedure_heading) R.(var kw_procedure * var identifier * var formal_parameter_list);
 
-      make (u, procedure_identification) R.(var kw_procedure * var procedure_identifier);
+        make (u, procedure_identification) R.(var kw_procedure * var procedure_identifier);
 
-      make (u, procedure_identifier) (var identifier);
+        make (u, procedure_identifier) (var identifier);
 
-      make (u, procedure_block) (var block);
+        make (u, procedure_block) (var block);
 
 
-      make (functiondeclaration', function_declaration) R.(var function_heading * var semi * var directive + var function_identification * var semi * var function_block + var function_heading * var semi * var function_block);
+        make (functiondeclaration', function_declaration) R.(var function_heading * var semi * var directive + var function_identification * var semi * var function_block + var function_heading * var semi * var function_block);
 
 
-      make (u, function_heading) R.(var kw_function * var identifier * opt (var formal_parameter_list) * var colon * var result_type);
+        make (u, function_heading) R.(var kw_function * var identifier * opt (var formal_parameter_list) * var colon * var result_type);
 
-      make (u, function_identification) R.(var kw_function * var function_identifier);
+        make (u, function_identification) R.(var kw_function * var function_identifier);
 
-      make (u, function_identifier) (var identifier);
+        make (u, function_identifier) (var identifier);
 
-      make (u, result_type) R.(var simple_type_identifier + var pointer_type_identifier);
+        make (u, result_type) R.(var simple_type_identifier + var pointer_type_identifier);
 
-      make (u, function_block) (var block);
+        make (u, function_block) (var block);
 
-      make (parameters', formal_parameter_list) R.(var lparen * var formal_parameter_section * star (var semi * var formal_parameter_section) * var rparen);
+        make (parameters', formal_parameter_list) R.(var lparen * var formal_parameter_section * star (var semi * var formal_parameter_section) * var rparen);
 
-      make (u, formal_parameter_section) R.(var value_parameter_specification + var variable_parameter_specification + var procedural_parameter_specification + var functional_parameter_specification + var conformant_array_parameter_specification);
+        make (u, formal_parameter_section) R.(var value_parameter_specification + var variable_parameter_specification + var procedural_parameter_specification + var functional_parameter_specification + var conformant_array_parameter_specification);
 
-      make (valueparameter', value_parameter_specification) R.(var identifier_list * var colon * var type_identifier);
+        make (valueparameter', value_parameter_specification) R.(var identifier_list * var colon * var type_identifier);
 
-      make (variableparameter', variable_parameter_specification) R.(var kw_var * var identifier_list * var colon * var type_identifier);
+        make (variableparameter', variable_parameter_specification) R.(var kw_var * var identifier_list * var colon * var type_identifier);
 
-      make (proceduralparameter', procedural_parameter_specification) (var procedure_heading);
+        make (proceduralparameter', procedural_parameter_specification) (var procedure_heading);
 
-      make (functionalparameter', functional_parameter_specification) (var function_heading);
+        make (functionalparameter', functional_parameter_specification) (var function_heading);
 
-      make (arrayparameter', conformant_array_parameter_specification) R.(var value_conformant_array_specification + var variable_conformant_array_specification);
+        make (arrayparameter', conformant_array_parameter_specification) R.(var value_conformant_array_specification + var variable_conformant_array_specification);
 
-      make (u, value_conformant_array_specification) R.(var identifier_list * var colon * var conformant_array_schema);
+        make (u, value_conformant_array_specification) R.(var identifier_list * var colon * var conformant_array_schema);
 
-      make (u, variable_conformant_array_specification) R.(var kw_var * var identifier_list * var colon * var conformant_array_schema);
+        make (u, variable_conformant_array_specification) R.(var kw_var * var identifier_list * var colon * var conformant_array_schema);
 
-      make (u, conformant_array_schema) R.(var packed_conformant_array_schema + var unpacked_conformant_array_schema);
+        make (u, conformant_array_schema) R.(var packed_conformant_array_schema + var unpacked_conformant_array_schema);
 
-      make (u, packed_conformant_array_schema) R.(var kw_packed * var kw_array * var lbrak * var index_type_specification * var rbrak * var kw_of * var type_identifier);
+        make (u, packed_conformant_array_schema) R.(var kw_packed * var kw_array * var lbrak * var index_type_specification * var rbrak * var kw_of * var type_identifier);
 
-      make (u, unpacked_conformant_array_schema) R.(var kw_array * var lbrak * var index_type_specification * star (var semi * var index_type_specification) * var rbrak * var kw_of * (var type_identifier + var conformant_array_schema));
+        make (u, unpacked_conformant_array_schema) R.(var kw_array * var lbrak * var index_type_specification * star (var semi * var index_type_specification) * var rbrak * var kw_of * (var type_identifier + var conformant_array_schema));
 
-      make (u, index_type_specification) R.(var identifier * var dotdot * var identifier * var colon * var ordinal_type_identifier);
+        make (u, index_type_specification) R.(var identifier * var dotdot * var identifier * var colon * var ordinal_type_identifier);
 
-      make (expression', expression) R.(var simple_expression * star (var relational_operator * var simple_expression));
+        make (expression', expression) R.(var simple_expression * star (var relational_operator * var simple_expression));
 
-      make (simpleepression', simple_expression) R.(opt (var sign) * var term * star (var adding_operator * var term));
+        make (simpleepression', simple_expression) R.(opt (var sign) * var term * star (var adding_operator * var term));
 
-      make (term', term) R.(var factor * star (var multiplying_operator * var factor));
+        make (term', term) R.(var factor * star (var multiplying_operator * var factor));
 
-      make (factor', factor) R.(var bound_identifier + var variable_access + var unsigned_constant + var function_designator + var set_constructor + var lparen * var expression * var rparen + var kw_not * var factor);
+        make (factor', factor) R.(var bound_identifier + var variable_access + var unsigned_constant + var function_designator + var set_constructor + var lparen * var expression * var rparen + var kw_not * var factor);
 
-      make (u, bound_identifier) (var identifier);
+        make (u, bound_identifier) (var identifier);
 
-      make (u, unsigned_constant) R.(var unsigned_number + var character_string + var constant_identifier + var kw_nil);
+        make (u, unsigned_constant) R.(var unsigned_number + var character_string + var constant_identifier + var kw_nil);
 
-      make (setconstructor', set_constructor) R.(var lbrak * opt (var member_designator * star (var comma * var member_designator)) * var rbrak);
+        make (setconstructor', set_constructor) R.(var lbrak * opt (var member_designator * star (var comma * var member_designator)) * var rbrak);
 
-      make (u, member_designator) R.(var expression * opt (var dotdot * var expression));
+        make (u, member_designator) R.(var expression * opt (var dotdot * var expression));
 
-      make (functiondesignator', function_designator) R.(var function_identifier * opt (var actual_parameter_list));
+        make (functiondesignator', function_designator) R.(var function_identifier * opt (var actual_parameter_list));
 
-      make (u, actual_parameter_list) R.(var lparen * var actual_parameter * star (var comma * var actual_parameter) * var rparen);
+        make (u, actual_parameter_list) R.(var lparen * var actual_parameter * star (var comma * var actual_parameter) * var rparen);
 
-      make (actualparameter', actual_parameter) R.(var expression + var variable_access + var procedure_identifier + var function_identifier);
+        make (actualparameter', actual_parameter) R.(var expression + var variable_access + var procedure_identifier + var function_identifier);
 
-      make (statement', statement) R.(opt (var label * var colon) * (var simple_statement + var structured_statement));
+        make (statement', statement) R.(opt (var label * var colon) * (var simple_statement + var structured_statement));
 
-      make (simplestatement', simple_statement) R.(var assignment_statement + var procedure_statement + var goto_statement);
+        make (simplestatement', simple_statement) R.(var assignment_statement + var procedure_statement + var goto_statement);
 
-      make (assignmentstatement', assignment_statement) R.((var variable_access + var function_identifier) * var assign * var expression);
+        make (assignmentstatement', assignment_statement) R.((var variable_access + var function_identifier) * var assign * var expression);
 
-      make (procedurestatement', procedure_statement) R.(var procedure_identifier * opt ((var actual_parameter_list + var read_parameter_list + var readln_parameter_list + var write_parameter_list + var writeln_parameter_list)));
+        make (procedurestatement', procedure_statement) R.(var procedure_identifier * opt ((var actual_parameter_list + var read_parameter_list + var readln_parameter_list + var write_parameter_list + var writeln_parameter_list)));
 
-      make (gotostatement', goto_statement) R.(var kw_goto * var label);
+        make (gotostatement', goto_statement) R.(var kw_goto * var label);
 
-      make (structuredstatement', structured_statement) R.(var compound_statement + var conditional_statement + var repetitive_statement + var with_statement);
+        make (structuredstatement', structured_statement) R.(var compound_statement + var conditional_statement + var repetitive_statement + var with_statement);
 
-      make (u, statement_sequence) R.(var statement * star (var semi * opt (var statement)));
+        make (u, statement_sequence) R.(var statement * star (var semi * opt (var statement)));
 
-      make (compoundstatement', compound_statement) R.(var kw_begin * opt (var statement_sequence) * var kw_end);
+        make (compoundstatement', compound_statement) R.(var kw_begin * opt (var statement_sequence) * var kw_end);
 
-      make (u, conditional_statement) R.(var if_statement + var case_statement);
+        make (u, conditional_statement) R.(var if_statement + var case_statement);
 
-      make (ifstatement', if_statement) R.(var kw_if * var expression * var kw_then * var statement * opt (var else_part));
+        make (ifstatement', if_statement) R.(var kw_if * var expression * var kw_then * var statement * opt (var else_part));
 
-      make (elsepart', else_part) R.(var kw_else * var statement);
+        make (elsepart', else_part) R.(var kw_else * var statement);
 
-      make (casestatement', case_statement) R.(var kw_case * var case_index * var kw_of * var case_list_element * star (var semi * var case_list_element) * opt (var semi) * var kw_end);
+        make (casestatement', case_statement) R.(var kw_case * var case_index * var kw_of * var case_list_element * star (var semi * var case_list_element) * opt (var semi) * var kw_end);
 
-      make (caseelement', case_list_element) R.(var case_constant_list * var colon * var statement);
+        make (caseelement', case_list_element) R.(var case_constant_list * var colon * var statement);
 
-      make (u, case_index) (var expression);
+        make (u, case_index) (var expression);
 
-      make (u, repetitive_statement) R.(var repeat_statement + var while_statement + var for_statement);
+        make (u, repetitive_statement) R.(var repeat_statement + var while_statement + var for_statement);
 
-      make (repeatstatement', repeat_statement) R.(var kw_repeat * opt (var statement_sequence) * var kw_until * var expression);
+        make (repeatstatement', repeat_statement) R.(var kw_repeat * opt (var statement_sequence) * var kw_until * var expression);
 
-      make (whilestatement', while_statement) R.(var kw_while * var expression * var kw_do * var statement);
+        make (whilestatement', while_statement) R.(var kw_while * var expression * var kw_do * var statement);
 
-      make (forstatement', for_statement) R.(var kw_for * var control_variable * var assign * var initial_value * (var kw_to + var kw_downto) * var final_value * var kw_do * var statement);
+        make (forstatement', for_statement) R.(var kw_for * var control_variable * var assign * var initial_value * (var kw_to + var kw_downto) * var final_value * var kw_do * var statement);
 
-      make (u, control_variable) (var entire_variable);
+        make (u, control_variable) (var entire_variable);
 
-      make (u, initial_value) (var expression);
+        make (u, initial_value) (var expression);
 
-      make (u, final_value) (var expression);
+        make (u, final_value) (var expression);
 
-      make (withstatement', with_statement) R.(var kw_with * var record_variable_list * var kw_do * var statement);
+        make (withstatement', with_statement) R.(var kw_with * var record_variable_list * var kw_do * var statement);
 
-      make (u, record_variable_list) R.(var record_variable * star (var comma * var record_variable));
+        make (u, record_variable_list) R.(var record_variable * star (var comma * var record_variable));
 
-      make (u, field_designator_identifier) (var identifier);
+        make (u, field_designator_identifier) (var identifier);
 
-      make (u, read_parameter_list) R.(var lparen * opt (var file_variable * var comma) * var variable_access * star (var comma * var variable_access) * var rparen);
+        make (u, read_parameter_list) R.(var lparen * opt (var file_variable * var comma) * var variable_access * star (var comma * var variable_access) * var rparen);
 
-      make (u, readln_parameter_list) R.(var lparen * (var file_variable + var variable_access) * star (var comma * var variable_access) * var rparen);
+        make (u, readln_parameter_list) R.(var lparen * (var file_variable + var variable_access) * star (var comma * var variable_access) * var rparen);
 
-      make (u, write_parameter_list) R.(var lparen * opt (var file_variable * var comma) * var write_parameter * star (var comma * var write_parameter) * var rparen);
+        make (u, write_parameter_list) R.(var lparen * opt (var file_variable * var comma) * var write_parameter * star (var comma * var write_parameter) * var rparen);
 
-      make (u, write_parameter) R.(var expression * opt (var colon * var expression * opt (var colon * var expression)));
+        make (u, write_parameter) R.(var expression * opt (var colon * var expression * opt (var colon * var expression)));
 
-      make (u, writeln_parameter_list) R.(var lparen * (var file_variable + var write_parameter) * star (var comma * var write_parameter) * var rparen);
+        make (u, writeln_parameter_list) R.(var lparen * (var file_variable + var write_parameter) * star (var comma * var write_parameter) * var rparen);
 
-      make (program', program) R.(var program_heading * var semi * var program_block * var dot);
+        make (program', program) R.(var program_heading * var semi * var program_block * var dot);
 
-      make (u, program_heading) R.(var kw_program * var identifier * opt (var lparen * var program_parameter_list * var rparen));
+        make (u, program_heading) R.(var kw_program * var identifier * opt (var lparen * var program_parameter_list * var rparen));
 
-      make (u, program_parameter_list) (var identifier_list);
+        make (u, program_parameter_list) (var identifier_list);
 
-      make (u, program_block) (var block);
-    ]
+        make (u, program_block) (var block);
+      ]
 
   let scanner =
     let digit = range "0" "9" in
@@ -789,7 +805,8 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       make (u, kw_if) (text "if");
       make (u, kw_to) (text "to");
 
-      make (u, ws) R.(star (codes " \n\r\t"));
+      make (u, ws) R.(plus (codes " \n\r\t"));
+      make (u, e) eof;
     ]
 
 end)
@@ -800,22 +817,21 @@ let _ =
   let t = Sys.time() in
   Fmt.pr "GO@.";
   X.Run.file (fun c -> d#read c) "linear/sample999999.pas";
-  Fmt.pr "%b %f@." d#accept (Sys.time() -. t);
-  d#status*)
-  (*Fmt.pr "@[%a@]" Trace.pp d#trace;*)
-  (*Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);
+  Fmt.pr "%b %f@." d#accept (Sys.time() -. t)*)
+(*Fmt.pr "@[%a@]" Trace.pp d#trace;*)
+(*Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);
   Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))*)
 
-  let t = X.tables () in
+let t = X.tables () in
   let fs = Sys.readdir "linear" in
   Array.sort (fun x y ->
-      let c = Int.compare (String.length x) (String.length y) in
-      if c <> 0 then c else
-      String.compare x y)
-    fs;
+    let c = Int.compare (String.length x) (String.length y) in
+    if c <> 0 then c else
+    String.compare x y)
+  fs;
   Array.iter (fun file ->
-      let d = X.driver t in
-      let t = Sys.time() in
-      X.Run.file (fun c -> d#read c) ("linear/" ^ file);
-      Fmt.pr "%s %b %f@." file d#accept (Sys.time() -. t))
-    fs
+    let d = X.driver t in
+    let t = Sys.time() in
+    X.Run.file (fun c -> d#read c) ("linear/" ^ file);
+    Fmt.pr "%s %b %f@." file d#accept (Sys.time() -. t))
+  fs

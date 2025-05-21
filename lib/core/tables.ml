@@ -177,10 +177,11 @@ module Unoptimized_classic = struct
       predictions: T.Vars.t T.State_to.t;
       accept: bool T.State_to.t;
       valid_lookahead: T.Vars.t T.State_to.t;
+      early_stop: (T.Symbol.t -> T.Symbol.t -> T.Symbol.t -> T.Symbol.t -> bool) T.Var_to.t
     }
   [@@deriving show]
 
-  let make start lexical lookahead' nullable' gp gs  =
+  let make start lexical lookahead' nullable' early_stop gp gs  =
     {
       start_parser = A.start gp;
       start_scanner = A.start gs;
@@ -190,6 +191,7 @@ module Unoptimized_classic = struct
       predictions = predictions lexical gs;
       accept = accept start lookahead' gp;
       valid_lookahead = valid_lookahead lexical lookahead' nullable' Tn.actions_classic gp;
+      early_stop = T.Var_to.of_list early_stop;
     }
 
   let lits_of_symbol = function
@@ -238,6 +240,12 @@ module Unoptimized_classic = struct
   let predictions t s =
     t.predictions
     |> T.State_to.find s
+
+  let early_stop t var =
+    try
+      t.early_stop
+      |> T.Var_to.find var
+    with Not_found -> (fun _ _ _ _ -> false)
 end
 
 module Symbol_multimap(Values: SET) = struct
