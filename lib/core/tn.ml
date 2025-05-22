@@ -1377,7 +1377,6 @@ let build overexpand syntactic lexical longest_match start prods =
   let analysis = Analysis.compute lexical eprods in
 
   print_endline "LOOK";
-
   let ieprods = index_enhanced_productions eprods in
   let lookahead' = Lookahead.compute analysis ieprods lexical longest_match in
   let nullable' = nullable analysis in
@@ -1429,19 +1428,26 @@ let build_classic syntactic lexical start parser_prods scanner_prods =
   let parser_iprods = index_productions ~supply:isupply1 parser_prods in
   let scanner_iprods = index_productions ~supply:isupply2 scanner_prods in
 
+  print_endline "CONSTRUCT";
   let c = construct ~supply:(T.State.fresh_supply ()) false start lexical parser_iprods in
 
+  print_endline "LR";
   let lr_supply1, lr_supply2, lr_supply3 = Supply.split3 @@ T.State.fresh_supply () in
   let p = lr ~supply:lr_supply1 c in
 
+  print_endline "ENHANCE";
   let e = enhance p c in
   let eprods = enhanced_productions start e in
+
+  print_endline "ANA";
   let analysis = Analysis.compute lexical eprods in
 
+  print_endline "LOOK";
   let ieprods = index_enhanced_productions eprods in
   let lookahead' = Lookahead.compute analysis ieprods lexical T.Vars.empty in
   let nullable' = nullable analysis in
 
+  print_endline "NC";
   let nc = noncanonical_subset ~supply:lr_supply3 p in
 
   let s = scanner ~supply:lr_supply2 lexical scanner_iprods in
