@@ -2158,9 +2158,20 @@ let _ =
       String.compare x y)
     fs;
   Array.iter (fun file ->
-      let d = X.driver t in
-      let t = Sys.time() in
-      Fmt.pr "%s@." file;
-      X.Run.file (fun c -> d#read c) ("linear/" ^ file);
-      Fmt.pr "%s %b %f@." file d#accept (Sys.time() -. t))
+      let pid = Unix.fork () in
+      if pid = 0
+      then begin
+        let _ = Unix.alarm 60 in
+        Sys.set_signal Sys.sigalrm (Sys.Signal_handle (fun _ -> Unix._exit 1));
+        let d = X.driver t in
+        let t = Sys.time() in
+        Fmt.pr "%s@." file;
+        X.Run.file (fun c -> d#read c) ("linear/" ^ file);
+        Fmt.pr "%s %b %f@." file d#accept (Sys.time() -. t);
+        Unix._exit 0
+      end
+      else begin
+        let _ = Unix.wait () in
+        ()
+      end)
     fs

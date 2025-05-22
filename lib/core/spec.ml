@@ -207,7 +207,7 @@ end
 
 module Classic(Spec: SPEC'') = struct
   module Spec' = Spec(Context)
-  module X = Glr.Make(Tables.Unoptimized_classic)
+  module X = Glr.Make(Tables.Optimized_classic)
 
   let convert x =
     List.to_seq x
@@ -221,7 +221,7 @@ module Classic(Spec: SPEC'') = struct
     let syntactic = T.Vars.of_list Spec'.syntactic in
 
     let (lookahead', nullable', gp, gs) = Tn.build_classic syntactic lexical Spec'.start (convert Spec'.parser) (convert Spec'.scanner) in
-    Tables.Unoptimized_classic.make Spec'.start lexical lookahead' nullable' Spec'.early_stop gp gs
+    Tables.Optimized_classic.make Spec'.start lexical lookahead' nullable' Spec'.early_stop gp gs
 
   let driver t =
     new X.driver t

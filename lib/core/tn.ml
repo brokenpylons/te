@@ -456,6 +456,7 @@ end
 module Enhanced_lits_multimap(S: SET): sig
   include MULTIMAP with type key = Enhanced_lits.t and type values = S.t
   val strip: t -> Lits_multimap(S).t
+  val to_seq_multiple: t -> (T.State.t * Lits_multimap(S).t) Seq.t
 end = struct
   module LM = Lits_multimap(S)
   module M = Multimap.Make1(T.State_to)(LM)
@@ -495,6 +496,8 @@ end = struct
 
   let of_seq_multiple s =
     add_seq_multiple s empty
+
+  let to_seq_multiple = M.to_seq_multiple
 end
 
 module Rhs = struct

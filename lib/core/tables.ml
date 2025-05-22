@@ -248,7 +248,7 @@ module Unoptimized_classic = struct
     with Not_found -> (fun _ _ _ _ -> false)
 end
 
-module Symbol_multimap(Values: SET) = struct
+module Symbol_multimap'(Values: SET) = struct
   module VM = Multimap.Make1(T.Var_to)(Values)
   module CM = Multimap.Make1(T.Code_to)(Values)
 
@@ -260,6 +260,7 @@ module Symbol_multimap(Values: SET) = struct
       codes: CM.t;
       default: Values.t;
     }
+  [@@deriving eq, ord]
 
   let pp pp_s ppf x =
     Fmt.pf ppf "@[@[%a@]@,@[%a@]@,@[%a@]@,@[%a@],@[%a@]@]"
@@ -317,14 +318,36 @@ module Symbol_multimap(Values: SET) = struct
     add_seq_multiple s empty
 end
 
+
+module Enhanced_symbol_multimap'(Values: SET) = struct
+  module Inner = Symbol_multimap'(Values)
+  include Multimap.Make1(T.State_to)(Inner)
+
+  let pp pp_s ppf x =
+    Fmt.pf ppf "%a" (T.State_to.pp (Inner.pp pp_s)) x
+
+  let find_multiple (s, sym) t =
+    T.State_to.find s t
+    |> Inner.find sym
+
+  let find_multiple_or_empty (s, sym) t =
+    try find_multiple (s, sym) t
+    with Not_found -> Values.empty
+end
+
 module Actions_multimap' = struct
-  include Symbol_multimap(T.Actions)
+  include Symbol_multimap'(T.Actions)
   let pp = pp T.Actions.pp
 end
 
 module Goto_partial_map' = struct
-  include Symbol_multimap(T.State_partial)
+  include Symbol_multimap'(T.State_partial)
   let pp = pp T.State_partial.pp
+end
+
+module Back_map' = struct
+  include Enhanced_symbol_multimap'(T.State_pair_partial)
+  let pp = pp T.State_pair_partial.pp
 end
 
 let lits_to_symbols lts = 
@@ -346,11 +369,11 @@ let to_array empty x =
   Array.init (succ max) (fun i ->
       try T.State_to.find i x with Not_found -> empty)
 
-let actions' lexical lookahead' nullable' a =
+let actions' lexical lookahead' nullable' f a =
   A.states a
   |> T.States.to_seq
   |> Seq.map (fun s ->
-      (s, Tn.actions lexical lookahead' nullable' s a
+      (s, f lexical lookahead' nullable' s a
           |> Seq.flat_map (fun (lts, x) ->
               Seq.map (fun sym ->
                   Actions_multimap'.singleton_multiple sym x)
@@ -369,15 +392,29 @@ let goto' a =
           |> Goto_partial_map'.of_seq_multiple))
   |> T.State_to.of_seq
 
+let back' b =
+  PA.to_segments b
+  |> Seq.map (fun ((s, _), adj) ->
+      (s, adj
+          |> Seq.flat_map (fun (p, lts) ->
+              T.State_to.to_seq lts
+              |> Seq.map (fun (r, lts) ->
+                  (r, Seq.map (fun sym ->
+                       (sym, Some p))
+                      (lits_to_symbols lts)
+                      |> Back_map'.Inner.of_seq_multiple)))
+          |> Back_map'.of_seq_multiple))
+  |> T.State_pair_to.of_seq
+
 module Optimized = struct
   type actions = T.Actions.t
   type t =
     {
       start: T.State.t;
       goto: Goto_partial_map'.t array;
-      orders: T.Vars.t array;
       actions: Actions_multimap'.t array;
-      back: Back_map.t T.State_pair_to.t;
+      orders: T.Vars.t array;
+      back: Back_map'.t T.State_pair_to.t;
       stop: bool T.State_pair_to.t;
       accept: bool T.State_to.t;
     }
@@ -386,19 +423,16 @@ module Optimized = struct
   let make start lexical lookahead' nullable' g b =
     {
       start = A.start g;
-      goto = to_array Goto_partial_map'.empty @@ goto' g;
-      orders = to_array T.Vars.empty @@ orders lexical g;
-      actions = to_array Actions_multimap'.empty @@ actions' lexical lookahead' nullable' g;
+      goto = to_array Goto_partial_map'.empty 
+        @@ goto' g;
+      actions = to_array Actions_multimap'.empty 
+        @@ actions' lexical lookahead' nullable' Tn.actions g;
+      orders = to_array T.Vars.empty 
+        @@ orders lexical g;
       stop = stop b;
-      back = back b;
+      back = back' b;
       accept = accept start lookahead' g;
     }
-
-  let lits_of_symbol = function
-    | T.Symbol.Eof -> Lits.eof
-    | T.Symbol.Code x -> Lits.of_codes (T.Codes.singleton x)
-    | T.Symbol.Var x -> Lits.of_vars (T.Vars.singleton x)
-    | T.Symbol.Delegate -> Lits.scan'
 
   let start t =
     t.start
@@ -417,7 +451,7 @@ module Optimized = struct
   let back t p s sym =
     t.back
     |> T.State_pair_to.find p
-    |> Back_map.find_multiple_or_empty (Enhanced_lits.make s (lits_of_symbol sym))
+    |> Back_map'.find_multiple_or_empty (s, sym)
 
   let accept t s =
     t.accept
@@ -444,4 +478,79 @@ module Optimized = struct
 
   let predictions a =
     a.T.Actions.predictions
+end
+
+module Optimized_classic = struct
+  type actions = T.Actions.t
+  type t =
+    {
+      start_parser: T.State.t;
+      start_scanner: T.State.t;
+      goto: Goto_partial_map'.t array;
+      actions: Actions_multimap'.t array;
+      matches: T.Labeled_vars.t array;
+      predictions: T.Vars.t array;
+      accept: bool T.State_to.t;
+      valid_lookahead: T.Vars.t T.State_to.t;
+      early_stop: (T.Symbol.t -> T.Symbol.t -> T.Symbol.t -> T.Symbol.t -> bool) T.Var_to.t
+    }
+  [@@deriving show]
+
+  let make start lexical lookahead' nullable' early_stop gp gs  =
+    {
+      start_parser = A.start gp;
+      start_scanner = A.start gs;
+      goto = to_array Goto_partial_map'.empty 
+        @@ T.State_to.union (fun _ -> Goto_partial_map'.union) (goto' gp) (goto' gs);
+      actions = to_array Actions_multimap'.empty 
+        @@ actions' lexical lookahead' nullable' Tn.actions_classic gp;
+      matches = to_array T.Labeled_vars.empty @@ matches lexical gs;
+      predictions = to_array T.Vars.empty @@  predictions lexical gs;
+      accept = accept start lookahead' gp;
+      valid_lookahead = valid_lookahead lexical lookahead' nullable' Tn.actions_classic gp;
+      early_stop = T.Var_to.of_list early_stop;
+    }
+
+  let start_parser t =
+    t.start_parser
+
+  let start_scanner t =
+    t.start_scanner
+
+  let actions t s sym =
+    t.actions.(s)
+    |> Actions_multimap'.find_or_empty sym
+
+  let goto t s sym =
+    t.goto.(s)
+    |> Goto_partial_map'.find_or_empty sym
+
+  let valid_lookahead t s =
+    t.valid_lookahead
+    |> T.State_to.find s
+
+  let accept t s =
+    t.accept
+    |> T.State_to.find s
+
+  let shift a =
+    a.T.Actions.shift
+
+  let reduce a =
+    a.T.Actions.reduce
+
+  let null a =
+    a.T.Actions.null
+
+  let matches t s =
+    t.matches.(s)
+
+  let predictions t s =
+    t.predictions.(s)
+
+  let early_stop t var =
+    try
+      t.early_stop
+      |> T.Var_to.find var
+    with Not_found -> (fun _ _ _ _ -> false)
 end
