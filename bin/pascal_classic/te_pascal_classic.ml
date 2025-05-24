@@ -194,9 +194,6 @@ module X = Spec.Classic(functor(Context: Spec.CONTEXT) -> struct
   let (kw_if, s) = variable s "kw_if"
   let (kw_to, s) = variable s "kw_to"
 
-  let (u, s) = variable s "u"
-  let (e, s) = variable s "e"
-  let (e', s) = variable s "e'"
   let (block', s) = variable s "block'"
   let (constantdefinition', s) = variable s "constantdefinition'"
   let (typedefinition', s) = variable s "typedefinition'"
@@ -252,7 +249,11 @@ module X = Spec.Classic(functor(Context: Spec.CONTEXT) -> struct
   let (componentvariable', s) = variable s "componentvariable'"
   let (fielddesignator', s) = variable s "fielddesignator'"
   let (buffervariable', s) = variable s "buffervariable'"
-  let (filevariable', _) = variable s "filevariable'"
+  let (filevariable', s) = variable s "filevariable'"
+
+  let (u, s) = variable s "u"
+  let (e, s) = variable s "e"
+  let (e', s) = variable s "e'"
 
   let syntactic = [
     e';
@@ -445,6 +446,66 @@ module X = Spec.Classic(functor(Context: Spec.CONTEXT) -> struct
     kw_do;
     kw_if;
     kw_to;
+  ]
+
+  let labels = [
+    u;
+    block';
+    constantdefinition';
+    typedefinition';
+    simpletype';
+    enumeratedtype';
+    subrangetype';
+    structuredtype';
+    arraytype';
+    recordtype';
+    variant';
+    settype';
+    filetype';
+    pointertype';
+    variabledeclaration';
+    variableaccess';
+    entirevariable';
+    identifiedvariable';
+    pointervariable';
+    indexedvariable';
+    arrayvariable';
+    recordvariable';
+    proceduredeclaration';
+    functiondeclaration';
+    parameters';
+    valueparameter';
+    variableparameter';
+    proceduralparameter';
+    functionalparameter';
+    arrayparameter';
+    expression';
+    simpleepression';
+    term';
+    factor';
+    setconstructor';
+    functiondesignator';
+    actualparameter';
+    statement';
+    simplestatement';
+    assignmentstatement';
+    procedurestatement';
+    gotostatement';
+    structuredstatement';
+    compoundstatement';
+    ifstatement';
+    elsepart';
+    casestatement';
+    caseelement';
+    repeatstatement';
+    whilestatement';
+    forstatement';
+    withstatement';
+    program';
+    componentvariable';
+    fielddesignator';
+    buffervariable';
+    filevariable';
   ]
 
   let early_stop =

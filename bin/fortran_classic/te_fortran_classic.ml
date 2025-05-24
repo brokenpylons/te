@@ -522,7 +522,7 @@ module X = Spec.Classic(functor(Context: Spec.CONTEXT) -> struct
   let (x_kw, s) = variable s "x_kw"
   let (z_kw, s) = variable s "z_kw"
 
-  let (u, _) = variable s "u"
+  let (u, s) = variable s "u"
   let (e, s) = variable s "e"
   let (e', s) = variable s "e'"
 
@@ -1044,6 +1044,9 @@ module X = Spec.Classic(functor(Context: Spec.CONTEXT) -> struct
     write_kw;
     x_kw;
     z_kw;
+  ]
+  let labels = [
+    u
   ]
 
   let early_stop =

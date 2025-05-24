@@ -12,6 +12,9 @@ module Abstract: sig
   val map: ('a -> 'b) -> 'a t -> 'b t
   val flat_map: ('a -> 'b t) -> 'a t -> 'b t
   val unextend: 'supply -> ('supply -> 'a * 'supply) -> ('a -> 'ls)  -> 'ls t -> 'ls t * ('a * 'ls t) list
+  val enumerate: 'a t -> 'a Seq.t
+  val is_extended1: _ t -> bool
+  val is_extended2: _ t -> bool
 
   val is_nullable: _ t -> bool
   val is_nothing: _ t -> bool

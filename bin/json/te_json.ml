@@ -35,9 +35,10 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   let (number', s) = variable s "number'"
   let (true', s) = variable s "true'"
   let (false', s) = variable s "false'"
-  let (null', _) = variable s "null'"
+  let (null', s) = variable s "null'"
 
   let syntactic = [
+    start;
     json;
     value;
     object_;
@@ -48,6 +49,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     element;
   ]
   let lexical = [
+    ws;
     number;
     string;
     true_;
@@ -59,6 +61,16 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     rbrak;
     comma;
     colon;
+  ]
+  let labels = [
+    u;
+    object';
+    array';
+    string';
+    number';
+    true';
+    false';
+    null';
   ]
 
   let longest_match = []

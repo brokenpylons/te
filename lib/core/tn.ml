@@ -1352,10 +1352,38 @@ let print_productions' prods =
       Fmt.pr "@[@[%a@] ::= @[%s@]@]@." Enhanced_var.pp prod.Enhanced_production.lhs (Dot.string_of_graph @@ to_dot''' (prod.Enhanced_production.rhs)))
     prods
 
-let build overexpand syntactic lexical longest_match start prods =
-  assert (T.Vars.disjoint syntactic lexical);
+let lhss prods =
+  prods
+  |> Seq.map (fun prod -> prod.Production.lhs)
+  |> Seq.filter (fun (_, var) -> not @@ T.Var.is_synthetic var)
+  |> T.Labeled_vars.of_seq
 
-  let iprods = index_productions ~supply:(T.State.fresh_supply ()) prods in
+let rhss prods =
+  prods
+  |> Seq.flat_map (fun prod -> Rhs.enumerate prod.Production.rhs)
+  |> Seq.flat_map (fun lts -> T.Vars.to_seq @@ Lits.to_vars lts)
+  |> Seq.filter (fun var -> not @@ T.Var.is_synthetic var)
+  |> T.Vars.of_seq
+
+let validate syntactic lexical labels parser_prods scanner_prods =
+  assert (T.Vars.disjoint syntactic lexical);
+  assert (T.Vars.disjoint syntactic labels);
+  assert (T.Vars.disjoint lexical labels);
+  let parser_lhss = lhss parser_prods in
+  let scanner_lhss = lhss scanner_prods in
+  let parser_rhss = rhss parser_prods in
+  let scanner_rhss = rhss scanner_prods in
+  assert (T.Vars.subset (T.Labeled_vars.labels parser_lhss) labels);
+  assert (T.Vars.subset (T.Labeled_vars.labels scanner_lhss) labels);
+  assert (T.Vars.subset (T.Labeled_vars.vars parser_lhss) syntactic);
+  assert (T.Vars.subset (T.Labeled_vars.vars scanner_lhss) lexical);
+  assert (T.Vars.subset (parser_rhss) (T.Vars.union syntactic lexical));
+  assert (T.Vars.subset (scanner_rhss) T.Vars.empty)
+
+let build overexpand syntactic lexical labels longest_match start parser_prods scanner_prods =
+  validate syntactic lexical labels parser_prods scanner_prods;
+
+  let iprods = index_productions ~supply:(T.State.fresh_supply ()) (Seq.append parser_prods scanner_prods) in
 
   print_endline "CONSTRUCT";
   let c = construct ~supply:(T.State.fresh_supply ()) overexpand start lexical iprods in
@@ -1421,8 +1449,8 @@ let build overexpand syntactic lexical longest_match start prods =
 
   (lookahead', nullable', nc, back)
 
-let build_classic syntactic lexical start parser_prods scanner_prods =
-  assert (T.Vars.disjoint syntactic lexical);
+let build_classic syntactic lexical labels start parser_prods scanner_prods =
+  validate syntactic lexical labels parser_prods scanner_prods;
 
   let isupply1, isupply2 = Supply.split2 @@ T.State.fresh_supply () in
   let parser_iprods = index_productions ~supply:isupply1 parser_prods in

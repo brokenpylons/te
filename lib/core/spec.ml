@@ -51,27 +51,16 @@ module type CONTEXT = sig
   end
 end
 
-module type SPEC'' = functor (Context: CONTEXT) -> sig
+module type SPEC_TEST = functor (Context: CONTEXT) -> sig
   open Context
 
   val start: T.Var.t
   val syntactic: T.Var.t list
   val lexical: T.Var.t list
-  val early_stop: (T.Var.t * (T.Symbol.t -> T.Symbol.t -> T.Symbol.t -> T.Symbol.t -> bool)) list
+  val labels: T.Var.t list
   val parser: Production.t list
   val scanner: Production.t list
-end
-
-
-module type SPEC' = functor (Context: CONTEXT) -> sig
-  open Context
-
-  val start: T.Var.t
-  val syntactic: T.Var.t list
-  val lexical: T.Var.t list
-  val longest_match: T.Var.t list
-  val parser: Production.t list
-  val scanner: Production.t list
+  val tests: Test.t list
 end
 
 module type SPEC = functor (Context: CONTEXT) -> sig
@@ -80,9 +69,22 @@ module type SPEC = functor (Context: CONTEXT) -> sig
   val start: T.Var.t
   val syntactic: T.Var.t list
   val lexical: T.Var.t list
+  val labels: T.Var.t list
+  val longest_match: T.Var.t list
   val parser: Production.t list
   val scanner: Production.t list
-  val tests: Test.t list
+end
+
+module type SPEC_CLASSIC = functor (Context: CONTEXT) -> sig
+  open Context
+
+  val start: T.Var.t
+  val syntactic: T.Var.t list
+  val lexical: T.Var.t list
+  val labels: T.Var.t list
+  val early_stop: (T.Var.t * (T.Symbol.t -> T.Symbol.t -> T.Symbol.t -> T.Symbol.t -> bool)) list
+  val parser: Production.t list
+  val scanner: Production.t list
 end
 
 module Context: CONTEXT = struct
@@ -168,7 +170,7 @@ module Context: CONTEXT = struct
   end
 end
 
-module Build(Spec: SPEC') = struct
+module Build(Spec: SPEC) = struct
   module Spec' = Spec(Context)
   module X = Gsglr.Make(Tables.Optimized)
 
@@ -182,9 +184,10 @@ module Build(Spec: SPEC') = struct
   let tables ?(overexpand = false) () =
     let syntactic = T.Vars.of_list Spec'.syntactic in
     let lexical = T.Vars.of_list Spec'.lexical in
+    let labels = T.Vars.of_list Spec'.labels in
     let longest_match = T.Vars.of_list Spec'.longest_match in
 
-    let (lookahead', nullable', g, b) = Tn.build overexpand syntactic lexical longest_match Spec'.start (Seq.append (convert Spec'.parser) (convert Spec'.scanner)) in
+    let (lookahead', nullable', g, b) = Tn.build overexpand syntactic lexical labels longest_match Spec'.start (convert Spec'.parser) (convert Spec'.scanner) in
     Tables.Optimized.make Spec'.start lexical lookahead' nullable' g b
 
   let driver t =
@@ -205,22 +208,23 @@ module Build(Spec: SPEC') = struct
   end
 end
 
-module Classic(Spec: SPEC'') = struct
+module Classic(Spec: SPEC_CLASSIC) = struct
   module Spec' = Spec(Context)
   module X = Glr.Make(Tables.Optimized_classic)
 
   let convert x =
-    List.to_seq x
-    |> Seq.map (fun p -> Tn.Production.{
+    List.map (fun p -> Tn.Production.{
         lhs = Context.Production.lhs p;
         rhs = Re.Abstract.map Tn.Lits.of_symbols (Context.Production.rhs p);
-      })
+      }) x
+    |> List.to_seq
 
   let tables () =
     let lexical = T.Vars.of_list Spec'.lexical in
     let syntactic = T.Vars.of_list Spec'.syntactic in
+    let labels = T.Vars.of_list Spec'.labels in
 
-    let (lookahead', nullable', gp, gs) = Tn.build_classic syntactic lexical Spec'.start (convert Spec'.parser) (convert Spec'.scanner) in
+    let (lookahead', nullable', gp, gs) = Tn.build_classic syntactic lexical labels Spec'.start (convert Spec'.parser) (convert Spec'.scanner) in
     Tables.Optimized_classic.make Spec'.start lexical lookahead' nullable' Spec'.early_stop gp gs
 
   let driver t =
@@ -247,7 +251,7 @@ module Classic(Spec: SPEC'') = struct
 end
 
 
-module Test(Spec: SPEC) = struct
+module Test(Spec: SPEC_TEST) = struct
   module Spec' = Spec(Context)
   module X = Gsglr.Make(Tables.Unoptimized)
 
@@ -263,8 +267,9 @@ module Test(Spec: SPEC) = struct
   let driver () =
     let lexical = T.Vars.of_list Spec'.lexical in
     let syntactic = T.Vars.of_list Spec'.syntactic in
+    let labels = T.Vars.of_list Spec'.labels in
 
-    let (lookahead', nullable', g, b) = Tn.build false syntactic lexical T.Vars.empty Spec'.start (Seq.append (convert Spec'.parser)  (convert Spec'.scanner)) in
+    let (lookahead', nullable', g, b) = Tn.build false syntactic lexical labels T.Vars.empty Spec'.start (convert Spec'.parser) (convert Spec'.scanner) in
     let t = Tables.Unoptimized.make Spec'.start lexical lookahead' nullable' g b in
     new X.driver t
 end

@@ -268,6 +268,45 @@ module Abstract = struct
         return (Comp (m, x))
     in go
 
+  let enumerate =
+    let rec go = function
+      | Nothing -> Seq.empty
+      | Null -> Seq.empty
+      | Any -> Seq.empty
+      | Lits ls -> Seq.return ls
+      | Concat (_, _, x, y) -> Seq.append (go x) (go y)
+      | Union (_, _, x, y) -> Seq.append (go x) (go y)
+      | Repeat (_, _, x, _) -> go x
+      | Star x -> go x
+      | Comp (_, x) -> go x
+    in go
+
+  let is_extended1 =
+    let rec go = function
+      | Nothing -> false
+      | Null -> false
+      | Any -> false
+      | Lits _ -> false
+      | Concat (_, _, x, y) -> go x || go y
+      | Union (_, _, x, y) -> go x || go y
+      | Repeat (_, _, x, _) -> go x
+      | Star _ -> true
+      | Comp (_, _) -> true
+    in go
+
+  let is_extended2 =
+    let rec go = function
+      | Nothing -> false
+      | Null -> false
+      | Any -> false
+      | Lits _ -> false
+      | Concat (_, _, x, y) -> go x || go y
+      | Union (_, _, x, y) -> go x || go y
+      | Repeat (_, _, x, _) -> go x
+      | Star x -> go x
+      | Comp (_, _) -> true
+    in go
+
   let comp_lits x =
     comp (lits x)
 

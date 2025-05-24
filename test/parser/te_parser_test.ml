@@ -29,6 +29,7 @@ module Noop = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; u] = variables Vector.["S'"; "_"]
     let syntactic = [s']
     let lexical = []
+    let labels = [u]
 
     let start = s'
 
@@ -58,6 +59,7 @@ module Noop2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; u] = variables Vector.["S'"; "S"; "_"]
     let syntactic = [s'; s]
     let lexical = []
+    let labels = [u]
 
     let start = s'
 
@@ -86,6 +88,7 @@ module Null = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; u] = variables Vector.["S'"; "_"]
     let syntactic = [s']
     let lexical = []
+    let labels = [u]
 
     let start = s'
 
@@ -114,6 +117,7 @@ module Load = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; u] = variables Vector.["S'"; "_"]
     let syntactic = [s']
     let lexical = []
+    let labels = [u]
 
     let start = s'
 
@@ -145,6 +149,7 @@ module Load2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; u] = variables Vector.["S'"; "_"]
     let syntactic = [s']
     let lexical = []
+    let labels = [u]
 
     let start = s'
 
@@ -178,6 +183,7 @@ module Null_reduce = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; u] = variables Vector.["S'"; "S"; "_"]
     let syntactic = [s'; s]
     let lexical = []
+    let labels = [u]
 
     let start = s'
 
@@ -210,6 +216,7 @@ module Null_shift = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; a; u] = variables Vector.["S'"; "a"; "_"]
     let syntactic = [s']
     let lexical = [a]
+    let labels = [u]
 
     let start = s'
 
@@ -245,6 +252,7 @@ module Load_reduce = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; u] = variables Vector.["S'"; "S"; "_"]
     let syntactic = [s'; s]
     let lexical = []
+    let labels = [u]
 
     let start = s'
 
@@ -278,6 +286,7 @@ module Multilabel_load_reduce = Spec.Test(functor(Context: Spec.CONTEXT) -> stru
     let Vector.[s'; s; u; p] = variables Vector.["S'"; "S"; "_"; "%"]
     let syntactic = [s'; s]
     let lexical = []
+    let labels = [u; p]
 
     let start = s'
 
@@ -314,6 +323,7 @@ module Shift = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; a; u] = variables Vector.["S'"; "a"; "_"]
     let syntactic = [s']
     let lexical = [a]
+    let labels = [u]
 
     let start = s'
 
@@ -352,6 +362,7 @@ module Shift_reduce = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; a; u] = variables Vector.["S'"; "S"; "a"; "_"]
     let syntactic = [s'; s]
     let lexical = [a]
+    let labels = [u]
 
     let start = s'
 
@@ -392,6 +403,7 @@ module Shift_reduce2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; p; a; u] = variables Vector.["S'"; "S"; "P"; "a"; "_"]
     let syntactic = [s'; s; p]
     let lexical = [a]
+    let labels = [u]
 
     let start = s'
 
@@ -434,6 +446,7 @@ module Multilabel_shift_reduce = Spec.Test(functor(Context: Spec.CONTEXT) -> str
     let Vector.[s'; s; a; u; p] = variables Vector.["S'"; "S"; "a"; "_"; "%"]
     let syntactic = [s'; s]
     let lexical = [a]
+    let labels = [u; p]
 
     let start = s'
 
@@ -477,6 +490,7 @@ module Same_label_reduce = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; a; b; u] = variables Vector.["S'"; "S"; "A"; "B"; "_"]
     let syntactic = [s'; s; a]
     let lexical = []
+    let labels = [u]
 
     let start = s'
 
@@ -516,6 +530,7 @@ module Same_label_reduce2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; a; u] = variables Vector.["S'"; "S"; "A"; "_"]
     let syntactic = [s'; s; a]
     let lexical = []
+    let labels = [u]
 
     let start = s'
 
@@ -552,6 +567,7 @@ module Right_nulled = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; a; u] = variables Vector.["S'"; "S"; "a"; "_"]
     let syntactic = [s'; s; a]
     let lexical = []
+    let labels = [u]
 
     let start = s'
 
@@ -587,6 +603,7 @@ module Right_nulled2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; a; u] = variables Vector.["S'"; "S"; "a"; "_"]
     let syntactic = [s'; s; a]
     let lexical = []
+    let labels = [u]
 
     let start = s'
 
@@ -633,6 +650,7 @@ module Right_nulled3 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; a; u] = variables Vector.["S'"; "S"; "a"; "_"]
     let syntactic = [s'; s; a]
     let lexical = []
+    let labels = [u]
 
     let start = s'
 
@@ -686,6 +704,7 @@ module Repeat_load = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; u] = variables Vector.["S'"; "S"; "_"]
     let syntactic = [s'; s]
     let lexical = []
+    let labels = [u]
 
     let start = s'
 
@@ -743,6 +762,7 @@ module Repeat_load2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; a; u] = variables Vector.["S'"; "S"; "A"; "_"]
     let syntactic = [s'; s]
     let lexical = []
+    let labels = [u]
 
     let start = s'
 
@@ -780,6 +800,7 @@ module Left_recursion_load = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; u] = variables Vector.["S'"; "S"; "_"]
     let syntactic = [s'; s]
     let lexical = []
+    let labels = [u]
 
     let start = s'
 
@@ -859,6 +880,7 @@ module Right_recursion_load = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; u] = variables Vector.["S'"; "S"; "_"]
     let syntactic = [s'; s]
     let lexical = []
+    let labels = [u]
 
     let start = s'
 
@@ -938,6 +960,7 @@ module Nest_load = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; u] = variables Vector.["S'"; "S"; "_"]
     let syntactic = [s'; s]
     let lexical = []
+    let labels = [u]
 
     let start = s'
 
@@ -1004,6 +1027,7 @@ module Middle = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; u] = variables Vector.["S'"; "S"; "_"]
     let syntactic = [s'; s]
     let lexical = []
+    let labels = [u]
 
     let start = s'
 
@@ -1078,6 +1102,7 @@ module Left_recursion_shift = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; a; u] = variables Vector.["S'"; "S"; "a"; "_"]
     let syntactic = [s'; s]
     let lexical = [a]
+    let labels = [u]
 
     let start = s'
 
@@ -1192,6 +1217,7 @@ module Right_recursion_shift = Spec.Test(functor(Context: Spec.CONTEXT) -> struc
     let Vector.[s'; s; a; u] = variables Vector.["S'"; "S"; "a"; "_"]
     let syntactic = [s'; s]
     let lexical = [a]
+    let labels = [u]
 
     let start = s'
 
@@ -1273,6 +1299,7 @@ module Nest_shift = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; a; b; u] = variables Vector.["S'"; "S"; "a"; "b"; "_"]
     let syntactic = [s'; s]
     let lexical = [a; b]
+    let labels = [u]
 
     let start = s'
 
@@ -1335,6 +1362,7 @@ module Predict = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; a; b; c; u] = variables Vector.["S'"; "S"; "a"; "b"; "c"; "_"]
     let syntactic = [s'; s]
     let lexical = [a; b; c]
+    let labels = [u]
 
     let start = s'
 
@@ -1387,6 +1415,7 @@ module Noncanonical = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; n0; n1; n2; a; l; u] = variables Vector.["S'"; "S"; "N0"; "N1"; "N2"; "a"; "l"; "_"]
     let syntactic = [s'; s; n0; n1; n2]
     let lexical = [a; l]
+    let labels = [u]
 
     let start = s'
 
@@ -1441,6 +1470,7 @@ module Noncanonical2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; n0; n1; n2; a; b; l; u; p] = variables Vector.["S'"; "S"; "N0"; "N1"; "N2"; "a"; "b"; "l"; "_"; "%"]
     let syntactic = [s'; s; n0; n1; n2]
     let lexical = [a; b; l]
+    let labels = [u; p]
 
     let start = s'
 
@@ -1504,6 +1534,7 @@ module Noncanonical3 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; n0; n1; n2; a; b; l; u; p] = variables Vector.["S'"; "S"; "N0"; "N1"; "N2"; "a"; "b"; "l"; "_"; "%"]
     let syntactic = [s'; s; n0; n1; n2]
     let lexical = [a; b; l]
+    let labels = [u; p]
 
     let start = s'
 
@@ -1585,6 +1616,7 @@ module Noncanonical4 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; n0; n1; n2; a; b; l; u; p] = variables Vector.["S'"; "S"; "N0"; "N1"; "N2"; "a"; "b"; "l"; "_"; "%"]
     let syntactic = [s'; s; n0; n1; n2]
     let lexical = [a; b; l]
+    let labels = [u; p]
 
     let start = s'
 
@@ -1680,6 +1712,7 @@ module Noncanonical5 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; n0; n1; n2; a; l0; l1; u] = variables Vector.["S'"; "S"; "N0"; "N1"; "N2"; "a"; "l0"; "l1"; "_"]
     let syntactic = [s'; s; n0; n1; n2]
     let lexical = [a; l0; l1]
+    let labels = [u]
 
     let start = s'
 
@@ -1741,6 +1774,7 @@ module Lookahead = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; a; b; c; d; l0; l1; u] = variables Vector.["S'"; "S"; "A"; "B"; "C"; "d"; "l0"; "l1"; "_"]
     let syntactic = [s'; s; a; b; c]
     let lexical = [d; l0; l1]
+    let labels = [u]
 
     let start = s'
 
@@ -1802,6 +1836,7 @@ module Lookahead2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; a; b; c; d; l0; l1; u] = variables Vector.["S'"; "S"; "A"; "B"; "C"; "d"; "l0"; "l1"; "_"]
     let syntactic = [s'; s; a; b; c]
     let lexical = [d; l0; l1]
+    let labels = [u]
 
     let start = s'
 
@@ -1867,6 +1902,7 @@ module Lookahead2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; a; b; c; d; u] = variables Vector.["S'"; "S"; "A"; "B"; "C"; "D"; "_"]
     let syntactic = [s'; s; a; b]
     let lexical = [c; d]
+    let labels = [u]
 
     let start = s'
 
@@ -1907,6 +1943,7 @@ module Lookahead2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     let Vector.[s'; s; a; b; c; d; e; l0; l1; u] = variables Vector.["S'"; "S"; "A"; "B"; "C"; "d"; "e"; "l0"; "l1"; "_"]
     let syntactic = [s'; s; a; b; c]
     let lexical = [d; e; l0; l1]
+    let labels = [u]
 
     let start = s'
 

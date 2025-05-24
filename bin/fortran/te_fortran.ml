@@ -522,7 +522,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   let (x_kw, s) = variable s "x_kw"
   let (z_kw, s) = variable s "z_kw"
 
-  let (u, _) = variable s "u"
+  let (u, s) = variable s "u"
 
   let syntactic = [
     start;
@@ -1042,6 +1042,10 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     z_kw;
   ]
 
+  let labels = [
+    u
+  ]
+
   let longest_match = [
     ws;
     eos;
@@ -1051,7 +1055,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   let start = start
 
   let parser =
-    with_ws (T.Vars.of_list lexical) (var ws) Production.[
+    with_ws (T.Vars.of_list lexical) (var ws) @@ unextend s u Production.[
       make (u, start) R.(var executable_program * plus eof);
 
       make (u, executable_program) R.(var ws * plus (var program_unit));

@@ -28,9 +28,6 @@ module X = Spec.Classic(functor(Context: Spec.CONTEXT) -> struct
   let (colon, s) = variable s "colon"
   let (ws, s) = variable s "ws"
 
-  let (u, s) = variable s "u"
-  let (e, s) = variable s "e"
-  let (e', s) = variable s "e'"
   let (object', s) = variable s "object'"
   let (array', s) = variable s "array'"
   let (string', s) = variable s "string'"
@@ -39,8 +36,13 @@ module X = Spec.Classic(functor(Context: Spec.CONTEXT) -> struct
   let (false', s) = variable s "false'"
   let (null', _) = variable s "null'"
 
+  let (u, s) = variable s "u"
+  let (e, s) = variable s "e"
+  let (e', s) = variable s "e'"
+
   let syntactic = [
     e';
+    start;
     json;
     value;
     object_;
@@ -64,6 +66,16 @@ module X = Spec.Classic(functor(Context: Spec.CONTEXT) -> struct
     rbrak;
     comma;
     colon;
+  ]
+  let labels = [
+    u;
+    object';
+    array';
+    string';
+    number';
+    true';
+    false';
+    null';
   ]
 
   let early_stop = []

@@ -233,6 +233,7 @@ module Var: sig
   val make: supply:(pre Supply.t) -> (string, 'a) Vector.t -> (t, 'a) Vector.t 
   val make': pre Supply.t -> string -> (t * pre Supply.t)
   val synthetic: pre Supply.t -> (t * pre Supply.t)
+  val is_synthetic: t -> bool
 end
 
 module Vars: sig
@@ -282,6 +283,7 @@ module Labeled_vars: sig
   val iter: (elt -> unit) -> t -> unit
   val filter: (elt -> bool) -> t -> t
   val vars: t -> Vars.t
+  val labels: t -> Vars.t
 end
 
 module Labeled_var_to: sig

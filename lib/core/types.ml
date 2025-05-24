@@ -236,6 +236,11 @@ module Var = struct
         (supply, (x, Some label)))
       supply labels
 
+  let is_synthetic (_, label) =
+    match label with
+    | None -> true
+    | _ -> false
+
   let synthetic supply =
     let (x, supply) = Supply.get supply in
     (x, None), supply
@@ -275,8 +280,12 @@ end
 module Labeled_vars = struct
   include Balanced_binary_tree.Set.Size(Labeled_var)
   let pp = pp Labeled_var.pp
+
   let vars =
     fold (fun (_, var) -> Vars.add var) Vars.empty
+
+  let labels =
+    fold (fun (lbl, _) -> Vars.add lbl) Vars.empty
 end
 module Labeled_var_to = struct
   include Balanced_binary_tree.Map.Size(Labeled_var)

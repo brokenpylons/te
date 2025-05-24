@@ -616,7 +616,7 @@ module X = Spec.Classic(functor(Context: Spec.CONTEXT) -> struct
     let (zeroes_kw, s) = variable s "zeroes_kw"
     let (zeros_kw, s) = variable s "zeros_kw"
 
-    let (u, _) = variable s "u"
+    let (u, s) = variable s "u"
     let (e, s) = variable s "e"
     let (e', s) = variable s "e'"
 
@@ -888,6 +888,7 @@ module X = Spec.Classic(functor(Context: Spec.CONTEXT) -> struct
       quoted_pseudo_text;
       id;
       cobol_word;
+      numeric;
       nonnumeric;
       integer;
       level_number;
@@ -1233,6 +1234,10 @@ module X = Spec.Classic(functor(Context: Spec.CONTEXT) -> struct
       zeroes_kw;
       zeros_kw;
     ]
+
+  let labels = [
+    u
+  ]
 
   let early_stop =
     let f l0 l1 l2 l3 =

@@ -616,7 +616,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     let (zeroes_kw, s) = variable s "zeroes_kw"
     let (zeros_kw, s) = variable s "zeros_kw"
 
-    let (u, _) = variable s "u"
+    let (u, s) = variable s "u"
 
     let syntactic = [
       start;
@@ -884,6 +884,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       quoted_pseudo_text;
       id;
       cobol_word;
+      numeric;
       nonnumeric;
       integer;
       level_number;
@@ -1230,6 +1231,10 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       zeros_kw;
     ]
 
+    let labels = [
+      u
+    ]
+
     let longest_match = [
       ws;
       id;
@@ -1243,7 +1248,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     let start = start
 
     let parser =
-      with_ws (T.Vars.of_list lexical) (var ws) (*@@ unextend s u*) @@ (Production.[
+      with_ws (T.Vars.of_list lexical) (var ws) @@ unextend s u Production.[
           make (u, start) R.(var cobol_source_program * plus eof);
 
           make (u, mode) (var cobol_word);
@@ -1759,7 +1764,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
           make (u, figurative_constant) R.(var zero_kw + var zeros_kw + var zeroes_kw + var space_kw + var spaces_kw + var high_value_kw + var high_values_kw + var low_value_kw + var low_values_kw + var quote_kw + var quotes_kw + var all_kw * var literal + var null_kw + var nulls_kw);
 
           make (u, usage_keyword) R.(var binary_kw + var comp_kw + var comp_1_kw + var comp_2_kw + var comp_3_kw + var comp_4_kw + var comp_5_kw + var computational_kw + var computational_1_kw + var computational_2_kw + var computational_3_kw + var computational_4_kw + var computational_5_kw + var display_kw + var display_1_kw + var index_kw + var packed_decimal_kw + var pointer_kw);
-        ])
+        ]
 
     let scanner =
       let digit = range "0" "9" in

@@ -194,7 +194,6 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   let (kw_if, s) = variable s "kw_if"
   let (kw_to, s) = variable s "kw_to"
 
-  let (u, s) = variable s "u"
   let (block', s) = variable s "block'"
   let (constantdefinition', s) = variable s "constantdefinition'"
   let (typedefinition', s) = variable s "typedefinition'"
@@ -250,7 +249,9 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   let (componentvariable', s) = variable s "componentvariable'"
   let (fielddesignator', s) = variable s "fielddesignator'"
   let (buffervariable', s) = variable s "buffervariable'"
-  let (filevariable', _) = variable s "filevariable'"
+  let (filevariable', s) = variable s "filevariable'"
+
+  let (u, s) = variable s "u"
 
   let syntactic = [
     start;
@@ -443,6 +444,66 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     kw_to;
   ]
 
+  let labels = [
+    u;
+    block';
+    constantdefinition';
+    typedefinition';
+    simpletype';
+    enumeratedtype';
+    subrangetype';
+    structuredtype';
+    arraytype';
+    recordtype';
+    variant';
+    settype';
+    filetype';
+    pointertype';
+    variabledeclaration';
+    variableaccess';
+    entirevariable';
+    identifiedvariable';
+    pointervariable';
+    indexedvariable';
+    arrayvariable';
+    recordvariable';
+    proceduredeclaration';
+    functiondeclaration';
+    parameters';
+    valueparameter';
+    variableparameter';
+    proceduralparameter';
+    functionalparameter';
+    arrayparameter';
+    expression';
+    simpleepression';
+    term';
+    factor';
+    setconstructor';
+    functiondesignator';
+    actualparameter';
+    statement';
+    simplestatement';
+    assignmentstatement';
+    procedurestatement';
+    gotostatement';
+    structuredstatement';
+    compoundstatement';
+    ifstatement';
+    elsepart';
+    casestatement';
+    caseelement';
+    repeatstatement';
+    whilestatement';
+    forstatement';
+    withstatement';
+    program';
+    componentvariable';
+    fielddesignator';
+    buffervariable';
+    filevariable';
+  ]
+
   let longest_match = [
     ws;
     identifier;
@@ -452,7 +513,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   let start = start
 
   let parser =
-    with_ws (T.Vars.of_list lexical) (var ws) (*@@ unextend s u*) Production.[
+    with_ws (T.Vars.of_list lexical) (var ws) @@ unextend s u Production.[
       make (u, start) R.(var program * plus eof);
 
       make (block', block) R.(opt (var label_declaration_part) * opt (var constant_definition_part) * opt (var type_definition_part) * opt (var variable_declaration_part) * star (var procedure_and_function_declaration_part) * var statement_part);
