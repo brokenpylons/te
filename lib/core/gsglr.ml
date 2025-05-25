@@ -1,48 +1,23 @@
 open Te_bot
 open! Prelude
 module T = Types
+open Driver
 
-module Path = struct
-  type t = T.Vertex.t * T.Node.t list
-  [@@deriving ord, show]
-end
-module Paths = struct
- include List
- let singleton x = [x]
- let add x xs = x :: xs
- let empty = []
-end
+(*
+Order of operation is in our case a mix between breadth first and depth first search.
+The synchronization point are the characters, the orther otherwise doesn't matter.
+That way we need less explict datastructures, the data is held on the stack.
+*)
 
-module Gss = struct
-  module G = T.Vertex_graph
-  type t = (unit, T.Nodes.t) G.t
-  let singleton v = G.singleton v ()
+(*
+The loads are not connected to scanner fragments.
+The return links are needed for that (howerver just selectively, not for all symbols).
+*)
 
-  let add u g =
-    (*assert (not (G.vertex_mem u g));*)
-    G.add u () g
+(*
+Lookahead needs to be recomputed for non-cannonical states otherwise it is slightly incorrect
 
-  let connect u v n g =
-    G.connect u v n g
-
-  let contains u g =
-    G.vertex_mem u g
-
-  let contains_edge u v g =
-    G.edge_mem u v g
-
-  let node u v g =
-    G.edge_label u v g
-
-  let adjacent v ns g =
-    G.adjacent v g
-    |> Seq.flat_map (fun (w, n) ->
-        T.Nodes.to_seq n
-        |> Seq.map (fun n -> (w, (n :: ns))))
-    |> Paths.of_seq
-end
-
-module Forest = T.Node_packed_forest
+*)
 
 module type TABLES = sig
   type t
@@ -68,30 +43,9 @@ module type TABLES = sig
   val reduce: actions -> T.Reductions.t
 end
 
-module Subclasses = Multimap.Make3(Balanced_binary_tree.Map.Size(Int))(T.Vertices)
-
-module Segments = Multimap.Make3(T.Vertex_to)(T.Vertices)
-module Orders = Multimap.Make3(T.Var_to)(T.Vertices)
-module Orders' = Multimap.Make3(T.Vertex_to)(Orders.Set)
-
-(*
-Order of operation is in our case a mix between breadth first and depth first search.
-The synchronization point are the characters, the orther otherwise doesn't matter.
-That way we need less explict datastructures, the data is held on the stack.
-*)
-
-(*
-The loads are not connected to scanner fragments.
-The return links are needed for that (howerver just selectively, not for all symbols).
-*)
-
-(*
-Lookahead needs to be recomputed for non-cannonical states otherwise it is slightly incorrect
-*)
-
 module Make(Tables: TABLES) = struct
 
-  class driver (t: Tables.t) =
+  class gsglr (t: Tables.t): driver =
     let bottom = T.Vertex.make (Tables.start t) 0 in object(self)
       val mutable stack: Gss.t = Gss.singleton bottom
       val mutable forest = Forest.empty
@@ -106,8 +60,6 @@ module Make(Tables: TABLES) = struct
       val mutable shift1 = Segments.singleton bottom bottom
 
       val mutable trace: Trace.t = []
-
-      val mutable count = 0
 
       initializer
         self#order bottom;
@@ -375,9 +327,6 @@ module Make(Tables: TABLES) = struct
         Seq.exists (fun (w, _) ->
             Tables.accept t (T.Vertex.states w))
           (Segments.to_seq_multiple shift1)
-
-      method status =
-        Fmt.pr "%i@." count;
 
       method to_dot =
         let subgraphs = Subclasses.fold_multiple (fun position subclass subgraphs ->

@@ -174,6 +174,8 @@ module Build(Spec: SPEC) = struct
   module Spec' = Spec(Context)
   module X = Gsglr.Make(Tables.Optimized)
 
+  type tables = Tables.Optimized.t
+
   let convert x =
     List.to_seq x
     |> Seq.map (fun p -> Tn.Production.{
@@ -191,7 +193,7 @@ module Build(Spec: SPEC) = struct
     Tables.Optimized.make Spec'.start lexical lookahead' nullable' g b
 
   let driver t =
-    new X.driver t
+    new X.gsglr t
 
   module Run = struct
     let code s = T.Symbol.Code (T.Codes.the @@ T.Codes.of_string s)
@@ -212,6 +214,8 @@ module Classic(Spec: SPEC_CLASSIC) = struct
   module Spec' = Spec(Context)
   module X = Glr.Make(Tables.Optimized_classic)
 
+  type tables = Tables.Optimized_classic.t
+
   let convert x =
     List.map (fun p -> Tn.Production.{
         lhs = Context.Production.lhs p;
@@ -219,7 +223,7 @@ module Classic(Spec: SPEC_CLASSIC) = struct
       }) x
     |> List.to_seq
 
-  let tables () =
+  let tables ?overexpand:_ () =
     let lexical = T.Vars.of_list Spec'.lexical in
     let syntactic = T.Vars.of_list Spec'.syntactic in
     let labels = T.Vars.of_list Spec'.labels in
@@ -228,7 +232,7 @@ module Classic(Spec: SPEC_CLASSIC) = struct
     Tables.Optimized_classic.make Spec'.start lexical lookahead' nullable' Spec'.early_stop gp gs
 
   let driver t =
-    new X.driver t
+    new X.glr t
 
   module Run = struct
     let code s = T.Symbol.Code (T.Codes.the @@ T.Codes.of_string s)
@@ -271,6 +275,6 @@ module Test(Spec: SPEC_TEST) = struct
 
     let (lookahead', nullable', g, b) = Tn.build false syntactic lexical labels T.Vars.empty Spec'.start (convert Spec'.parser) (convert Spec'.scanner) in
     let t = Tables.Unoptimized.make Spec'.start lexical lookahead' nullable' g b in
-    new X.driver t
+    new X.gsglr t
 end
 

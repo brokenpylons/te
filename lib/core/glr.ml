@@ -1,45 +1,7 @@
 open Te_bot
 open! Prelude
 module T = Types
-
-module Path = struct
-  type t = T.Vertex.t * T.Node.t list
-  [@@deriving ord, show]
-end
-module Paths = struct
-  include List
-  let singleton x = [x]
-  let add x xs = x :: xs
-  let empty = []
-end
-
-module Gss = struct
-  module G = T.Vertex_graph
-  type t = (unit, T.Nodes.t) G.t
-  let singleton v = G.singleton v ()
-
-  let add u g =
-    G.add u () g
-
-  let connect u v n g =
-    G.connect u v n g
-
-  let contains u g =
-    G.vertex_mem u g
-
-  let contains_edge u v g =
-    G.edge_mem u v g
-
-  let node u v g =
-    G.edge_label u v g
-
-  let adjacent v ns g =
-    G.adjacent v g
-    |> Seq.flat_map (fun (w, n) ->
-        T.Nodes.to_seq n
-        |> Seq.map (fun n -> (w, (n :: ns))))
-    |> Paths.of_seq
-end
+open Driver
 
 module Scanner = struct
   type t =
@@ -49,8 +11,6 @@ module Scanner = struct
       vars: T.Vars.t;
     }
 end
-
-module Forest = T.Node_packed_forest
 
 module type TABLES = sig
   type t
@@ -80,7 +40,7 @@ module Segments = Multimap.Make3(T.Vertex_to)(T.Vertices)
 
 module Make(Tables: TABLES) = struct
 
-  class driver (t: Tables.t) =
+  class glr (t: Tables.t): driver =
     let bottom = T.Vertex.make (Tables.start_parser t) 0 in object(self)
       val mutable stack: Gss.t = Gss.singleton bottom
       val mutable forest = Forest.empty

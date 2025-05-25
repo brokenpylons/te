@@ -1008,29 +1008,29 @@ module Analysis = struct
     }
 
   let compute lexical (prods: Enhanced_production.t Seq.t) =
-    print_endline "NULLABLE";
+    (*print_endline "NULLABLE";*)
     let nullable_per_lits = Nullable.per_lits prods NM.empty in
 
-    print_endline "NULLABLE_PER_STATE";
+    (*print_endline "NULLABLE_PER_STATE";*)
     let nullable_per_state = wrap ~default:false @@ Nullable.per_state prods nullable_per_lits in
 
-    print_endline "FIRST";
+    (*print_endline "FIRST";*)
     let first_per_lits = First.per_lits prods
         (fun lts -> NM.find_multiple_or_empty lts nullable_per_lits)
         (first_seed lexical) EM.empty
     in
-    print_endline "FIRST_PER_STATE";
+    (*print_endline "FIRST_PER_STATE";*)
     let first_per_state = wrap ~default:Enhanced_lits.empty @@ First.per_state prods
         (fun lts -> NM.find_multiple_or_empty lts nullable_per_lits)
         (first_seed lexical) first_per_lits
     in
-    print_endline "FOLLOW";
+    (*print_endline "FOLLOW";*)
     let follow_per_lits = Follow.per_lits prods
         nullable_per_state
         first_per_state
         EM.empty
     in
-    print_endline "FOLLOW_PER_STATE";
+    (*print_endline "FOLLOW_PER_STATE";*)
     let follow_per_state = wrap ~default:Enhanced_lits.empty @@ Follow.per_state prods
         nullable_per_state
         first_per_state
@@ -1385,31 +1385,31 @@ let build overexpand syntactic lexical labels longest_match start parser_prods s
 
   let iprods = index_productions ~supply:(T.State.fresh_supply ()) (Seq.append parser_prods scanner_prods) in
 
-  print_endline "CONSTRUCT";
+  (*print_endline "CONSTRUCT";*)
   let c = construct ~supply:(T.State.fresh_supply ()) overexpand start lexical iprods in
-  Fmt.pr "%i@." (T.States.cardinal (A.states c));
+  (*Fmt.pr "%i@." (T.States.cardinal (A.states c));*)
 
-  print_endline "LR";
+  (*print_endline "LR";*)
   let lr_supply1, lr_supply2 = Supply.split2 @@ T.State.fresh_supply () in
   let p = lr ~supply:lr_supply1 c in
 
-  Fmt.pr "%i@." (T.States.cardinal (A.states p));
+  (*Fmt.pr "%i@." (T.States.cardinal (A.states p));*)
 
-  print_endline "ENHANCE";
+  (*print_endline "ENHANCE";*)
   let e = enhance p c in
   let eprods = enhanced_productions start e in
 
-  Fmt.pr "%i@." (T.State_pairs.cardinal (PA.states e));
+  (*Fmt.pr "%i@." (T.State_pairs.cardinal (PA.states e));*)
 
-  print_endline "ANA";
+  (*print_endline "ANA";*)
   let analysis = Analysis.compute lexical eprods in
 
-  print_endline "LOOK";
+  (*print_endline "LOOK";*)
   let ieprods = index_enhanced_productions eprods in
   let lookahead' = Lookahead.compute analysis ieprods lexical longest_match in
   let nullable' = nullable analysis in
 
-  print_endline "NC";
+  (*print_endline "NC";*)
   let nc =
     noncanonical lexical lookahead' p
     |> noncanonical_subset ~supply:lr_supply2
@@ -1418,8 +1418,8 @@ let build overexpand syntactic lexical labels longest_match start parser_prods s
 
   let back = back lexical eprods in
 
-  Fmt.pr "%i@." (T.States.cardinal (A.states nc));
-  Fmt.pr "%i@." (T.State_pairs.cardinal (PA.states back));
+  (*Fmt.pr "%i@." (T.States.cardinal (A.states nc));
+  Fmt.pr "%i@." (T.State_pairs.cardinal (PA.states back));*)
 
   (*Fmt.pr "E %s@,"  (Dot.string_of_graph (to_dot''' back));*)
 
@@ -1456,32 +1456,32 @@ let build_classic syntactic lexical labels start parser_prods scanner_prods =
   let parser_iprods = index_productions ~supply:isupply1 parser_prods in
   let scanner_iprods = index_productions ~supply:isupply2 scanner_prods in
 
-  print_endline "CONSTRUCT";
+  (*print_endline "CONSTRUCT";*)
   let c = construct ~supply:(T.State.fresh_supply ()) false start lexical parser_iprods in
 
-  print_endline "LR";
+  (*print_endline "LR";*)
   let lr_supply1, lr_supply2, lr_supply3 = Supply.split3 @@ T.State.fresh_supply () in
   let p = lr ~supply:lr_supply1 c in
 
-  print_endline "ENHANCE";
+  (*print_endline "ENHANCE";*)
   let e = enhance p c in
   let eprods = enhanced_productions start e in
 
-  print_endline "ANA";
+  (*print_endline "ANA";*)
   let analysis = Analysis.compute lexical eprods in
 
-  print_endline "LOOK";
+  (*print_endline "LOOK";*)
   let ieprods = index_enhanced_productions eprods in
   let lookahead' = Lookahead.compute analysis ieprods lexical T.Vars.empty in
   let nullable' = nullable analysis in
 
-  print_endline "NC";
+  (*print_endline "NC";*)
   let nc = noncanonical_subset ~supply:lr_supply3 p in
 
   let s = scanner ~supply:lr_supply2 lexical scanner_iprods in
   let s' = lr ~supply:(T.State.fresh_supply ()) s in
 
-  Fmt.pr "%i@." (T.States.cardinal (A.states p));
+  (*Fmt.pr "%i@." (T.States.cardinal (A.states p));*)
 
   (*Fmt.pr "P %s@,"  (Dot.string_of_graph (to_dot'' p));
   Fmt.pr "P %s@,"  (Dot.string_of_graph (to_dot'' s'));*)

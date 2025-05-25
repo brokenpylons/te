@@ -1,5 +1,6 @@
 open! Te_bot
 open Te_core
+open Te_top
 module T = Types
 
 module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
@@ -1253,6 +1254,8 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
   let scanner = []
 end)
 
+module B = Benchmark.Make(X)
+
 let _ =
   (*let d = X.driver (X.tables ()) in
   X.Run.file (fun c -> d#read c) "test.c";
@@ -1260,10 +1263,4 @@ let _ =
   (*Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);
   Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))*)
 
-  let t = X.tables () in
-  Array.iter (fun file ->
-      let d = X.driver t in
-      let t = Sys.time() in
-      X.Run.file (fun c -> d#read c) ("linear/" ^ file);
-      Fmt.pr "%s %b %f@." file d#accept (Sys.time() -. t))
-    (Sys.readdir "linear")
+  B.benchmark ()

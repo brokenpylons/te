@@ -1,5 +1,6 @@
 open! Te_bot
 open Te_core
+open Te_top
 module T = Types
 
 module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
@@ -126,26 +127,16 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
 
 end)
 
+module B = Benchmark.Make(X)
+
 let _ =
-  let d = X.driver (X.tables ()) in
+  (*let d = X.driver (X.tables ()) in
   let t = Sys.time() in
   X.Run.file (fun c -> d#read c) "linear/sample998998.json";
   Printf.printf "Execution time: %fs\n" (Sys.time() -. t);
-  Fmt.pr "%b@." d#accept;
+  Fmt.pr "%b@." d#accept;*)
   (*Fmt.pr "@[%a@]" Trace.pp d#trace;*)
   (*Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);*)
   (*Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))*)
 
-  (*let t = X.tables () in
-  let fs = Sys.readdir "linear" in
-  Array.sort (fun x y ->
-      let c = Int.compare (String.length x) (String.length y) in
-      if c <> 0 then c else
-      String.compare x y)
-    fs;
-  Array.iter (fun file ->
-      let d = X.driver t in
-      let t = Sys.time() in
-      X.Run.file (fun c -> d#read c) ("linear/" ^ file);
-      Fmt.pr "%s %b %f@." file d#accept (Sys.time() -. t))
-    fs*)
+  B.benchmark ()
