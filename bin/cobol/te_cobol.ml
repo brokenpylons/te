@@ -2156,4 +2156,4 @@ let _ =
   (*Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))*)
   (*Fmt.pr "@[%a@]" Trace.pp d#trace;*)
 
-  B.benchmark ()
+  B.benchmark ~overexpand:true ()

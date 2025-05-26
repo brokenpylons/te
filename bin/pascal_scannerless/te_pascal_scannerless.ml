@@ -567,7 +567,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
 
   let start = start
 
-  let (s, s') = Supply.split2 s
+  let (s, _s') = Supply.split2 s
 
   let parser =
     (with_ws (T.Vars.of_list lexical') (var ws) @@ unextend s u Production.[
@@ -851,7 +851,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     let apostrophe_image = R.(codes "'" * codes "'") in
     let string_character = not_codes "'" in
     let string_element = R.(apostrophe_image + string_character) in
-    unextend s' u Production.[
+    (*unextend s' u*) Production.[
       make (u, identifier) R.(letter * star (letter + digit));
       make (u, directive) R.(letter * star (letter + digit));
       make (u, unsigned_number) R.(unsigned_integer + unsigned_real);

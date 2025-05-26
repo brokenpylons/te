@@ -19,8 +19,8 @@ module Make(X: RUNNER) = struct
     close_in ch;
     string
 
-  let benchmark () =
-    let t = X.tables () in
+  let benchmark ?overexpand () =
+    let t = X.tables ?overexpand () in
     Gc.compact ();
 
     let fs = Sys.readdir "linear" in

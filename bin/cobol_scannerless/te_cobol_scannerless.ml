@@ -1599,7 +1599,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
 
     let start = start
 
-    let (s, s') = Supply.split2 s
+    let (s, _s') = Supply.split2 s
 
     let parser =
       (with_ws (T.Vars.of_list lexical') (var ws) @@ unextend s u Production.[
@@ -2138,7 +2138,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
       let eighteight_ = text "88" in
       let level_number_ = R.(opt (codes "+-") * (plus digit)) in
       let id_ = R.(letter * star (letter + digit) * star (plus (codes "-_") * plus (letter + digit))) in
-      unextend s' u Production.[
+      (*unextend s' u*) Production.[
         make (u, id) id_;
         make (u, cobol_word) id_;
         make (u, nonnumeric) R.(string + dbcs + hexnumber + nullterminated);

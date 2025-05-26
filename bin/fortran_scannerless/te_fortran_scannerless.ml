@@ -1244,7 +1244,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
 
   let start = start
 
-  let (s, s') = Supply.split2 s
+  let (s, _s') = Supply.split2 s
 
   let parser =
     (with_ws (T.Vars.of_list lexical') (var ws) @@ unextend s u Production.[
@@ -1921,7 +1921,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     let hex_digit = R.(digit + range "A" "F" + range "a" "f") in
     let octal_digit = range "0" "7" in
     let binary_digit = codes "01" in
-    unextend s' u Production.[
+    (*unextend s' u*) Production.[
       make (u, ident) ident_;
       make (u, sign) sign_;
       make (u, letter) letter_;

@@ -93,7 +93,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
 
   let start = start
 
-  let (s, s') = Supply.split2 s
+  let (s, _s') = Supply.split2 s
 
   let parser =
     (with_ws (T.Vars.of_list lexical') (var ws) @@ unextend s u (Production.[
@@ -125,7 +125,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     let hex = R.(digit + range "A" "F" + range "a" "f") in
     let escape = R.(codes "\"\\/bfnrt" + codes "u" * hex * hex * hex * hex) in
     let characters = R.((not_codes "\"\\") + codes "\\" * escape) in
-    unextend s' u Production.[
+    (*unextend s' u*) Production.[
       make (u, number) R.(integer * opt fraction * opt exponent);
       make (u, string) R.(codes "\"" * star characters * codes "\"");
       make (u, true_) (text "true");

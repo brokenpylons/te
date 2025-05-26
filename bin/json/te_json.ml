@@ -139,4 +139,4 @@ let _ =
   (*Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);*)
   (*Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))*)
 
-  B.benchmark ()
+  B.benchmark ~overexpand:true ()
