@@ -847,7 +847,7 @@ let enhance sa a =
       A.labels a_from a, next)
     start start
 
-let extract a =
+(*let extract a =
   PA.unfold (fun _ from ->
       let next =
         PA.adjacent from a
@@ -877,6 +877,34 @@ let enhanced_productions start ea =
   |> Seq.filter (fun (_, _, lts) -> Enhanced_lits.is_delegate lts)
   |> Seq.flat_map (fun (s, q, _) -> enhanced_production start s q ea)
   |> Seq.append (enhanced_production start (PA.start ea) (PA.start ea) ea)
+  |> Seq.memoize*)
+
+let extract a =
+  PA.unfold (fun _ from ->
+      let next =
+        PA.adjacent from a
+        |> Seq.filter_map (fun (s, lts) ->
+            if Enhanced_lits.is_delegate lts
+            then None
+            else Some (lts, s, s))
+      in
+      (PA.labels from a, next))
+    (PA.start a) (PA.start a)
+
+let enhanced_production (s, _) q ea =
+  Seq.map (fun Item.{number; lhs = (_, var); _}  ->
+      Enhanced_production.{
+        number;
+        lhs = (s, var);
+        rhs = extract @@ PA.tail q ea;
+      })
+    (Items.to_seq @@ PA.labels q ea)
+
+let enhanced_productions _start ea =
+  PA.transitions ea
+  |> Seq.filter (fun (_, _, lts) -> Enhanced_lits.is_delegate lts)
+  |> Seq.flat_map (fun (s, q, _) -> enhanced_production s q ea)
+  |> Seq.append (enhanced_production (PA.start ea) (PA.start ea) ea)
   |> Seq.memoize
 
 module Bool_set = struct
