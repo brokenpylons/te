@@ -573,6 +573,7 @@ module Actions = struct
   let is_empty x =
     not x.accept &&
     not x.shift &&
+    not x.load &&
     Vars.is_empty x.orders &&
     Labeled_vars.is_empty x.matches &&
     Vars.is_empty x.predictions &&

@@ -198,7 +198,7 @@ module Make(Tables: TABLES) = struct
                 forest <- Forest.add n forest;
               end;
               forest <- Forest.pack n (T.Vars.singleton @@ T.Labeled_var.label output) [] forest
-            | None -> ())
+            | None -> assert false)
           (Orders'.find_multiple_or_empty w orders
            |> Orders.find_multiple_or_empty (T.Labeled_var.var output))
 
@@ -254,7 +254,7 @@ module Make(Tables: TABLES) = struct
                       (ns @ ns')
                       forest)
                 (self#enumerate pos r.reminder)
-            | None -> ())
+            | None -> assert false)
           (self#find_paths ?filter v l r.strategy)
 
       method private expand v =
@@ -263,15 +263,15 @@ module Make(Tables: TABLES) = struct
           (let pos = T.Vertex.position v in
            let u = T.Vertex.make s pos in
            self#log (Trace.expand v u);
-           read1 <- Segments.add u v read1
-           (*if not (Gss.contains u stack) then begin
+           (*read1 <- Segments.add u v read1;*)
+           if not (Gss.contains u stack) then begin
              stack <- Gss.add u stack;
              subclasses <- Subclasses.add pos u subclasses;
            end;
            if not (Gss.contains_edge u v stack) then begin
              stack <- Gss.connect u v T.Nodes.empty stack;
              read1 <- Segments.add u v read1
-           end*))
+           end)
         | None -> ()
 
       method read x = begin
@@ -303,15 +303,15 @@ module Make(Tables: TABLES) = struct
                   let pos = succ @@ T.Vertex.position w in
                   let u = T.Vertex.make s pos in
                   self#log (Trace.read x v w u );
-                  read1 <- Segments.add u v read1;
-                  (*if not (Gss.contains u stack) then begin
+                  (*read1 <- Segments.add u v read1;*)
+                  if not (Gss.contains u stack) then begin
                     stack <- Gss.add u stack;
                     subclasses <- Subclasses.add pos u subclasses;
                   end;
                   if not (Gss.contains_edge u v stack) then begin
                     stack <- Gss.connect u v T.Nodes.empty stack;
                     read1 <- Segments.add u v read1
-                  end*)
+                  end
                 | None -> ())
               l)
           (Segments.to_seq_multiple read0);

@@ -1221,7 +1221,7 @@ let predictions lexical lookahead' _ s' a =
 let null lexical lookahead' nullable' s' a =
   let (let*) = Seq.bind in
   let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
-  let* {number; lhs = (label, var); rhs; state; is_kernel; is_reduce; _} = Items.to_seq its in
+  let* {number; lhs = (label, var); rhs; state; is_kernel; _} = Items.to_seq its in
   let right_nulled = (lookahead' number s state).Lookahead.right_nulled in
   let* () = Seq.guard (not @@ T.Vars.mem var lexical && not @@ is_kernel && right_nulled) in
   Seq.return
@@ -1230,9 +1230,7 @@ let null lexical lookahead' nullable' s' a =
                        (T.Reduction.make
                           (label, var)
                           Null
-                          (if not is_reduce
-                           then Lists (resolve_tail nullable' rhs)
-                           else Complete))))
+                          (Lists (resolve_tail nullable' rhs)))))
 
 let shift_null lexical lookahead' nullable' s' a =
   let (let*) = Seq.bind in
@@ -1323,7 +1321,6 @@ let actions' lexical lookahead' nullable s a =
   |> Seq.filter (fun (lts, _) -> not @@ Lits.is_empty lts)
   |> Seq.map (fun (lts, x) -> Actions_multimap.singleton_multiple lts x)
   |> Seq.fold_left Actions_multimap.union Actions_multimap.empty
-
 
 let with_actions lexical lookahead' nullable a =
   A.map_labels (fun s _ ->
@@ -1446,6 +1443,16 @@ let build overexpand syntactic lexical labels longest_match start parser_prods s
   Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot (with_actions lexical lookahead' nc)));*)
 
   (*Fmt.pr "%s@,"  (Dot.string_of_graph (to_dot (with_actions lexical lookahead' nullable' nc)));*)
+
+  (*Fmt.pr "%s@," (Dot.string_of_graph (to_dot (with_actions lexical lookahead' nullable' nc)));*)
+
+  Fmt.pr "LK %s@,"  (Dot.string_of_graph (to_dot''''' (with_lookahead lookahead' (A.map_labels (fun _ -> Noncanonical_items.join) nc))));
+
+  Fmt.pr "ITMS %s@,"  (Dot.string_of_graph (to_dot'' (A.map_labels (fun _ -> Noncanonical_items.join) nc)));
+
+  Fmt.pr "E %s@,"  (Dot.string_of_graph (to_dote back));
+
+  Fmt.pr "%s@," (Dot.string_of_graph (to_dot (with_actions lexical lookahead' nullable' nc)));
 
   (lookahead', nullable', nc, back)
 

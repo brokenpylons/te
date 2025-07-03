@@ -488,7 +488,7 @@ module Same_label_reduce = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     open Context
 
     let Vector.[s'; s; a; b; u] = variables Vector.["S'"; "S"; "A"; "B"; "_"]
-    let syntactic = [s'; s; a]
+    let syntactic = [s'; s; a; b]
     let lexical = []
     let labels = [u]
 
@@ -760,7 +760,7 @@ module Repeat_load2 = Spec.Test(functor(Context: Spec.CONTEXT) -> struct
     open Context
 
     let Vector.[s'; s; a; u] = variables Vector.["S'"; "S"; "A"; "_"]
-    let syntactic = [s'; s]
+    let syntactic = [s'; s; a]
     let lexical = []
     let labels = [u]
 
