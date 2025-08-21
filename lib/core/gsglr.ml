@@ -89,14 +89,10 @@ module Make(Tables: TABLES) = struct
               self#scan_back ~history v' ns' (Gss.adjacent v' ns' stack) p')
               paths
 
-      method private enumerate pos (xss: T.Reduction.Reminder.t) =
-        match xss with
-        | Lists xss ->
-          List.map (fun xs ->
-              List.map (fun x -> T.Node.make (Var x) pos pos) xs)
-            xss
-        | Gen _ -> failwith "Not supported"
-        | Complete -> [[]]
+      method private enumerate pos xss =
+        List.map (fun xs ->
+            List.map (fun x -> T.Node.make (Var x) pos pos) xs)
+          xss
 
       method private find_paths ?filter v l (strategy: T.Reduction.Strategy.t)  =
         let init =
@@ -181,6 +177,8 @@ module Make(Tables: TABLES) = struct
             | Some s ->
               let u = T.Vertex.make s pos in
               let n = T.Node.make (Var (T.Labeled_var.var output)) (T.Vertex.position v') pos in
+              let ns' = try Gss.node u w stack with Not_found -> T.Nodes.empty in
+
               self#log (Trace.shift output v w v' u);
               if not (Gss.contains u stack) then begin
                 stack <- Gss.add u stack;
@@ -193,12 +191,12 @@ module Make(Tables: TABLES) = struct
                 reduce <- Segments.add u v' reduce;
                 shift1 <- Segments.add u v' shift1;
                 forest <- Forest.add n forest;
-              end else if not (Forest.mem n forest) then begin
+              end else if not (T.Nodes.mem n ns') then begin
                 stack <- Gss.connect u v' (T.Nodes.add n @@ Gss.node u v' stack) stack;
                 forest <- Forest.add n forest;
               end;
               forest <- Forest.pack n (T.Vars.singleton @@ T.Labeled_var.label output) [] forest
-            | None -> assert false)
+            | None -> ())
           (Orders'.find_multiple_or_empty w orders
            |> Orders.find_multiple_or_empty (T.Labeled_var.var output))
 
@@ -224,6 +222,7 @@ module Make(Tables: TABLES) = struct
               let u = T.Vertex.make s pos in
               let n = T.Node.make (Var (T.Labeled_var.var r.output)) (T.Vertex.position w) pos in
               self#log (Trace.reduce r.output v w u);
+              let ns' = try Gss.node u w stack with Not_found -> T.Nodes.empty in
 
               if not (Gss.contains u stack) then begin
                 stack <- Gss.add u stack;
@@ -239,7 +238,7 @@ module Make(Tables: TABLES) = struct
                 match r.strategy with
                 | Null -> ()
                 | _ -> self#parse_actor ~null:false u (T.Vertices.singleton w) xs
-              end else if not (Forest.mem n forest) then begin
+              end else if not (T.Nodes.mem n ns') then begin
                 stack <- Gss.connect u w (T.Nodes.add n @@ Gss.node u w stack) stack;
                 forest <- Forest.add n forest;
                 match r.strategy with
@@ -254,7 +253,7 @@ module Make(Tables: TABLES) = struct
                       (ns @ ns')
                       forest)
                 (self#enumerate pos r.reminder)
-            | None -> assert false)
+            | None -> ())
           (self#find_paths ?filter v l r.strategy)
 
       method private expand v =

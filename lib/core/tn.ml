@@ -1071,6 +1071,7 @@ module Lookahead = struct
       shift_lookahead: Enhanced_lits.t;
       reduce_lookahead: Enhanced_lits.t;
       code_lookahead: Enhanced_lits.t;
+      reduce_lookahead2: Enhanced_lits.t;
       lexical_lookahead: Enhanced_lits.t;
     }
 
@@ -1086,6 +1087,11 @@ let compute analysis lookback lexical longest_match =
       |> List.map (fun lhs -> analysis.Analysis.follow_per_state (number, lhs) (s, q))
       |> List.fold_left Enhanced_lits.union Enhanced_lits.empty
     in
+    let lexical_lts = Lits.of_vars lexical in
+    let lexical_lookahead =
+      shift_lookahead
+      |> Enhanced_lits.restrict (fun _ -> Lits.inter lexical_lts)
+    in
     let reduce_lookahead =
       lhss
       |> List.filter_map (fun ((_, var) as lhs) ->
@@ -1099,18 +1105,22 @@ let compute analysis lookback lexical longest_match =
           else None)
       |> List.fold_left Enhanced_lits.union Enhanced_lits.empty
     in
-    let lexical_lookahead =
-      let lexical_lts = Lits.of_vars lexical in
-      shift_lookahead
-      |> Enhanced_lits.restrict (fun _ -> Lits.inter lexical_lts)
-    in
     let code_lookahead =
       Enhanced_lits.diff shift_lookahead (analysis.Analysis.first_per_lits lexical_lookahead)
       |> Enhanced_lits.restrict (fun _ lts -> Lits.union
                                     (Lits.extract_codes lts)
                                     (Lits.extract_eof lts))
     in
-    {right_nulled; shift_lookahead; reduce_lookahead; lexical_lookahead; code_lookahead}
+    let reduce_lookahead2 =
+      Enhanced_lits.diff reduce_lookahead
+        (reduce_lookahead
+         |> Enhanced_lits.restrict (fun _ -> Lits.inter lexical_lts)
+         |> analysis.Analysis.first_per_lits
+         |> Enhanced_lits.restrict (fun _ lts -> Lits.union
+                                       (Lits.extract_codes lts)
+                                       (Lits.extract_eof lts)))
+    in
+    {right_nulled; shift_lookahead; reduce_lookahead; lexical_lookahead; code_lookahead; reduce_lookahead2}
   in
   let table = ref Numbered_state_pair_to.empty in
   fun number s q ->
@@ -1205,8 +1215,9 @@ let matches lexical lookahead' _ s' a =
   let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
   let* {number; lhs = (label, var); state; is_kernel; is_reduce; _} = Items.to_seq its in
   let* () = Seq.guard (T.Vars.mem var lexical && is_kernel && is_reduce) in
+  let la = Enhanced_lits.strip @@ (lookahead' number s state).Lookahead.reduce_lookahead in
   Seq.return
-    (Enhanced_lits.strip @@ (lookahead' number s state).Lookahead.reduce_lookahead,
+    (Lits.union (Lits.extract_codes la) (Lits.extract_eof la),
      T.Actions.matches (T.Labeled_vars.singleton (label, var)))
 
 let predictions lexical lookahead' _ s' a =
@@ -1214,8 +1225,9 @@ let predictions lexical lookahead' _ s' a =
   let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
   let* {number; lhs = (_, var); state; _} = Items.to_seq its in
   let* () = Seq.guard (T.Vars.mem var lexical) in
+  let la = Enhanced_lits.strip @@ (lookahead' number s state).Lookahead.shift_lookahead in
   Seq.return
-    (Enhanced_lits.strip @@ (lookahead' number s state).Lookahead.shift_lookahead,
+    (Lits.union (Lits.extract_codes la) (Lits.extract_eof la),
      T.Actions.predictions (T.Vars.singleton var))
 
 let null lexical lookahead' nullable' s' a =
@@ -1225,29 +1237,32 @@ let null lexical lookahead' nullable' s' a =
   let right_nulled = (lookahead' number s state).Lookahead.right_nulled in
   let* () = Seq.guard (not @@ T.Vars.mem var lexical && not @@ is_kernel && right_nulled) in
   Seq.return
-    (Enhanced_lits.strip @@ (lookahead' number s state).Lookahead.reduce_lookahead,
+    (Enhanced_lits.strip @@ (lookahead' number s state).Lookahead.reduce_lookahead2,
      T.Actions.null (T.Reductions.singleton
                        (T.Reduction.make
                           (label, var)
                           Null
-                          (Lists (resolve_tail nullable' rhs)))))
+                          (resolve_tail nullable' rhs))))
 
 let shift_null lexical lookahead' nullable' s' a =
   let (let*) = Seq.bind in
+  let lts' =
+    A.adjacent s' a
+    |> Seq.map (fun (_, lts) -> lts)
+    |> Seq.fold_left Lits.union Lits.empty
+  in
   let* (q, lts) = A.adjacent s' a in
   let* () = Seq.guard (Lits.is_scan' lts) in
   let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels q a) in
-  let* {number; lhs = (label, var); rhs; state; is_kernel; is_reduce; _} = Items.to_seq its in
+  let* {number; lhs = (label, var); rhs; state; is_kernel; _} = Items.to_seq its in
   let right_nulled = (lookahead' number s state).Lookahead.right_nulled in
-  let* () = Seq.guard (T.Vars.mem var lexical && not @@ is_kernel && right_nulled) in
+  let* () = Seq.guard (T.Vars.mem var lexical && not @@ is_kernel && right_nulled && T.Vars.mem var (Lits.to_vars lts')) in
   Seq.return
-    (Enhanced_lits.strip @@ (lookahead' number s state).Lookahead.reduce_lookahead,
+    (Enhanced_lits.strip @@ (lookahead' number s state).Lookahead.reduce_lookahead2,
      T.Actions.null (T.Reductions.singleton
                        (T.Reduction.make (label, var)
                           Null
-                          (if not is_reduce
-                           then Lists (resolve_tail nullable' rhs)
-                           else Complete))))
+                          (resolve_tail nullable' rhs))))
 
 let select_strategy distance s' q =
   match Size.to_int @@ distance with
@@ -1257,17 +1272,15 @@ let select_strategy distance s' q =
 let reduce lexical lookahead' nullable' s' a =
   let (let*) = Seq.bind in
   let* (s, its) = Noncanonical_items.to_seq_multiple (A.labels s' a) in
-  let* {number; lhs = (label, var); rhs; state; is_kernel; is_reduce; distance} = Items.to_seq its in
+  let* {number; lhs = (label, var); rhs; state; is_kernel; distance; _} = Items.to_seq its in
   let right_nulled = (lookahead' number s state).Lookahead.right_nulled in
   let* () = Seq.guard (not @@ T.Vars.mem var lexical && is_kernel && right_nulled) in
   Seq.return
-    (Enhanced_lits.strip @@ (lookahead' number s state).Lookahead.reduce_lookahead,
+    (Enhanced_lits.strip @@ (lookahead' number s state).Lookahead.reduce_lookahead2,
      T.Actions.reduce (T.Reductions.singleton
                          (T.Reduction.make (label, var)
                             (select_strategy distance s' state)
-                            (if not is_reduce
-                             then Lists (resolve_tail nullable' rhs)
-                             else Complete))))
+                            (resolve_tail nullable' rhs))))
 
 let accept start lookahead' s' a =
   let (let*) = Seq.bind in
@@ -1432,7 +1445,7 @@ let build overexpand syntactic lexical labels longest_match start parser_prods s
   (*Fmt.pr "C %s@,"  (Dot.string_of_graph (to_dot'' c));*)
   (*Fmt.pr "E %s@,"  (Dot.string_of_graph (to_dot''' e));*)
 
-  (*print_productions eprods1;*)
+  (*print_productions' eprods;*)
 
   (*Fmt.pr "NL %s@,"  (Dot.string_of_graph (to_dot' (with_nullable lookahead' (A.map_labels (fun _ -> Noncanonical_items.join) nc))));
 
@@ -1448,9 +1461,14 @@ let build overexpand syntactic lexical labels longest_match start parser_prods s
 
   Fmt.pr "LK %s@,"  (Dot.string_of_graph (to_dot''''' (with_lookahead lookahead' (A.map_labels (fun _ -> Noncanonical_items.join) nc))));
 
+  Fmt.pr "ITMS' %s@,"  (Dot.string_of_graph (to_dot'' c));
+
+
   Fmt.pr "ITMS %s@,"  (Dot.string_of_graph (to_dot'' (A.map_labels (fun _ -> Noncanonical_items.join) nc)));
 
   Fmt.pr "E %s@,"  (Dot.string_of_graph (to_dote back));
+
+  Fmt.pr "E' %s@,"  (Dot.string_of_graph (to_dote e));
 
   Fmt.pr "%s@," (Dot.string_of_graph (to_dot (with_actions lexical lookahead' nullable' nc)));
 

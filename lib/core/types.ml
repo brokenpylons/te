@@ -302,23 +302,13 @@ module Reduction = struct
       | Fixed d -> Fmt.pf ppf "FIXED %i" d
       | Scan (s, q) -> Fmt.pf ppf "SCAN (%a, %a)" State.pp s State.pp q
   end
-  module Reminder = struct
-    type t = Complete | Lists of Var.t list list | Gen of State_pair.t
-    [@@deriving eq, ord]
-
-    let pp ppf = function
-      | Complete -> Fmt.pf ppf "COMPLETE"
-      | Lists l -> Fmt.pf ppf "LIST %a" (Fmt.list (Fmt.list Var.pp)) l
-      | _ -> assert false;
-
-  end
-  type t = {output: Labeled_var.t; strategy: Strategy.t; reminder: Reminder.t}
+  type t = {output: Labeled_var.t; strategy: Strategy.t; reminder: Var.t list list }
   [@@deriving eq, ord]
 
   let make output strategy reminder = {output; strategy; reminder}
 
   let pp ppf x =
-    Fmt.pf ppf "[%a: %a %a]" Labeled_var.pp x.output Strategy.pp x.strategy Reminder.pp x.reminder
+    Fmt.pf ppf "[%a: %a %a]" Labeled_var.pp x.output Strategy.pp x.strategy (Fmt.list (Fmt.list Var.pp)) x.reminder
 end
 module Reductions = struct
   include Balanced_binary_tree.Set.Size(Reduction)

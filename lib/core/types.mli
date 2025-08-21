@@ -305,13 +305,8 @@ module Reduction: sig
     val compare: t -> t -> int
     val equal: t -> t -> bool
   end
-  module Reminder: sig
-    type t = Complete | Lists of Var.t list list | Gen of State_pair.t
-    val compare: t -> t -> int
-    val equal: t -> t -> bool
-  end
-  type t = private {output: Labeled_var.t; strategy: Strategy.t; reminder: Reminder.t}
-  val make: Labeled_var.t -> Strategy.t -> Reminder.t -> t
+  type t = private {output: Labeled_var.t; strategy: Strategy.t; reminder: Var.t list list}
+  val make: Labeled_var.t -> Strategy.t -> Var.t list list -> t
 
   val compare: t -> t -> int
   val equal: t -> t -> bool

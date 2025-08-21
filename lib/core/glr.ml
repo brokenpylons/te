@@ -66,14 +66,10 @@ module Make(Tables: TABLES) = struct
             self#successors v' ns' (Gss.adjacent v' ns' stack) (pred d))
             paths
 
-      method private enumerate pos (xss: T.Reduction.Reminder.t) =
-        match xss with
-        | Lists xss ->
-          List.map (fun xs ->
-              List.map (fun x -> T.Node.make (Var x) pos pos) xs)
-            xss
-        | Gen _ -> failwith "Not supported"
-        | Complete -> [[]]
+      method private enumerate pos xss =
+        List.map (fun xs ->
+            List.map (fun x -> T.Node.make (Var x) pos pos) xs)
+          xss
 
       method private find_paths ?filter v l (strategy: T.Reduction.Strategy.t)  =
         let init =
