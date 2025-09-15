@@ -17,9 +17,12 @@ declare -a dirs=(
   cobol_scannerless
 )
 
-for dir in "${dirs[@]}"
+for i in {1..10}
 do
-  pushd "$dir"
-  dune exec "./te_$dir.exe" | tee results.txt
-  popd
+  for dir in "${dirs[@]}"
+  do
+    pushd "$dir"
+    dune exec "./te_$dir.exe" | tee "results${i}.txt"
+    popd
+  done
 done
