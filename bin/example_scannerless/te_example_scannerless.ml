@@ -4,9 +4,9 @@ module T = Types
 
 module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     open Context
-    let Vector.[s'; s; a; b; c; u] = variables Vector.["S'"; "S"; "A"; "B"; "C"; "_"]
+    let Vector.[s'; s; a; b; u] = variables Vector.["S'"; "S"; "A"; "B"; "_"]
     let syntactic = [s'; s; a; b]
-    let lexical = [c]
+    let lexical = []
     let labels = [u]
     let longest_match = []
 
@@ -15,19 +15,19 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     let parser =
       Production.[
         make (u, s') R.(var s * plus eof);
-        make (u, s) R.(var a * (codes "y" + var c));
-        make (u, a) (codes "x");
+        make (u, s) R.(var a * codes "y");
+        make (u, a) R.(star (var b));
+        make (u, b) (codes "x");
       ]
 
     let scanner =
-      Production.[
-      make (u, c) R.(codes "z" * codes "z");
-    ]
+      []
 end)
 
 let _ =
   let d = X.driver (X.tables ()) in
   let open X.Run in
+  d#read (code "x");
   d#read (code "x");
   d#read (code "y");
   d#read eof;
