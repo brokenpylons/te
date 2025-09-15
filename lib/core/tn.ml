@@ -1069,9 +1069,9 @@ module Lookahead = struct
     {
       right_nulled: bool;
       shift_lookahead: Enhanced_lits.t;
-      reduce_lookahead: Enhanced_lits.t;
       code_lookahead: Enhanced_lits.t;
-      reduce_lookahead2: Enhanced_lits.t;
+      reduce_lookahead: Enhanced_lits.t;
+      parser_reduce_lookahead: Enhanced_lits.t;
       lexical_lookahead: Enhanced_lits.t;
     }
 
@@ -1111,7 +1111,7 @@ let compute analysis lookback lexical longest_match =
                                     (Lits.extract_codes lts)
                                     (Lits.extract_eof lts))
     in
-    let reduce_lookahead2 =
+    let parser_reduce_lookahead =
       Enhanced_lits.diff reduce_lookahead
         (reduce_lookahead
          |> Enhanced_lits.restrict (fun _ -> Lits.inter lexical_lts)
@@ -1120,7 +1120,7 @@ let compute analysis lookback lexical longest_match =
                                        (Lits.extract_codes lts)
                                        (Lits.extract_eof lts)))
     in
-    {right_nulled; shift_lookahead; reduce_lookahead; lexical_lookahead; code_lookahead; reduce_lookahead2}
+    {right_nulled; shift_lookahead; reduce_lookahead; lexical_lookahead; code_lookahead; parser_reduce_lookahead}
   in
   let table = ref Numbered_state_pair_to.empty in
   fun number s q ->
@@ -1237,7 +1237,7 @@ let null lexical lookahead' nullable' s' a =
   let right_nulled = (lookahead' number s state).Lookahead.right_nulled in
   let* () = Seq.guard (not @@ T.Vars.mem var lexical && not @@ is_kernel && right_nulled) in
   Seq.return
-    (Enhanced_lits.strip @@ (lookahead' number s state).Lookahead.reduce_lookahead2,
+    (Enhanced_lits.strip @@ (lookahead' number s state).Lookahead.parser_reduce_lookahead,
      T.Actions.null (T.Reductions.singleton
                        (T.Reduction.make
                           (label, var)
@@ -1258,7 +1258,7 @@ let shift_null lexical lookahead' nullable' s' a =
   let right_nulled = (lookahead' number s state).Lookahead.right_nulled in
   let* () = Seq.guard (T.Vars.mem var lexical && not @@ is_kernel && right_nulled && T.Vars.mem var (Lits.to_vars lts')) in
   Seq.return
-    (Enhanced_lits.strip @@ (lookahead' number s state).Lookahead.reduce_lookahead2,
+    (Enhanced_lits.strip @@ (lookahead' number s state).Lookahead.parser_reduce_lookahead,
      T.Actions.null (T.Reductions.singleton
                        (T.Reduction.make (label, var)
                           Null
@@ -1276,7 +1276,7 @@ let reduce lexical lookahead' nullable' s' a =
   let right_nulled = (lookahead' number s state).Lookahead.right_nulled in
   let* () = Seq.guard (not @@ T.Vars.mem var lexical && is_kernel && right_nulled) in
   Seq.return
-    (Enhanced_lits.strip @@ (lookahead' number s state).Lookahead.reduce_lookahead2,
+    (Enhanced_lits.strip @@ (lookahead' number s state).Lookahead.parser_reduce_lookahead,
      T.Actions.reduce (T.Reductions.singleton
                          (T.Reduction.make (label, var)
                             (select_strategy distance s' state)
@@ -1318,7 +1318,7 @@ let actions_classic lexical lookahead' nullable s a =
 let with_lookahead lookahead' a =
   A.map_labels (fun s its ->
       Seq.map (fun Item.{number; lhs; state; _} ->
-          (lhs, (lookahead' number s state).Lookahead.code_lookahead))
+          (lhs, (lookahead' number s state).Lookahead.reduce_lookahead))
         (Items.to_seq its))
     a
 
@@ -1459,10 +1459,11 @@ let build overexpand syntactic lexical labels longest_match start parser_prods s
 
   (*Fmt.pr "%s@," (Dot.string_of_graph (to_dot (with_actions lexical lookahead' nullable' nc)));*)
 
-  Fmt.pr "LK %s@,"  (Dot.string_of_graph (to_dot''''' (with_lookahead lookahead' (A.map_labels (fun _ -> Noncanonical_items.join) nc))));
+  (*Fmt.pr "LK %s@,"  (Dot.string_of_graph (to_dot''''' (with_lookahead lookahead' (A.map_labels (fun _ -> Noncanonical_items.join) nc))));
 
   Fmt.pr "ITMS' %s@,"  (Dot.string_of_graph (to_dot'' c));
 
+  Fmt.pr "ITMS2 %s@,"  (Dot.string_of_graph (to_dot'' p));
 
   Fmt.pr "ITMS %s@,"  (Dot.string_of_graph (to_dot'' (A.map_labels (fun _ -> Noncanonical_items.join) nc)));
 
@@ -1470,7 +1471,7 @@ let build overexpand syntactic lexical labels longest_match start parser_prods s
 
   Fmt.pr "E' %s@,"  (Dot.string_of_graph (to_dote e));
 
-  Fmt.pr "%s@," (Dot.string_of_graph (to_dot (with_actions lexical lookahead' nullable' nc)));
+  Fmt.pr "%s@," (Dot.string_of_graph (to_dot (with_actions lexical lookahead' nullable' nc)));*)
 
   (lookahead', nullable', nc, back)
 
