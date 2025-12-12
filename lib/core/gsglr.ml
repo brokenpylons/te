@@ -177,7 +177,7 @@ module Make(Tables: TABLES) = struct
             | Some s ->
               let u = T.Vertex.make s pos in
               let n = T.Node.make (Var (T.Labeled_var.var output)) (T.Vertex.position v') pos in
-              let ns' = try Gss.node u w stack with Not_found -> T.Nodes.empty in
+              let ns' = try Gss.node u v' stack with Not_found -> T.Nodes.empty in
 
               self#log (Trace.shift output v w v' u);
               if not (Gss.contains u stack) then begin
@@ -247,7 +247,7 @@ module Make(Tables: TABLES) = struct
               end;
               orders <- Orders'.add_multiple v (Orders'.find_multiple_or_empty u orders) orders;
               List.iter (fun ns' ->
-                  forest <- Forest.pack 
+                  forest <- Forest.pack
                       n
                       (T.Vars.singleton @@ T.Labeled_var.label r.output)
                       (ns @ ns')
@@ -262,7 +262,7 @@ module Make(Tables: TABLES) = struct
           (let pos = T.Vertex.position v in
            let u = T.Vertex.make s pos in
            self#log (Trace.expand v u);
-           (*read1 <- Segments.add u v read1;*)
+           (*read1 <- Segments.add u v read1)*)
            if not (Gss.contains u stack) then begin
              stack <- Gss.add u stack;
              subclasses <- Subclasses.add pos u subclasses;
@@ -274,7 +274,7 @@ module Make(Tables: TABLES) = struct
         | None -> ()
 
       method read x = begin
-        (*Fmt.pr "@,COMPLETE %a@," T.Symbol.pp x;*)
+        (*Fmt.pr "@,COMPLETE %a@,@." T.Symbol.pp x;*)
         (*Fmt.pr "R %a@," (T.Vertex_to.pp (Fmt.parens T.Vertices.pp)) read1;*)
         Seq.iter (fun (w, l) ->
             self#scan_actor w l [x])

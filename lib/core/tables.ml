@@ -31,12 +31,15 @@ let goto a =
   |> T.State_to.of_seq
 
 let orders lexical a =
-  A.to_segments a
+  let x = A.to_segments a
   |> Seq.map (fun ((s, _), adj) ->
       (s, adj
           |> Seq.map (fun (_, lts) -> T.Vars.inter lexical (Lits.to_vars lts))
           |> Seq.fold_left T.Vars.union T.Vars.empty))
   |> T.State_to.of_seq
+  in
+  Fmt.pr "{{%a}}" (T.State_to.pp T.Vars.pp) x;
+  x
 
 let matches lexical a =
   A.states a

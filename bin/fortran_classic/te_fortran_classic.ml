@@ -1749,6 +1749,7 @@ module X = Spec.Classic(functor(Context: Spec.CONTEXT) -> struct
     let hex_digit = R.(digit + range "A" "F" + range "a" "f") in
     let octal_digit = range "0" "7" in
     let binary_digit = codes "01" in
+    let predefined = R.(text ".EQV." + text ".NEQV." + text ".OR." + text ".AND." + text ".NOT." + text ".TRUE." + text ".FALSE." + text ".EQ." + text ".NE." + text ".LT." + text ".LE." + text ".GT." + text ".GE.") in
     Production.[
       make (u, ident) ident_;
       make (u, sign) sign_;
@@ -1768,7 +1769,7 @@ module X = Spec.Classic(functor(Context: Spec.CONTEXT) -> struct
       make (u, logical_constant) R.(text ".TRUE." * opt (codes "_" * kind_param) + text ".FALSE." * opt (codes "_" * kind_param));
 
       make (u, char_string_edit_descr) R.(char_literal_constant_ * digit_string * codes "Hh" * plus any);
-      make (u, dop) R.(codes "." * plus letter_ * codes ".");
+      make (u, dop) R.(diff (codes "." * plus letter_ * codes ".") predefined);
       make (u, label) int_literal_constant_;
 
       make (u, perc) (text "%");

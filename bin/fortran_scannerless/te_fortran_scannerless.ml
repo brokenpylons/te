@@ -1939,7 +1939,7 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
 
       make (u, logical_constant) R.(text ".TRUE." * opt (codes "_" * kind_param) + text ".FALSE." * opt (codes "_" * kind_param));
 
-      make (u, char_string_edit_descr) R.(char_literal_constant_ * digit_string * codes "Hh" * plus any);
+      make (u, char_string_edit_descr) R.(char_literal_constant_ * digit_string * codes "Hh" * ident_);
       make (u, dop) R.(codes "." * plus letter_ * codes ".");
       make (u, label) int_literal_constant_;
 

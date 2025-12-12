@@ -35,7 +35,7 @@ module X = Spec.Classic(functor(Context: Spec.CONTEXT) -> struct
   let (number', s) = variable s "number'"
   let (true', s) = variable s "true'"
   let (false', s) = variable s "false'"
-  let (null', _) = variable s "null'"
+  let (null', s) = variable s "null'"
 
   let (u, s) = variable s "u"
   let (e, s) = variable s "e"
@@ -87,7 +87,7 @@ module X = Spec.Classic(functor(Context: Spec.CONTEXT) -> struct
     unextend s u @@ with_ws (T.Vars.of_list lexical) R.(opt (var ws)) (Production.[
       make (u, start) R.(var json * var e * var e');
       make (u, e') R.(var e * var e' + null);
-      make (u, json) R.(var ws * var value);
+      make (u, json) R.(opt (var ws) * var value);
 
       make (object', value) (var object_);
       make (array', value) (var array);
@@ -138,10 +138,10 @@ module B = Benchmark.Make(X)
 let _ =
   (*let d = X.driver (X.tables ()) in
   let t = Sys.time() in
-  X.Run.file (fun c -> d#read c) "linear/sample998998.json";
+  X.Run.file (fun c -> d#read c) "linear/sample80080.json";
   Printf.printf "Execution time: %fs\n" (Sys.time() -. t);
-  Fmt.pr "%b@." d#accept;*)
-  (*Fmt.pr "%a@." Trace.pp d#trace;*)
+  Fmt.pr "%b@." d#accept;
+  Fmt.pr "%a@." Trace.pp d#trace;*)
   (*Fmt.pr "@[%a@]" Trace.pp d#trace;*)
   (*Fmt.pr "@[%s@]" (Dot.string_of_graph d#to_dot);*)
   (*Fmt.pr "@[%s@]" (Dot.string_of_graph (T.Node_packed_forest.to_dot d#forest))*)

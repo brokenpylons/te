@@ -1459,7 +1459,7 @@ let build overexpand syntactic lexical labels longest_match start parser_prods s
 
   (*Fmt.pr "%s@," (Dot.string_of_graph (to_dot (with_actions lexical lookahead' nullable' nc)));*)
 
-  (*Fmt.pr "LK %s@,"  (Dot.string_of_graph (to_dot''''' (with_lookahead lookahead' (A.map_labels (fun _ -> Noncanonical_items.join) nc))));
+  Fmt.pr "LK %s@,"  (Dot.string_of_graph (to_dot''''' (with_lookahead lookahead' (A.map_labels (fun _ -> Noncanonical_items.join) nc))));
 
   Fmt.pr "ITMS' %s@,"  (Dot.string_of_graph (to_dot'' c));
 
@@ -1471,7 +1471,7 @@ let build overexpand syntactic lexical labels longest_match start parser_prods s
 
   Fmt.pr "E' %s@,"  (Dot.string_of_graph (to_dote e));
 
-  Fmt.pr "%s@," (Dot.string_of_graph (to_dot (with_actions lexical lookahead' nullable' nc)));*)
+  Fmt.pr "%s@," (Dot.string_of_graph (to_dot (with_actions lexical lookahead' nullable' nc)));
 
   (lookahead', nullable', nc, back)
 

@@ -197,7 +197,7 @@ module Make(Tables: TABLES) = struct
               shift0 <- shift1;
               shift1 <- Segments.empty;
               let matches =
-                Tables.matches t scanner.state 
+                Tables.matches t scanner.state
                 |> T.Labeled_vars.filter (fun (_, var) -> T.Vars.mem var scanner.vars)
               in
               Seq.iter (fun (w, l) ->
@@ -211,7 +211,7 @@ module Make(Tables: TABLES) = struct
                 |> Seq.fold_left T.Vars.union T.Vars.empty
               in
               match move Scanner.{pos = scanner.pos; state = Tables.start_scanner t; vars} with
-              | Some scanner' -> 
+              | Some scanner' ->
                 scanner <- scanner'
               | None -> ()
         end

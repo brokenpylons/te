@@ -49,8 +49,10 @@ module Make(X: RUNNER) = struct
           let input = read file in
           let length = String.length input in
 
+          Gc.full_major ();
           let t = Sys.time() in
           X.Run.file (fun c -> d#read c) file;
+          Gc.full_major ();
           Fmt.pr "%s %i %b %f@." file length d#accept (Sys.time() -. t);
           Unix._exit 0
         end

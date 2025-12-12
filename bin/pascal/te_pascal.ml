@@ -797,9 +797,12 @@ module X = Spec.Build(functor(Context: Spec.CONTEXT) -> struct
     let apostrophe_image = R.(codes "'" * codes "'") in
     let string_character = not_codes "'" in
     let string_element = R.(apostrophe_image + string_character) in
+    let keyword_ = R.(text "and" + text "array" + text "begin" + text "case" + text "const" + text "div" + text "do" + text "downto" + text "else" + text "end" + text "file" + text "for" + text "function" + text "goto" + text "if" + text "in" + text "label" + text "mod" + text "nil" + text "not" + text "of" + text "or" + text "packed" + text "procedure" + text "program" + text "record" + text "repeat" + text "set" + text "then" + text "to" + text "type" + text "until" + text "var" + text "while" + text "with")
+    in
+    let id_ = R.(diff (letter * star (letter + digit)) keyword_) in
     Production.[
-      make (u, identifier) R.(letter * star (letter + digit));
-      make (u, directive) R.(letter * star (letter + digit));
+      make (u, identifier) id_;
+      make (u, directive) id_;
       make (u, unsigned_number) R.(unsigned_integer + unsigned_real);
       make (u, sign) sign_;
       make (u, label) digit_sequence;

@@ -1,0 +1,4 @@
+(executable
+ (public_name te)
+ (name te_example_repeat)
+ (libraries te_top te_core te_bot))
